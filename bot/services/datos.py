@@ -70,6 +70,9 @@ class Datos:
     async def campeones_de(self, persona_id: str) -> dict | None:
         return await self._json(f"campeones/{quote(persona_id)}.json")
 
+    async def coaching(self, persona_id: str) -> dict | None:
+        return await self._json(f"coaching/{quote(persona_id)}.json")
+
     async def sinergia(self) -> dict:
         return await self._json("sinergia.json") or {"filas": []}
 

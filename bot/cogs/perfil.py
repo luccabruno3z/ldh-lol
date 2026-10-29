@@ -245,6 +245,7 @@ class Perfil(commands.Cog):
             "`-perfil [jugador]` rango, KPIs con su intervalo, forma reciente y últimas partidas\n"
             "`-roles` · `-campeones` · `-sinergia` `[jugador]` rendimiento ajustado por muestra\n"
             "`-top [semana|mes|temporada] [solo|flex|normal]` · `-top_rol <rol> [cola]` rankings del grupo\n"
+            "`-performance` · `-mejora` · `-temprano` `[jugador] [rol]` coaching contra tu franja de rango\n"
             f"Todo sale de la web: {WEB}")
 
 

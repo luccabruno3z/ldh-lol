@@ -1,4 +1,4 @@
-"""python -m ldh [ingestar|reconstruir|publicar|todo]"""
+"""python -m ldh [ingestar|reconstruir|publicar|todo|referencia [armar]]"""
 
 from __future__ import annotations
 
@@ -12,6 +12,13 @@ def main(argv: list[str]) -> int:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     cargar_env()
     orden = argv[0] if argv else "todo"
+    if orden == "referencia":
+        # Aparte de "todo": gasta API por horas y se corre a mano (python -m ldh referencia [armar]).
+        from . import referencia
+        if "armar" not in argv[1:]:
+            referencia.scoutear()
+        referencia.armar_filas()
+        return 0
     if orden in ("ingestar", "todo"):
         from .ingesta import correr
         correr()

@@ -1,0 +1,62 @@
+{
+  "_": "Consejos de la fase 3. Clave = componente del Performance o métrica; dentro, por rol ('_' vale para todos). El perfil los muestra solo cuando los números marcan esa brecha, siempre al lado del valor y de la mediana de tu franja.",
+
+  "combate": {
+    "_": "Antes de entrar a una pelea, contá: ¿cuántos rivales no están a la vista? Si faltan dos o más, no sos vos el que abre. La mayoría de las muertes que bajan el KDA son entradas sin información, no duelos perdidos.",
+    "Support": "Tus asistencias pesan más que tus kills: quedate a distancia de habilidad de tu tirador y no seas el primero en entrar sin visión. Si morís antes que tu ADC, la pelea se pierde 4 contra 5.",
+    "Jungla": "Pelear un objetivo sin saber dónde está el jungla rival es tirar una moneda. Mirá el minimapa antes de cada dragón y Heraldo, y si no lo ves, entrá con prioridad de las líneas o no entres."
+  },
+  "efectividad": {
+    "_": "Estar cuando el equipo pelea vale más que farmear una oleada más. Cuando un objetivo aparece en 60 segundos, empujá tu oleada y movete antes que el rival.",
+    "Top": "En top la participación baja es normal, pero el Heraldo y las peleas del Barón (aparece al 20) son tuyas también: empujá antes y llegá con teleport o caminando.",
+    "ADC": "Tu daño sale de estar vivo en la pelea, no de entrar primero. Pegale a lo que tengas más cerca sin quedar expuesto; si siempre llegás tarde, empujá la oleada antes del objetivo.",
+    "Support": "Rotá a mid cuando tu tirador vuelve a base: un support que solo está en bot pierde la mitad de las jugadas del mapa."
+  },
+  "economia": {
+    "_": "Cada oleada perdida son unos 120 de oro. Antes de volver a base, empujá la oleada; antes de ir a pelear, preguntate si llegás o si la tomás y después vas.",
+    "Jungla": "Entre gank y gank, limpiá campamentos: un jungla que siempre está en línea queda atrás en nivel y oro. Hacé el recorrido completo cuando no hay jugada clara.",
+    "Support": "Tu oro sale de completar la misión de support a tiempo y de las placas. Tocá placas cuando tu tirador empuja y no te quedes en la línea sin hacer nada si él vuelve a base."
+  },
+  "linea": {
+    "_": "Los primeros 15 minutos se ganan con CS y sin morir. Si vas atrás contra tu rival a los 15, la primera meta no es matarlo: es no perder oleadas y no morir antes del 6.",
+    "Jungla": "La diferencia contra el jungla rival a los 15 viene de campamentos y cangrejos, no de ganks fallidos. Si un gank no sale, volvé a farmear en lugar de quedarte esperando.",
+    "Support": "La visión contra el support rival se gana poniendo wards antes de que salga el objetivo y sacando las de ellos. Comprá un ward de control en cada vuelta a base."
+  },
+  "winrate": {
+    "_": "El winrate es la consecuencia del resto: mirá qué otro componente tiene más margen. Lo que más lo movió en el coaching del grupo fue jugar dentro de tu pool (ver 'Tus campeones')."
+  },
+  "equipo": {
+    "_": "Poné un ward en cada vuelta a la línea y comprá un ward de control cuando vuelvas a base. Estar en los objetivos del equipo cuenta tanto como el daño.",
+    "Jungla": "Cada dragón o Heraldo sin vos es un objetivo que el equipo pelea con uno menos. Planeá el recorrido para estar del lado del próximo objetivo un minuto antes.",
+    "Top": "Cuando la partida pasa a agruparse (después de las primeras torres), quedarte en top a farmear solo sirve si el resto del equipo puede evitar pelear. Si no, sumate.",
+    "Support": "Sos el que más visión tiene que poner: limpiá wards rivales con la barrida y llevá siempre un ward de control encima."
+  },
+  "consistencia": {
+    "_": "Tus partidas varían más que las de tu franja: tenés partidas muy buenas y otras muy malas. Mirá en el historial qué tienen en común las peores (campeón fuera del pool, rol, hora) antes de cambiar nada."
+  },
+
+  "kda": {"_": "Mirá en qué minuto morís en tus derrotas: si es antes del 15, el problema es la línea; si es después, las entradas sin visión."},
+  "kp": {"_": "Si el equipo pelea y no estás, no sumás. Empujá tu oleada y rotá cuando hay un objetivo cerca."},
+  "dano": {"_": "Más daño no es entrar primero: es estar vivo y pegando toda la pelea. Ubicate donde puedas pegar sin ser el blanco."},
+  "oro_min": {"_": "El oro por minuto sale de oleadas, campamentos y placas. Nunca vuelvas a base con la oleada yendo hacia tu torre."},
+  "cs_min": {
+    "_": "Practicá último golpe en la herramienta de práctica 10 minutos: la meta es superar a la mediana de tu franja sin rivales. En partida, no dejes oleadas morir bajo tu torre.",
+    "Jungla": "Hacé el recorrido completo entre jugadas: si no hay gank claro, limpiá campamentos. Los cangrejos también suman."
+  },
+  "vision_min": {"_": "Cambiá el abalorio de wards en cuanto tengas la misión, y usalo cada vez que esté cargado."},
+  "control": {"_": "Un ward de control en cada vuelta a base. Ponelo en el río o en la jungla rival, no en tu línea."},
+  "obj": {
+    "_": "Estar en dragones, Heraldo y torres del equipo. Un minuto antes de que salga el objetivo, empujá y movete.",
+    "Top": "El Heraldo es de tu lado: cuando aparece, empujá la oleada y andá con tu jungla."
+  },
+  "muertes_min": {"_": "Antes de pasar el río o una línea sin visión, fijate cuántos rivales faltan del mapa. Si faltan dos o más, no vayas solo."},
+  "cs10": {"_": "Los primeros 10 minutos: la meta es la mediana de tu franja que ves al lado. Si el rival te presiona, priorizá el último golpe sobre el intercambio."},
+  "cs15": {"_": "Del 10 al 15 se pierden oleadas por rotar sin empujar. Empujá antes de moverte."},
+  "dif_oro10": {"_": "Ir atrás en oro al 10 suele ser CS perdido o una muerte temprana. Jugá seguro hasta el 6 si el matchup es malo."},
+  "dif_oro15": {"_": "Ir atrás al 15 marca la línea. Mirá si es por CS (oleadas perdidas) o por muertes y atacá esa."},
+  "dif_cs10": {"_": "Perdés CS contra tu rival al 10: practicá el último golpe bajo torre y no regales oleadas por intercambiar."},
+  "dif_cs15": {"_": "Perdés CS contra tu rival al 15: cuidá las oleadas cuando volvés a base y cuando rotás."},
+  "dif_xp15": {"_": "Ir atrás en experiencia es estar fuera de la línea: muertes, vueltas a base largas o rotaciones sin empujar."},
+  "dif_vision_min": {"_": "El support rival pone más visión que vos. Comprá un ward de control en cada vuelta y limpiá con la barrida."},
+  "winrate": {"_": "Mirá 'Tus campeones': lo que más movió el winrate en el grupo fue jugar dentro del pool."}
+}

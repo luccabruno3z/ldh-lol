@@ -9,7 +9,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 from . import estadistica as est
-from . import fase2
+from . import fase2, fase3
 from .ajustes import AJUSTES, RAIZ, SALIDA
 from .almacen import cargar_estado
 from .base import RUTA_BASE, valor_rango
@@ -145,6 +145,7 @@ def publicar() -> dict:
             "losses": r["losses"], "t": r["t"], "valor": r["valor"]}
 
     resumen_f2 = fase2.generar(db, filas_por, _escribir)
+    fase3.generar(db, filas_por, rangos, _escribir)
 
     resumen_personas = []
     por_pag = AJUSTES["historial_por_pagina"]
