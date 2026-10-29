@@ -47,3 +47,15 @@ Si cambia `extract_match_stats`, subir `EXTRACTOR_VERSION` en `ldh/base.py`.
 - **Sinergia:** el p se ajusta por Benjamini-Hochberg sobre todos los pares. Con un p crudo, unos 15 de 298 pares salen "significativos" por azar.
 - **Jungla:** la participación en objetivos épicos se probó y no discrimina (mediana 94 %). Se mide el oro contra el jungla rival a los 15.
 - **Pool:** los meses sin 90 días de historia previa salen marcados como "arranque", porque ahí todo cuenta como fuera del pool.
+
+## Fase 3: referencia y coaching
+
+- **Muestra de referencia:** `python -m ldh referencia` baja jugadores al azar de cada división de solo/dúo (league-v4 entries) y se queda con los que tienen 10+ partidas en su rol principal. Va al 60 % del límite de la clave porque la comparte Coach AI. Se puede cortar y retomar: el crudo queda en `.cache/referencia/` (no va a git) y el avance en `.cache/referencia/estado.json`.
+- `python -m ldh referencia armar` reduce ese crudo a `datos/referencia/filas.jsonl.gz` (una fila por partida y jugador, con id anónimo). Eso es lo único que va a la rama `datos`; `publicar` lo lee de ahí.
+- **Celdas:** 3 franjas (Hierro–Bronce, Plata–Oro, Platino–Esmeralda) × 5 roles. Una celda con menos de 20 jugadores no da percentiles; el perfil lo dice.
+- **La franja de cada persona** sale de su mejor rango actual de solo/dúo. Sin rango, no hay percentiles (sí los primeros 15 minutos).
+- **Performance:** 7 componentes, cada uno es un percentil contra la celda; pesos y sigmoide en `config/ajustes.json` (`performance`). El winrate usa Bayes empírico: con 10 partidas por jugador de referencia casi toda la dispersión es azar, así que se estima la dispersión real de la franja y se compara contra esa.
+- **Participación en objetivos:** dragones, Heraldo y Barón, sin larvas ni estructuras. Con larvas y estructuras Lucca y Glarrex daban igual (0,35); así reproduce la brecha conocida (0,65 contra 0,42 en solo/dúo desde el 14/08).
+- **Contra tu campeón:** sin API. Compara con los desconocidos que jugaron el mismo campeón y rol en las partidas de solo/dúo del grupo, en la misma franja, sacando las partidas donde su rival directo era alguien del grupo.
+- **Consejos:** `config/consejos.json`, por componente o métrica y por rol. Solo aparecen cuando el número marca la brecha.
+- **Refrescar la referencia:** con la clave personal, volver a correr `python -m ldh referencia` cada tanto (los jugadores ya bajados no se vuelven a pedir). Las timelines de los amigos siguen en la rama `datos` desde la fase 1; el doc de lecciones pide sacarlas de git (pendiente).

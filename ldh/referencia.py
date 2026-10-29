@@ -194,7 +194,9 @@ def scoutear(hasta_epoch: float | None = None) -> None:
         hechos += 1
         if hechos % 10 == 0:
             llenas = _llenas(est)
-            celdas = " ".join(f"{f[:4]}/{r[:3]}={llenas[(f, r)]}" for f in CONF["franjas"] for r in ROLES)
+            # "HB/Top=12": iniciales de la franja (Hierro–Bronce) y del rol.
+            celdas = " ".join(f"{''.join(x[0] for x in f.split('–'))}/{r[:3]}={llenas[(f, r)]}"
+                              for f in CONF["franjas"] for r in ROLES)
             print(f"[{(time.time() - t0) / 60:.0f} min, {api.llamadas} pedidos, {hechos} jugadores] {celdas}",
                   flush=True)
     _guardar_estado(est)
