@@ -69,7 +69,9 @@ def correr(semilla: str | None = None) -> dict:
     print("Cuentas…")
     resolver_cuentas(api, personas, estado)
     guardar_estado(estado)
-    cuentas = [(rid, c) for rid, c in estado["cuentas"].items() if c.get("puuid")]
+    # En el orden de personas.json (y solo las que siguen ahí: sacar a alguien lo deja de bajar).
+    cuentas = [(c["riot_id"], estado["cuentas"][c["riot_id"]]) for p in personas for c in p["cuentas"]
+               if (estado["cuentas"].get(c["riot_id"]) or {}).get("puuid")]
     vinculados = {c["puuid"] for _, c in cuentas}
 
     print("Rango…")
