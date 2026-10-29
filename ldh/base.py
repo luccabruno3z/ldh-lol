@@ -63,7 +63,7 @@ def valor_rango(tier: str | None, division: str | None, lp: int | None) -> int |
 def _validar(info: dict) -> str | None:
     """Rechaza valores imposibles (lección 2 del doc de funcionalidades)."""
     dur = info.get("gameDuration") or 0
-    if not 300 <= dur <= 4 * 3600:
+    if not 60 <= dur <= 4 * 3600:
         return f"duración imposible ({dur} s)"
     if len(info.get("participants", [])) != 10 and cola_de(info.get("queueId")) != "otra":
         return "no hay 10 participantes"

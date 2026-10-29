@@ -217,7 +217,9 @@ def extract_match_stats(match: dict, puuid: str, timeline: dict | None = None) -
         return None
 
     duration = _duration_seconds(info)
-    if duration < 300:  # remake
+    # LDH: remake = gameEndedInEarlySurrender, no "menos de 5 minutos". Una derrota real
+    # de 286 s (LA2_1621150801) cuenta en el W/L de Riot y con el corte por duración se perdía.
+    if any(p.get("gameEndedInEarlySurrender") for p in info.get("participants", [])):
         return None
     minutes = duration / 60
     ch = me.get("challenges", {}) or {}

@@ -120,7 +120,7 @@ def correr(semilla: str | None = None) -> dict:
                     continue
             info = match.get("info", {})
             remake = any(p.get("gameEndedInEarlySurrender") for p in info.get("participants", []))
-            if remake or (info.get("gameDuration") or 0) < AJUSTES["duracion_minima_seg"]:
+            if remake:
                 estado["salteadas"][match_id] = "remake"
                 salteadas += 1
                 continue
