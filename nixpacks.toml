@@ -1,0 +1,6 @@
+# El bot usa sus propias dependencias; requirements.txt es del pipeline (Actions).
+[phases.install]
+cmds = ["python -m venv /opt/venv && . /opt/venv/bin/activate && pip install -r requirements-bot.txt"]
+
+[start]
+cmd = "python -m bot"

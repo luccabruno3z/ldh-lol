@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ldh-lol-web",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "http.server", "8010", "--bind", "127.0.0.1", "-d", "salida"],
+      "port": 8010
+    }
+  ]
+}

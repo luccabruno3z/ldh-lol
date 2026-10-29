@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>LDH Stats LoL</title>
+<meta name="description" content="Estadísticas de League of Legends de un grupo de amigos, pensadas para mejorar.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+<a class="skip" href="#main">Saltar al contenido</a>
+<header class="site-header">
+  <a class="brand" href="#/inicio">LDH <span>Stats</span> <small>LoL</small></a>
+  <nav class="main-nav" aria-label="Secciones">
+    <a href="#/inicio" data-view="inicio">Inicio</a>
+    <a href="#/jugadores" data-view="jugadores">Jugadores</a>
+  </nav>
+  <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema">◐</button>
+</header>
+
+<main id="main">
+  <div class="view" data-view-panel="inicio">
+    <header class="view-head">
+      <h1 class="view-title">Inicio</h1>
+      <p class="view-sub" id="meta-linea">Cargando datos…</p>
+    </header>
+    <section class="section" id="grupo">
+      <h2>El grupo</h2>
+      <div id="grupo-lista" class="cards"><div class="skeleton"></div></div>
+    </section>
+    <section class="section" id="ultimas">
+      <h2>Últimas partidas</h2>
+      <div id="ultimas-lista"><div class="skeleton"></div></div>
+    </section>
+  </div>
+
+  <div class="view" data-view-panel="jugadores">
+    <header class="view-head">
+      <h1 class="view-title">Jugadores</h1>
+      <form class="search" id="buscar" autocomplete="off" role="search">
+        <label class="sr-only" for="buscar-input">Buscar jugador o Riot ID</label>
+        <input id="buscar-input" type="search" placeholder="Buscá un jugador o Riot ID" list="buscar-opciones">
+        <datalist id="buscar-opciones"></datalist>
+        <button type="submit">Ver perfil</button>
+      </form>
+    </header>
+    <div id="perfil"><p class="empty-state">Elegí a alguien del grupo para ver su perfil.</p></div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <p>LDH Stats LoL no está respaldado por Riot Games y no refleja la opinión de Riot Games ni de nadie involucrado oficialmente en la producción o gestión de League of Legends. League of Legends y Riot Games son marcas registradas de Riot Games, Inc.</p>
+  <p><a href="descargas/ldh.sqlite">Descargar la base completa (SQLite)</a></p>
+</footer>
+
+<script type="module" src="js/main.js"></script>
+<script>
+  if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+    navigator.serviceWorker.register('sw.js');
+  }
+</script>
+</body>
+</html>

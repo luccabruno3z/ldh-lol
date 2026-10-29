@@ -1,0 +1,85 @@
+"""Lee los JSON publicados (api/) por HTTP, con caché TTL y dato viejo si falla la red.
+El bot nunca llama a Riot: solo lee lo que publicó el pipeline."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import time
+from urllib.parse import quote
+
+import aiohttp
+
+logger = logging.getLogger(__name__)
+
+# En Railway: https://luccabruno3z.github.io/ldh-lol/api ; en local: http://127.0.0.1:8010/api
+DATA_URL = os.getenv("LDH_DATA_URL", "https://luccabruno3z.github.io/ldh-lol/api").rstrip("/")
+
+
+class Datos:
+    def __init__(self, ttl: int = 300, timeout: int = 10, max_retries: int = 3):
+        self.ttl = ttl
+        self.timeout = aiohttp.ClientTimeout(total=timeout)
+        self.max_retries = max_retries
+        self._cache: dict[str, tuple[float, object]] = {}
+        self._session: aiohttp.ClientSession | None = None
+
+    async def close(self) -> None:
+        if self._session and not self._session.closed:
+            await self._session.close()
+
+    async def _json(self, ruta: str):
+        url = f"{DATA_URL}/{ruta}"
+        cached = self._cache.get(url)
+        if cached and time.monotonic() - cached[0] < self.ttl:
+            return cached[1]
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession(timeout=self.timeout)
+        ultimo: Exception | None = None
+        for intento in range(self.max_retries):
+            try:
+                async with self._session.get(url) as resp:
+                    if resp.status == 404:
+                        return None
+                    resp.raise_for_status()
+                    data = await resp.json(content_type=None)
+                    self._cache[url] = (time.monotonic(), data)
+                    return data
+            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
+                # ValueError: JSON a medio publicar. Se reintenta igual que un error de red.
+                ultimo = exc
+                await asyncio.sleep(2**intento)
+        if cached:
+            logger.warning("Uso datos viejos de %s: %s", url, ultimo)
+            return cached[1]
+        raise RuntimeError(f"No pude leer {url}: {ultimo}")
+
+    async def personas(self) -> list[dict]:
+        return await self._json("personas.json") or []
+
+    async def perfil(self, persona_id: str) -> dict | None:
+        return await self._json(f"perfil/{quote(persona_id)}.json")
+
+    async def historial(self, persona_id: str, pagina: int = 1) -> dict | None:
+        return await self._json(f"historial/{quote(persona_id)}/{pagina}.json")
+
+    async def campeones(self) -> dict:
+        return (await self._json("campeones.json") or {}).get("campeones", {})
+
+    async def ajustes(self) -> dict:
+        return await self._json("ajustes.json") or {}
+
+    async def buscar(self, texto: str) -> dict | None:
+        """Por id, nombre o Riot ID (con o sin #TAG). Solo personas vinculadas."""
+        t = texto.strip().lower()
+        personas = await self.personas()
+        for criterio in (
+            lambda p: p["id"] == t or p["nombre"].lower() == t,
+            lambda p: any(c.lower() == t or c.lower().split("#")[0] == t for c in p["cuentas"]),
+            lambda p: t in p["nombre"].lower() or any(t in c.lower() for c in p["cuentas"]),
+        ):
+            hallado = next((p for p in personas if criterio(p)), None)
+            if hallado:
+                return hallado
+        return None

@@ -1,0 +1,101 @@
+name: Actualización de estadísticas LoL
+
+on:
+  workflow_dispatch:
+  # Apagado hasta tener una clave personal de Riot: la de desarrollo vence a las 24 h
+  # y el cron moriría al día siguiente. Para prenderlo, descomentar estas dos líneas.
+  # schedule:
+  #   - cron: "17 * * * *"
+
+# Una corrida por vez; no se cancela la que está en curso para no perder partidas bajadas.
+concurrency:
+  group: actualizar-lol
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # solo se pushea a la rama `datos`, nunca a main
+  pages: write
+  id-token: write
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Código (main)
+        uses: actions/checkout@v4
+
+      - name: Datos (rama datos)
+        uses: actions/checkout@v4
+        with:
+          ref: datos
+          path: datos
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Dependencias
+        run: pip install -r requirements.txt
+
+      - name: Caché de Data Dragon
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: ddragon-${{ github.run_id }}
+          restore-keys: ddragon-
+
+      - name: Revisar la clave
+        env:
+          RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+        run: |
+          if [ -z "$RIOT_API_KEY" ]; then echo "::error::Falta el secreto RIOT_API_KEY"; exit 1; fi
+          code=$(curl -s -o /dev/null -w "%{http_code}" -H "X-Riot-Token: $RIOT_API_KEY" \
+            "https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/LuccaBruno/LAS")
+          if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+            echo "::error::La clave de Riot está vencida o es inválida (HTTP $code). No se commitea nada."; exit 1
+          fi
+
+      - name: Ingesta, base y publicación
+        id: ingesta
+        env:
+          RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+          ANON_SALT: ${{ secrets.ANON_SALT }}
+          PYTHONIOENCODING: utf-8
+        run: python -m ldh todo
+
+      - name: Commit a la rama datos
+        # Aunque falle la publicación, lo ya bajado se guarda: cada partida es un archivo nuevo.
+        if: always() && steps.ingesta.outcome != 'skipped'
+        working-directory: datos
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "github-actions@github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "Datos: corrida ${{ github.run_number }}"
+          git push origin HEAD:datos
+
+      - name: Subir sitio
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: salida
+
+      - name: Publicar en Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
+
+      - name: Avisar por Discord si falló
+        if: failure()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          if [ -n "$DISCORD_WEBHOOK" ]; then
+            curl -H "Content-Type: application/json" \
+              -d "{\"content\":\"⚠️ Falló la actualización de LDH Stats LoL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+              "$DISCORD_WEBHOOK"
+          fi

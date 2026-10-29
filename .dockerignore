@@ -1,0 +1,14 @@
+# El bot lee los datos de GitHub Pages por HTTP: en la imagen solo hace falta bot/ y su config.
+ldh/
+sitio/
+salida/
+datos/
+config/
+docs/
+.github/
+.cache/
+.venv/
+.git/
+**/__pycache__/
+*.pyc
+.env

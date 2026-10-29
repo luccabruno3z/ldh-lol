@@ -60,7 +60,7 @@ def _tabla(filas: list[dict]) -> list[dict]:
 
     def orden(t):
         rol = ROLES_ORDEN.index(t["rol"]) if t["rol"] in ROLES_ORDEN else (-1 if t["rol"] == "Todos" else 9)
-        return (COLAS_ORDEN.index(t["cola"]), t["muestra_chica"], rol)
+        return (t["muestra_chica"], COLAS_ORDEN.index(t["cola"]), rol)
 
     return sorted(tabla, key=orden)
 
@@ -83,7 +83,12 @@ def _forma(filas: list[dict]) -> dict | None:
                       ("cs_min", lambda f: f.get("cs_per_min")),
                       ("dano_min", lambda f: f.get("damage_per_min")),
                       ("kp", lambda f: f.get("kill_participation"))]:
-        comp[clave] = {"ultimas": est.media([fn(f) for f in ult]), "resto": est.media([fn(f) for f in resto]),
+        if clave == "winrate":  # tasas: Wilson, como en la tabla de KPIs
+            ultimas = est.wilson(sum(f["win"] for f in ult), len(ult))
+            resto_m = est.wilson(sum(f["win"] for f in resto), len(resto))
+        else:
+            ultimas, resto_m = est.media([fn(f) for f in ult]), est.media([fn(f) for f in resto])
+        comp[clave] = {"ultimas": ultimas, "resto": resto_m,
                        "dif": est.diferencia([fn(f) for f in ult], [fn(f) for f in resto])}
     return {
         "cola": cola,
@@ -111,6 +116,7 @@ def _historial(f: dict, lp: dict | None) -> dict:
 def publicar() -> dict:
     if API.exists():
         shutil.rmtree(API)
+    shutil.copytree(RAIZ / "sitio", SALIDA, dirs_exist_ok=True)
     db = sqlite3.connect(RUTA_BASE)
     db.row_factory = sqlite3.Row
     estado = cargar_estado()
