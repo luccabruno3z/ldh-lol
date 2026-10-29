@@ -34,3 +34,8 @@
 Corregir el código y correr de nuevo. La base se rehace desde el crudo, así que la corrección se aplica a todo el historial sin volver a bajar nada.
 
 Si cambia `extract_match_stats`, subir `EXTRACTOR_VERSION` en `ldh/base.py`.
+
+## Límites conocidos de los datos
+
+- **La lista de partidas de Riot no siempre llega al 8/1.** En algunas cuentas `match-v5 by-puuid/ids` se corta meses después del inicio de temporada, aunque las partidas viejas sigan existiendo si se piden por id. Medido el 29/10: monarca tiene 830 de 1228 partidas de solo, y mac55 111 de 171. El perfil lo muestra como "N de M guardadas".
+- **Remakes donde el vinculado fue el AFK.** Riot le cuenta la derrota, pero acá no entran (remake = `gameEndedInEarlySurrender`). Explica parte de las 1 a 3 derrotas que le faltan a varias cuentas.

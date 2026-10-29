@@ -8,6 +8,8 @@ from .ajustes import cargar_env
 
 
 def main(argv: list[str]) -> int:
+    # Riot IDs con caracteres fuera de cp1252 (な, ˇ) rompían el print con la salida redirigida en Windows.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     cargar_env()
     orden = argv[0] if argv else "todo"
     if orden in ("ingestar", "todo"):

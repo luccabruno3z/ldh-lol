@@ -22,6 +22,13 @@ function buscar(texto) {
 }
 
 function cabecera(p) {
+    // Riot cuenta W/L de la temporada; la lista de partidas a veces no llega tan atrás.
+    const faltantes = r => {
+      const total = r.wins + r.losses;
+      return r.guardadas != null && total - r.guardadas >= 5
+        ? `<span class="dim" title="Riot ya no lista las partidas más viejas de esta cuenta">· ${r.guardadas} de ${total} guardadas</span>`
+        : '';
+    };
     const rangos = p.cuentas.map(c => [c.riot_id, (p.rango || {})[c.riot_id] || {}]);
     return `
     <section class="section perfil-head">
@@ -32,7 +39,8 @@ function cabecera(p) {
           <span class="mono">${escapeHtml(rid)}</span>
           ${['solo', 'flex'].filter(c => colas[c]).map(c => `
             <span class="chip ${tierClase(colas[c])}" title="${escapeHtml(nombreCola(c))}">
-              ${c === 'solo' ? 'Solo' : 'Flex'}: ${escapeHtml(rangoTexto(colas[c]))} · ${colas[c].wins} V / ${colas[c].losses} D</span>`).join('')
+              ${c === 'solo' ? 'Solo' : 'Flex'}: ${escapeHtml(rangoTexto(colas[c]))} · ${colas[c].wins} V / ${colas[c].losses} D</span>
+            ${faltantes(colas[c])}`).join('')
           || '<span class="chip tier-none">Sin clasificar</span>'}
         </div>`).join('') : '<span class="dim">Sin datos de rango todavía.</span>'}
       </div>

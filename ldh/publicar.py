@@ -153,6 +153,11 @@ def publicar() -> dict:
         mejor = max(((rid, c["solo"]) for rid, c in rangos[pid].items() if "solo" in c),
                     key=lambda x: x[1]["valor"] or -1, default=None)
         paginas = max(1, -(-len(filas) // por_pag))
+        # La lista de partidas de Riot no llega hasta enero en todas las cuentas: se muestra
+        # cuántas de las que cuenta league-v4 tenemos de verdad, para no sugerir más muestra de la que hay.
+        for rid, colas in rangos[pid].items():
+            for cola, r in colas.items():
+                r["guardadas"] = sum(f["riot_id"] == rid and f["cola"] == cola for f in filas)
         perfil = {
             "id": pid, "nombre": p["nombre"],
             "cuentas": [{**c, "n": sum(f["riot_id"] == c["riot_id"] for f in filas)} for c in cuentas],
