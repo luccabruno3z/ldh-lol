@@ -73,3 +73,61 @@ def diferencia(a: Sequence[float], b: Sequence[float]) -> dict:
     lo, hi = np.percentile(da - db, _Q)
     return {"v": _r(xa.mean() - xb.mean()), "lo": _r(lo), "hi": _r(hi),
             "na": len(xa), "nb": len(xb), "ruido": bool(lo <= 0 <= hi)}
+
+
+# ---- Fase 2: ajuste por muestra, confianza y pruebas entre grupos ----
+
+AJ = AJUSTES["ajuste_muestra"]
+
+
+def ajustada_tasa(ganadas: int, n: int, k: float = AJ["k_tasa"], centro: float = 0.5) -> float | None:
+    """Winrate encogido hacia el centro: suma k partidas 'al centro'. 2 de 2 no es 100 %."""
+    return None if n == 0 else _r((ganadas + k * centro) / (n + k))
+
+
+def ajustado_kda(kills: int, deaths: int, assists: int, mediana: float | None,
+                 k_muertes: float = AJ["k_muertes"]) -> float | None:
+    """KDA con k muertes sumadas 'a la mediana' del mismo rol (el doc de funcionalidades usa 20)."""
+    if mediana is None:
+        return None
+    return _r((kills + assists + k_muertes * mediana) / (max(deaths, 0) + k_muertes), 2)
+
+
+def confianza(n: int, aportes: Sequence[float] | None = None) -> str:
+    """alta con 15+; baja con menos de 8 o si una sola partida explica más del 40 % del resultado."""
+    if aportes:
+        total = sum(aportes)
+        if total > 0 and max(aportes) / total > AJ["tope_peso_partida"]:
+            return "baja"
+    if n >= AJ["confianza_alta"]:
+        return "alta"
+    return "baja" if n < AJ["confianza_media"] else "media"
+
+
+def fisher(a: int, b: int, c: int, d: int) -> float:
+    """Prueba exacta de Fisher, bilateral, para [[a, b], [c, d]].
+    Suma las tablas con los mismos márgenes y probabilidad <= la observada."""
+    n1, n2, m1 = a + b, c + d, a + c
+    n = n1 + n2
+
+    def lp(x: int) -> float:
+        return (math.lgamma(n1 + 1) - math.lgamma(x + 1) - math.lgamma(n1 - x + 1)
+                + math.lgamma(n2 + 1) - math.lgamma(m1 - x + 1) - math.lgamma(n2 - m1 + x + 1)
+                - math.lgamma(n + 1) + math.lgamma(m1 + 1) + math.lgamma(n - m1 + 1))
+
+    obs = lp(a)
+    p = sum(math.exp(lp(x)) for x in range(max(0, m1 - n2), min(n1, m1) + 1) if lp(x) <= obs + 1e-7)
+    return min(1.0, p)
+
+
+def benjamini_hochberg(ps: Sequence[float]) -> list[float]:
+    """p ajustados por Benjamini-Hochberg: con muchas comparaciones alguna sale 'significativa' por azar."""
+    m = len(ps)
+    orden = sorted(range(m), key=lambda i: ps[i])
+    ajust = [0.0] * m
+    previo = 1.0
+    for rango in range(m, 0, -1):
+        i = orden[rango - 1]
+        previo = min(previo, ps[i] * m / rango)
+        ajust[i] = previo
+    return ajust

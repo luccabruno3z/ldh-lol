@@ -1,8 +1,9 @@
-/* jugador.js — perfil mínimo: cabecera con rango, KPIs por cola y rol (con n e
-   intervalo), forma reciente con su prueba e historial de partidas. */
+/* jugador.js — perfil: cabecera con rango, KPIs por cola y rol (con n e intervalo),
+   forma reciente con su prueba, los bloques de la fase 2 (fase2.js) e historial. */
 
 import { state, loadPerfil, loadHistorial } from './data.js';
 import { onRoute, go } from './router.js';
+import { bloquesFase2 } from './fase2.js';
 import { escapeHtml, rangoTexto, tierClase, nombreCola, conIntervalo, iconoCampeon, campeon, fecha, num } from './utils.js';
 
 const COLS = [
@@ -171,7 +172,9 @@ async function mostrar(id) {
         <div id="kpi-tabla">${tablaKpis(p.kpis.todas)}</div>
       </section>
       ${forma(p.forma)}
+      <div id="fase2"></div>
       <div id="historial"></div>`;
+    bloquesFase2(p, document.getElementById('fase2'));
     document.getElementById('kpi-cuenta')?.addEventListener('change', (e) => {
         document.getElementById('kpi-tabla').innerHTML = tablaKpis(p.kpis[e.target.value] || []);
     });

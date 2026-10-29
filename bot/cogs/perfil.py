@@ -37,6 +37,87 @@ def ic(m: dict | None, tipo="dec", dec=1) -> str:
     return f"{f(m['v'])}{suf}" + (f" ({f(m['lo'])}–{f(m['hi'])})" if m.get("lo") is not None else "")
 
 
+def pct(v: float | None) -> str:
+    return "—" if v is None else f"{round(v * 100)} %"
+
+
+def dec2(v: float | None) -> str:
+    return "—" if v is None else f"{v:.2f}".replace(".", ",")
+
+
+def _cola_principal(tabla: list[dict]) -> str | None:
+    n: dict[str, int] = {}
+    for t in tabla:
+        n[t["cola"]] = n.get(t["cola"], 0) + t["n"]
+    return max(n, key=n.get, default=None)
+
+
+def tarjeta_simple(lineas: list[str], url: str) -> discord.ui.LayoutView:
+    """Un Container con el texto (cortado al límite de Discord) y el botón a la web."""
+    texto = "\n".join(lineas)
+    if len(texto) > 3900:
+        texto = texto[:3890] + "\n…"
+    view = discord.ui.LayoutView(timeout=None)
+    view.add_item(discord.ui.Container(discord.ui.TextDisplay(texto),
+                                       discord.ui.ActionRow(discord.ui.Button(label="Ver en la web", url=url)),
+                                       accent_colour=0x00CCCC))
+    return view
+
+
+def tarjeta_roles(p: dict, d: dict, nombre_cola: dict) -> discord.ui.LayoutView:
+    cola = _cola_principal(d["tabla"])
+    nombre = discord.utils.escape_markdown(p["nombre"])
+    if not cola:
+        return tarjeta_simple([f"## {nombre}", "Todavía no hay partidas de Grieta."], f"{WEB}#/jugadores/{p['id']}")
+    lineas = [f"## {nombre} · roles en {nombre_cola.get(cola, cola)}"]
+    mejor = d["mejor"].get(cola)
+    lineas.append(f"Mejor rol: **{mejor['rol']}** ({pct(mejor['winrate_aj'])} ajustado, n={mejor['n']})" if mejor
+                  else 'Ningún rol llega a confianza media: no hay "mejor rol" todavía.')
+    for t in (t for t in d["tabla"] if t["cola"] == cola):
+        m = (d["metricas"].get(t["rol"]) or [None])[0]
+        extra = f" · {m['nombre']} {ic(t.get(m['clave']), dec=0 if 'oro' in m['clave'] else 2)}" if m else ""
+        chica = " · *muestra chica*" if t["muestra_chica"] else ""
+        lineas.append(f"**{t['rol']}** (n={t['n']}, confianza {t['confianza']}{chica})\n"
+                      f"WR {pct(t['winrate_aj'])} ajustado (real {ic(t['winrate'], 'pct')}) · KDA {dec2(t['kda_aj'])}{extra}")
+    return tarjeta_simple(lineas, f"{WEB}#/jugadores/{p['id']}")
+
+
+def tarjeta_campeones(p: dict, d: dict, champs: dict, nombre_cola: dict) -> discord.ui.LayoutView:
+    cola = _cola_principal(d["tabla"])
+    nombre = discord.utils.escape_markdown(p["nombre"])
+    if not cola:
+        return tarjeta_simple([f"## {nombre}", "Todavía no hay partidas de Grieta."], f"{WEB}#/jugadores/{p['id']}")
+    lineas = [f"## {nombre} · campeones en {nombre_cola.get(cola, cola)}"]
+    for t in [t for t in d["tabla"] if t["cola"] == cola][:8]:
+        champ = (champs.get(str(t["champ"])) or {}).get("nombre", t["champ"])
+        chica = " · *muestra chica*" if t["muestra_chica"] else ""
+        lineas.append(f"**{champ}** {t['rol'] or ''} (n={t['n']}{chica}) · WR {pct(t['winrate_aj'])} ajustado "
+                      f"(real {ic(t['winrate'], 'pct')}) · KDA {dec2(t['kda_aj'])}")
+    pool = d["pool"]["colas"].get(cola)
+    if pool:
+        lectura = "no discrimina" if pool["p"] is None or pool["p"] >= 0.05 else "hay señal"
+        lineas.append(f"### Dentro y fuera del pool\nDentro {ic(pool['dentro'], 'pct')} (n={pool['dentro']['n']}) · "
+                      f"fuera {ic(pool['fuera'], 'pct')} (n={pool['fuera']['n']}) → {lectura} (Fisher p = {pool['p']})")
+    return tarjeta_simple(lineas, f"{WEB}#/jugadores/{p['id']}")
+
+
+def tarjeta_sinergia(p: dict, d: dict, nombres: dict, nombre_cola: dict) -> discord.ui.LayoutView:
+    filas = [r for r in d["filas"] if r["persona"] == p["id"] and not r["muestra_chica"]][:8]
+    lineas = [f"## {discord.utils.escape_markdown(p['nombre'])} · sinergia"]
+    mc = p.get("mejor_companero")
+    lineas.append(f"Mejor compañero: **{nombres.get(mc['companero'], mc['companero'])}** en {nombre_cola.get(mc['cola'], mc['cola'])}"
+                  if mc else "Con ningún compañero rendís mejor más allá del ruido.")
+    for r in filas:
+        dif = r["dif"]["v"] or 0
+        lineas.append(f"**{nombres.get(r['companero'], r['companero'])}** · {nombre_cola.get(r['cola'], r['cola'])} · "
+                      f"{r['juntos']} juntos: {ic(r['con'], 'pct')} contra {ic(r['sin'], 'pct')} sin esa persona "
+                      f"({'+' if dif > 0 else ''}{round(dif * 100)} pts, {'señal' if r['senal'] else 'ruido'})")
+    if not filas:
+        lineas.append(f"No hay compañeros con {d.get('min_juntos', 3)}+ partidas juntos fuera de la muestra chica.")
+    lineas.append(f"-# {d.get('nota', '')}")
+    return tarjeta_simple(lineas, f"{WEB}#/jugadores/{p['id']}")
+
+
 class Perfil(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -62,21 +143,47 @@ class Perfil(commands.Cog):
         self.vinculos.delete(str(ctx.author.id))
         await ctx.reply("Listo, ya no estás vinculado.")
 
-    @commands.hybrid_command(name="perfil", description="Rango, KPIs, forma reciente y últimas partidas")
-    async def perfil(self, ctx: commands.Context, *, jugador: str | None = None):
+    async def _persona(self, ctx: commands.Context, jugador: str | None, comando: str) -> dict | None:
+        """El jugador nombrado o, sin nombre, el vinculado. Responde el error y devuelve None si no hay."""
         if jugador:
             p = await self.datos.buscar(jugador)
         else:
             pid = self.vinculos.get(str(ctx.author.id))
-            p = {"id": pid} if pid else None
-            if not p:
-                await ctx.reply("No estás vinculado. Usá `-vincular <tu nombre o Riot ID>` o `-perfil <jugador>`.")
-                return
+            if not pid:
+                await ctx.reply(f"No estás vinculado. Usá `-vincular <tu nombre o Riot ID>` o `-{comando} <jugador>`.")
+                return None
+            p = {"id": pid}
         perfil = await self.datos.perfil(p["id"]) if p else None
         if not perfil:
             await ctx.reply("No encontré ese jugador. Solo aparecen las cuentas que se vincularon.")
+        return perfil
+
+    @commands.hybrid_command(name="perfil", description="Rango, KPIs, forma reciente y últimas partidas")
+    async def perfil(self, ctx: commands.Context, *, jugador: str | None = None):
+        if perfil := await self._persona(ctx, jugador, "perfil"):
+            await ctx.reply(view=await self._tarjeta(perfil))
+
+    @commands.hybrid_command(name="roles", description="Rendimiento por posición, ajustado por muestra")
+    async def roles(self, ctx: commands.Context, *, jugador: str | None = None):
+        if not (p := await self._persona(ctx, jugador, "roles")):
             return
-        await ctx.reply(view=await self._tarjeta(perfil))
+        await ctx.reply(view=tarjeta_roles(p, await self.datos.roles(p["id"]),
+                                           (await self.datos.ajustes()).get("nombres_cola", {})))
+
+    @commands.hybrid_command(name="campeones", description="Campeón por posición, con el bloque dentro y fuera del pool")
+    async def campeones(self, ctx: commands.Context, *, jugador: str | None = None):
+        if not (p := await self._persona(ctx, jugador, "campeones")):
+            return
+        await ctx.reply(view=tarjeta_campeones(p, await self.datos.campeones_de(p["id"]), await self.datos.campeones(),
+                                               (await self.datos.ajustes()).get("nombres_cola", {})))
+
+    @commands.hybrid_command(name="sinergia", description="Con qué amigos rendís distinto")
+    async def sinergia(self, ctx: commands.Context, *, jugador: str | None = None):
+        if not (p := await self._persona(ctx, jugador, "sinergia")):
+            return
+        nombres = {x["id"]: x["nombre"] for x in await self.datos.personas()}
+        await ctx.reply(view=tarjeta_sinergia(p, await self.datos.sinergia(), nombres,
+                                              (await self.datos.ajustes()).get("nombres_cola", {})))
 
     async def _tarjeta(self, p: dict) -> discord.ui.LayoutView:
         campeones = await self.datos.campeones()
@@ -136,6 +243,8 @@ class Perfil(commands.Cog):
             "`-vincular <nombre o Riot ID>` une tu Discord con tu jugador\n"
             "`-desvincular` borra el vínculo\n"
             "`-perfil [jugador]` rango, KPIs con su intervalo, forma reciente y últimas partidas\n"
+            "`-roles` · `-campeones` · `-sinergia` `[jugador]` rendimiento ajustado por muestra\n"
+            "`-top [semana|mes|temporada] [solo|flex|normal]` · `-top_rol <rol> [cola]` rankings del grupo\n"
             f"Todo sale de la web: {WEB}")
 
 

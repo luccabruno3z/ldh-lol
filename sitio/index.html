@@ -19,6 +19,7 @@
   <nav class="main-nav" aria-label="Secciones">
     <a href="#/inicio" data-view="inicio">Inicio</a>
     <a href="#/jugadores" data-view="jugadores">Jugadores</a>
+    <a href="#/rankings" data-view="rankings">Rankings</a>
   </nav>
   <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema">◐</button>
 </header>
@@ -50,6 +51,14 @@
       </form>
     </header>
     <div id="perfil"><p class="empty-state">Elegí a alguien del grupo para ver su perfil.</p></div>
+  </div>
+
+  <div class="view" data-view-panel="rankings">
+    <header class="view-head">
+      <h1 class="view-title">Rankings</h1>
+      <nav class="tabs" id="rankings-tabs" aria-label="Tipo de ranking"></nav>
+    </header>
+    <section class="section" id="rankings-cuerpo"><div class="skeleton"></div></section>
   </div>
 </main>
 

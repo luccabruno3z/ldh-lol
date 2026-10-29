@@ -9,6 +9,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 from . import estadistica as est
+from . import fase2
 from .ajustes import AJUSTES, RAIZ, SALIDA
 from .almacen import cargar_estado
 from .base import RUTA_BASE, valor_rango
@@ -129,7 +130,7 @@ def publicar() -> dict:
         JOIN participantes pt ON pt.match_id=f.match_id AND pt.puuid=f.puuid
         JOIN cuentas c ON c.puuid=f.puuid"""):
         fila = json.loads(r["datos"])
-        fila.update({k: r[k] for k in ("persona_id", "match_id", "riot_id", "cola", "inicio_ms",
+        fila.update({k: r[k] for k in ("persona_id", "match_id", "puuid", "riot_id", "cola", "inicio_ms",
                                          "lado", "rol_ldh", "team_position", "champion_id")})
         filas_por[r["persona_id"]].append(fila)
 
@@ -142,6 +143,8 @@ def publicar() -> dict:
         rangos[r["persona_id"]].setdefault(r["riot_id"], {})[r["cola"]] = {
             "tier": r["tier"], "division": r["division"], "lp": r["lp"], "wins": r["wins"],
             "losses": r["losses"], "t": r["t"], "valor": r["valor"]}
+
+    resumen_f2 = fase2.generar(db, filas_por, _escribir)
 
     resumen_personas = []
     por_pag = AJUSTES["historial_por_pagina"]
@@ -168,6 +171,7 @@ def publicar() -> dict:
                      **{c["riot_id"]: _tabla([f for f in filas if f["riot_id"] == c["riot_id"]])
                         for c in cuentas if len(cuentas) > 1}},
             "forma": _forma(filas),
+            **resumen_f2.get(pid, {"mejor_rol": {}, "mejor_companero": None}),
             "historial_paginas": paginas,
         }
         _escribir(f"perfil/{pid}.json", perfil)

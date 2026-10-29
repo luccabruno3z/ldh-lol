@@ -43,5 +43,37 @@
     "MIDDLE": "Mid",
     "BOTTOM": "ADC",
     "UTILITY": "Support"
+  },
+  "ajuste_muestra": {
+    "k_tasa": 10,
+    "k_muertes": 20,
+    "confianza_alta": 15,
+    "confianza_media": 8,
+    "tope_peso_partida": 0.4,
+    "alfa": 0.05
+  },
+  "_ajuste_muestra": "K = 10 partidas al 50 % para winrate (balanceador de Coach AI) y 20 muertes a la mediana del rol para KDA (doc de funcionalidades). Confianza alta con 15+, baja con menos de 8 o si una partida explica más del 40 %.",
+  "pool": {
+    "min_previas": 5,
+    "dias": 90
+  },
+  "_pool": "Una partida es 'del pool' si ese par (campeón, posición) ya tenía 5+ partidas en los 90 días anteriores. Se mide con lo previo para no definir el pool con la misma partida.",
+  "sinergia": {
+    "min_juntos": 3,
+    "min_mejor": 10
+  },
+  "rankings": {
+    "periodos": {
+      "semana": 7,
+      "mes": 30,
+      "temporada": null
+    },
+    "min": {
+      "semana": 5,
+      "mes": 10,
+      "temporada": 20
+    },
+    "min_rol": 10,
+    "dias_rol_reciente": 30
   }
 }

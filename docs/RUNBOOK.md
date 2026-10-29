@@ -39,3 +39,11 @@ Si cambia `extract_match_stats`, subir `EXTRACTOR_VERSION` en `ldh/base.py`.
 
 - **La lista de partidas de Riot no siempre llega al 8/1.** En algunas cuentas `match-v5 by-puuid/ids` se corta meses después del inicio de temporada, aunque las partidas viejas sigan existiendo si se piden por id. Medido el 29/10: monarca tiene 830 de 1228 partidas de solo, y mac55 111 de 171. El perfil lo muestra como "N de M guardadas".
 - **Remakes donde el vinculado fue el AFK.** Riot le cuenta la derrota, pero acá no entran (remake = `gameEndedInEarlySurrender`). Explica parte de las 1 a 3 derrotas que le faltan a varias cuentas.
+
+## Fase 2: qué se publica y con qué reglas
+
+- `api/roles/<persona>.json`, `api/campeones/<persona>.json` (con el bloque del pool), `api/sinergia.json` y `api/rankings/{semana,mes,temporada,roles}.json`. Los arma `ldh/fase2.py` y las constantes están en `config/ajustes.json` (`ajuste_muestra`, `pool`, `sinergia`, `rankings`).
+- Todo va dentro de cada cola. El valor principal es el ajustado por muestra; el real va al lado.
+- **Sinergia:** el p se ajusta por Benjamini-Hochberg sobre todos los pares. Con un p crudo, unos 15 de 298 pares salen "significativos" por azar.
+- **Jungla:** la participación en objetivos épicos se probó y no discrimina (mediana 94 %). Se mide el oro contra el jungla rival a los 15.
+- **Pool:** los meses sin 90 días de historia previa salen marcados como "arranque", porque ahí todo cuenta como fuera del pool.

@@ -64,6 +64,19 @@ class Datos:
     async def historial(self, persona_id: str, pagina: int = 1) -> dict | None:
         return await self._json(f"historial/{quote(persona_id)}/{pagina}.json")
 
+    async def roles(self, persona_id: str) -> dict | None:
+        return await self._json(f"roles/{quote(persona_id)}.json")
+
+    async def campeones_de(self, persona_id: str) -> dict | None:
+        return await self._json(f"campeones/{quote(persona_id)}.json")
+
+    async def sinergia(self) -> dict:
+        return await self._json("sinergia.json") or {"filas": []}
+
+    async def ranking(self, nombre: str) -> dict | None:
+        """semana, mes, temporada o roles."""
+        return await self._json(f"rankings/{nombre}.json")
+
     async def campeones(self) -> dict:
         return (await self._json("campeones.json") or {}).get("campeones", {})
 

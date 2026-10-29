@@ -5,6 +5,7 @@ import { loadBase } from './data.js';
 import { initRouter } from './router.js';
 import { initInicio } from './inicio.js';
 import { initJugador } from './jugador.js';
+import { initRankings } from './rankings.js';
 
 function safe(name, fn) {
     try {
@@ -41,6 +42,7 @@ async function boot() {
     }
     safe('inicio', initInicio);
     safe('jugador', initJugador);
+    safe('rankings', initRankings);
     safe('router', initRouter);
 }
 
