@@ -1,0 +1,3 @@
+# Pipeline (Actions). Versiones fijas: las mismas que se probaron en local.
+requests==2.34.2
+numpy==2.5.2

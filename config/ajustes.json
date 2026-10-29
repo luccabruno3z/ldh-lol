@@ -1,0 +1,39 @@
+{
+  "_nota": "Constantes compartidas por el pipeline, la web y el bot. Cambiar acá, nunca en el código.",
+  "inicio_historial": "2026-01-08T15:00:00Z",
+  "_inicio_historial": "Arranque de la temporada 2026: 8/1 a las 12:00 hora del servidor (LAS, UTC-3).",
+  "rate_limits": [[18, 1.0], [95, 120.0]],
+  "_rate_limits": "Clave de desarrollo y personal: 20 pedidos/1 s y 100/2 min (verificado en los headers X-App-Rate-Limit). Dejamos margen.",
+  "tope_partidas_por_corrida": 400,
+  "tope_segundos_por_corrida": 2400,
+  "duracion_minima_seg": 300,
+  "min_partidas": 10,
+  "forma_reciente": 10,
+  "bootstrap_reps": 2000,
+  "bootstrap_semilla": 23,
+  "confianza": 0.95,
+  "historial_por_pagina": 15,
+  "ddragon_idioma": "es_MX",
+  "colas": {
+    "420": "solo",
+    "440": "flex",
+    "400": "normal",
+    "430": "normal",
+    "490": "normal",
+    "450": "aram"
+  },
+  "nombres_cola": {
+    "solo": "Ranked Solo/Dúo",
+    "flex": "Ranked Flex",
+    "normal": "Normales",
+    "aram": "ARAM",
+    "otra": "Otras colas"
+  },
+  "roles": {
+    "TOP": "Top",
+    "JUNGLE": "Jungla",
+    "MIDDLE": "Mid",
+    "BOTTOM": "ADC",
+    "UTILITY": "Support"
+  }
+}
