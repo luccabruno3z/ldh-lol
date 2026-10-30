@@ -6,6 +6,7 @@ import { seccionEvolucion } from './graficos.js';
 import { onRoute, go } from './router.js';
 import { bloquesFase2 } from './fase2.js';
 import { bloquesFase3 } from './fase3.js';
+import { bloquesFase4 } from './fase4.js';
 import { escapeHtml, rangoTexto, tierClase, nombreCola, conIntervalo, iconoCampeon, campeon, fecha, num } from './utils.js';
 
 const COLS = [
@@ -247,6 +248,7 @@ async function pintarPerfil(cont, base, vista) {
       ${seccionEvolucion(p.evolucion)}
       <div id="fase3"></div>
       <div id="fase2"></div>
+      <div id="fase4"></div>
       <section class="section">
         <div class="section-head"><h3>KPIs por rol</h3>
           <label class="selector">Cola <select id="kpi-cola">${colasKpis(p.kpis.todas).map(c => `<option value="${escapeHtml(c)}">${escapeHtml(nombreCola(c))}</option>`).join('')}</select></label>
@@ -274,6 +276,7 @@ async function pintarPerfil(cont, base, vista) {
     });
     bloquesFase3(p, document.getElementById('fase3')).catch(err => console.error('[coaching]', err));
     bloquesFase2(p, document.getElementById('fase2'));
+    bloquesFase4(p, document.getElementById('fase4'));
     document.getElementById('kpi-cola')?.addEventListener('change', (e) => {
         colaK = e.target.value;
         document.getElementById('kpi-tabla').innerHTML = tablaKpis(p.kpis.todas, colaK);

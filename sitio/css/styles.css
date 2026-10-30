@@ -309,3 +309,16 @@ section.section { scroll-margin-top: calc(var(--header-h) + 56px); }
 .g-hito { font-size: 10px; } .g-hoy { fill: var(--accent); font-weight: 700; }
 .g-recta { stroke-width: 2.4; stroke-dasharray: 8 5; stroke: var(--text-muted); }
 .g-recta--win { stroke: var(--success); } .g-recta--loss { stroke: var(--danger); }
+
+/* ---- Equipos ---- */
+.eq-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin: 8px 0; }
+.eq-card h4 { margin: 0 0 6px; }
+.eq-card.eq-a { border-color: var(--accent); } .eq-card.eq-b { border-color: var(--secondary); }
+.eq-card .ic { display: block; font-size: .72rem; color: var(--text-dim); font-family: var(--font-mono); }
+.eq-elegir { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+.eq-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; font-size: .88rem; }
+.eq-chip:has(input:checked) { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+
+/* ---- Heatmap ---- */
+.g-mapa { width: 100%; max-width: 480px; height: auto; display: block; margin: 8px auto; border-radius: var(--r-md); background: #0b1018; }
+.hm-filtros { display: flex; flex-wrap: wrap; gap: 8px 12px; }
