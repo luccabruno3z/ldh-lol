@@ -84,3 +84,12 @@ Si cambia `extract_match_stats`, subir `EXTRACTOR_VERSION` en `ldh/base.py`.
 - **Feed:** `-canal_feed #canal` publica cada partida nueva del grupo (resultado, KDA, LP exacto) y los ascensos y descensos de división en solo/dúo. El bot lee `recientes.json` cada 5 minutos: el feed llega cuando corre la actualización, no al terminar la partida. La primera vez solo anota lo que hay, para no inundar el canal.
 - **Competencias:** `-competencia <desde> [hasta] [cola]` sale de `partidas_resumen.json`. El LP solo suma las partidas con LP exacto.
 - **Slash commands:** se sincronizan solo cuando cambian (huella en el volumen, `slash_huella.txt`).
+
+## Fase 4
+
+- **Equipos** (`api/equipos.json`, página Equipos, `-ideal`, `-inhouse`): fuerza = winrate ajustado en el rol (todas las colas de Grieta). Nadie va a un rol con menos de `fase4.min_rol` partidas; el balanceador prueba las 126 particiones 5v5, no repite campeón entre equipos y, si no hay asignación válida, lo dice y muestra el mejor compromiso. Probabilidad = A / (A + B): sin calibrar hasta que haya inhouses registradas.
+- **Matchups** (`api/matchups/<persona>.json`, `-matchups`): contra el campeón rival directo, por cola y rol; con menos de `fase4.min_matchup` partidas van plegados.
+- **Heatmaps** (`api/heatmap/<persona>.json`, `-mapa`): muertes y kills de la tabla `eventos` sobre `map11.png` de Data Dragon, separados por lado. Coordenadas del mapa: x de −120 a 14870, y de −120 a 14980 (verificado contra las líneas).
+- **Jungla** (`api/jungla/<persona>.json`, `-jungla`): posición en el minuto 1 (y > x = mitad de arriba, el criterio de Coach AI), por lado. Los datos del grupo dan que Lucca arranca casi siempre en el buff azul; Coach AI decía buff rojo para su Shyvana: pendiente de revisar con él.
+- **Guías** (página Guías): medianas de la referencia por franja y rol, consejos del rol y quién del grupo lo juega mejor.
+- **Partida en vivo:** pendiente. Necesita consultar Spectator-V5 seguido, así que espera la clave personal.

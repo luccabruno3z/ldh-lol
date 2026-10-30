@@ -322,3 +322,6 @@ section.section { scroll-margin-top: calc(var(--header-h) + 56px); }
 /* ---- Heatmap ---- */
 .g-mapa { width: 100%; max-width: 480px; height: auto; display: block; margin: 8px auto; border-radius: var(--r-md); background: #0b1018; }
 .hm-filtros { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+
+.guias-tabs { margin-bottom: 12px; }
+.data-table th .ic { display: block; font-size: .72rem; color: var(--text-dim); font-weight: 400; }

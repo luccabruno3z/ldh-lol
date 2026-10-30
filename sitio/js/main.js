@@ -8,6 +8,7 @@ import { initJugador } from './jugador.js';
 import { initRankings } from './rankings.js';
 import { initComparar } from './comparar.js';
 import { initEquipos } from './equipos.js';
+import { initGuias } from './guias.js';
 
 function safe(name, fn) {
     try {
@@ -47,6 +48,7 @@ async function boot() {
     safe('rankings', initRankings);
     safe('comparar', initComparar);
     safe('equipos', initEquipos);
+    safe('guias', initGuias);
     safe('router', initRouter);
 }
 
