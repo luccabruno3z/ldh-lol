@@ -63,7 +63,7 @@ function performance(r, franja) {
           <td class="num mono">${num(c.peso * 100, 0)}</td>
           <td class="num mono">${num(c.aporte * 100, 1)}</td>
           <td class="num mono">${num(c.margen * 100, 1)}</td></tr>`).join('')}</tbody></table></div>
-      <p class="nota">Cada componente es tu percentil contra ${r.n_ref} jugadores de ${escapeHtml(franja)} en el mismo rol (50 = la mitad de tu franja), y el Performance es la suma con los pesos. Con pocas partidas el índice se acerca a 50: con ${r.n} partidas pesa ${num(100 / (1 + Math.exp(-(r.n - (state.ajustes?.performance?.penalizacion_centro ?? 15)) / (state.ajustes?.performance?.penalizacion_escala ?? 4))), 0)} %. Los intervalos son bootstrap de tus partidas.</p>`;
+      <p class="nota">Cada componente es tu percentil contra ${r.n_ref} jugadores de ${escapeHtml(franja)} en el mismo rol (50 = la mitad de tu franja), y el Performance es la suma con los pesos. Con pocas partidas el índice se acerca a 50: con ${r.n} partidas pesa ${num(100 / (1 + Math.exp(-(r.n - (state.ajustes?.performance?.penalizacion_centro ?? 15)) / (state.ajustes?.performance?.penalizacion_escala ?? 4))), 0)} %. Los intervalos son bootstrap de tus partidas.${r.ref_winrate_crudo != null ? ` Los jugadores de referencia entran por su rango actual y en esas partidas ganaron el ${Math.round(r.ref_winrate_crudo * 100)} % (vienen de ${r.ref_winrate_crudo < 0.47 ? 'bajar' : r.ref_winrate_crudo > 0.53 ? 'subir' : 'ir parejos'}): sus victorias y derrotas se ponderan al 50 %.` : ''}</p>`;
 }
 
 // ---- Tu juego en una mirada y cómo sumar ----

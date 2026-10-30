@@ -112,6 +112,39 @@ async def tarjeta_comparar(bot, a: str, b: str, cola: str | None, rol: str | Non
     return tarjeta_simple(lineas, url)
 
 
+async def armar_grafico(bot, p: dict, tipo: str, rol: str | None):
+    """(vista, png) del gráfico pedido, o (mensaje, None) si todavía no se puede dibujar."""
+    from bot.services import graficos
+    nombre = p["nombre"]
+    if tipo.lower().startswith("rad"):
+        d = await bot.datos.coaching(p["id"])
+        rol_n = ROLES.get((rol or "").lower()) or (d or {}).get("rol_principal")
+        r = ((d or {}).get("roles") or {}).get(rol_n)
+        if not r or r.get("sin_referencia"):
+            return (f"Todavía no hay referencia para el radar de {nombre} en {rol_n or 'ningún rol'}: hacen falta "
+                    "10+ partidas de solo/dúo en el rol y 20 jugadores de referencia en su franja."), None
+        png = graficos.radar(r["componentes"], f"{nombre} · {rol_n} contra {d['franja']}")
+        texto = (f"## {discord.utils.escape_markdown(nombre)} · radar\n-# Performance {round(r['performance']['v'] * 100)}/100. "
+                 f"El anillo punteado es 50, la mitad de su franja ({d['franja']}). Detalle en `-performance`.")
+    else:
+        evo = p.get("evolucion") or {}
+        colas = evo.get("colas") or {}
+        if not colas:
+            return f"{nombre} todavía no tiene {evo.get('ventana', 20)} partidas en ninguna cola de Grieta.", None
+        cola = max(colas, key=lambda c: colas[c]["n"])
+        nc = (await bot.datos.ajustes()).get("nombres_cola", {})
+        png = graficos.evolucion(evo, cola, nc.get(cola, cola), nombre)
+        texto = (f"## {discord.utils.escape_markdown(nombre)} · evolución\n-# La banda es el intervalo del 95 %. "
+                 "Si cruza la línea del 50 %, ese tramo no se distingue de ir parejo.")
+    view = discord.ui.LayoutView(timeout=None)
+    view.add_item(discord.ui.Container(
+        discord.ui.TextDisplay(texto),
+        discord.ui.MediaGallery(discord.MediaGalleryItem("attachment://grafico.png")),
+        discord.ui.ActionRow(discord.ui.Button(label="Ver en la web", url=f"{WEB}#/jugadores/{p['id']}")),
+        accent_colour=0x00CCCC))
+    return view, png
+
+
 class _SelectorTexto(discord.ui.Select):
     def __init__(self, textos: dict, titulo: str):
         self.textos, self.titulo = textos, titulo
@@ -206,39 +239,14 @@ class Extra(commands.Cog):
     @commands.hybrid_command(name="grafico", description="Tu winrate en el tiempo con su banda, o el radar de tus componentes")
     @app_commands.autocomplete(jugador=autocompletar_jugador)
     async def grafico(self, ctx: commands.Context, jugador: str | None = None, tipo: str = "evolucion", rol: str | None = None):
-        from bot.services import graficos
         if jugador and jugador.lower() in ("evolucion", "evolución", "radar"):  # -grafico radar
             jugador, tipo = None, jugador
         if not (p := await self._persona(ctx, jugador, "grafico")):
             return
-        nombre = p["nombre"]
-        if tipo.lower().startswith("rad"):
-            d = await self.datos.coaching(p["id"])
-            rol_n = ROLES.get((rol or "").lower()) or (d or {}).get("rol_principal")
-            r = ((d or {}).get("roles") or {}).get(rol_n)
-            if not r or r.get("sin_referencia"):
-                await ctx.reply(f"Todavía no hay referencia para el radar de {nombre} en {rol_n or 'ningún rol'} "
-                                "(hacen falta 10+ partidas de solo/dúo en el rol y 20 jugadores de referencia en su franja).")
-                return
-            png = graficos.radar(r["componentes"], f"{nombre} · {rol_n} contra {d['franja']}")
-            texto = f"## {discord.utils.escape_markdown(nombre)} · radar\n-# 50 = la mitad de su franja ({d['franja']}). Detalle en `-performance`."
-        else:
-            evo = p.get("evolucion") or {}
-            colas = evo.get("colas") or {}
-            if not colas:
-                await ctx.reply(f"{nombre} todavía no tiene {evo.get('ventana', 20)} partidas en ninguna cola de Grieta.")
-                return
-            cola = max(colas, key=lambda c: colas[c]["n"])
-            nc = (await self.datos.ajustes()).get("nombres_cola", {})
-            png = graficos.evolucion(evo, cola, nc.get(cola, cola), nombre)
-            texto = (f"## {discord.utils.escape_markdown(nombre)} · evolución\n-# La banda es el intervalo del 95 %. "
-                     "Si cruza la línea del 50 %, ese tramo no se distingue de ir parejo.")
-        view = discord.ui.LayoutView(timeout=None)
-        view.add_item(discord.ui.Container(
-            discord.ui.TextDisplay(texto),
-            discord.ui.MediaGallery(discord.MediaGalleryItem("attachment://grafico.png")),
-            discord.ui.ActionRow(discord.ui.Button(label="Ver en la web", url=f"{WEB}#/jugadores/{p['id']}")),
-            accent_colour=0x00CCCC))
+        view, png = await armar_grafico(self.bot, p, tipo, rol)
+        if png is None:
+            await ctx.reply(view)
+            return
         await ctx.reply(view=view, file=discord.File(png, "grafico.png"))
 
     @commands.hybrid_command(name="sugerencia", description="Dejá una idea o un error para mejorar el bot o la web")

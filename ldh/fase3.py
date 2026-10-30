@@ -56,7 +56,9 @@ METRICAS: dict[str, tuple] = {
     "winrate": ("Winrate ajustado a tu franja", None, True, 3, ""),
 }
 # El CS no es tarea del support: sus métricas de CS no entran en sus fortalezas ni debilidades.
-NO_APLICA = {"Support": {"cs_min", "cs10", "cs15", "dif_cs10", "dif_cs15"}}
+# La participación en dragones, Heraldo y Barón no distingue junglas: mediana de 96 % en la
+# referencia (el jungla está en casi todos). Se probó y se saca, como en la fase 2.
+NO_APLICA = {"Support": {"cs_min", "cs10", "cs15", "dif_cs10", "dif_cs15"}, "Jungla": {"obj"}}
 # Las métricas que forman la "nota" por partida que mide la consistencia.
 NOTA = ("kp", "dano", "oro_min", "vision_min")
 
@@ -69,7 +71,7 @@ def _componentes(rol: str) -> list[tuple[str, str, list[str]]]:
         ("economia", "Economía", ["oro_min"] if sup else ["oro_min", "cs_min"]),
         ("linea", "Línea", ["dif_vision_min"] if sup else ["dif_oro15", "dif_cs15"]),
         ("winrate", "Winrate", ["winrate"]),
-        ("equipo", "Equipo", ["vision_min", "obj"]),
+        ("equipo", "Equipo", ["vision_min"] if rol == "Jungla" else ["vision_min", "obj"]),
         ("consistencia", "Consistencia", ["consistencia"]),
     ]
 
@@ -120,21 +122,25 @@ def _matriz(filas: list[dict]) -> dict[str, np.ndarray]:
     return out
 
 
-def _valores(m: dict[str, np.ndarray], idx: np.ndarray) -> dict[str, np.ndarray]:
-    """Valor de cada métrica de jugador para cada fila de índices (bootstrap: idx de REPS × n)."""
+def _valores(m: dict[str, np.ndarray], idx: np.ndarray, peso: np.ndarray | None = None) -> dict[str, np.ndarray]:
+    """Valor de cada métrica de jugador para cada fila de índices (bootstrap: idx de REPS × n).
+
+    peso: uno por partida (solo la referencia lo usa, para llevar victorias y derrotas al 50 %)."""
     v = {}
+    w = np.ones(len(m["_w"])) if peso is None else peso
     with np.errstate(invalid="ignore", divide="ignore"):
         for k in METRICAS:
             if k == "kda":
-                v[k] = (m["_k"][idx].sum(-1) + m["_a"][idx].sum(-1)) / np.maximum(m["_d"][idx].sum(-1), 1)
+                v[k] = ((m["_k"] * w)[idx].sum(-1) + (m["_a"] * w)[idx].sum(-1)) / np.maximum((m["_d"] * w)[idx].sum(-1), 1)
             elif k == "winrate":
                 n = idx.shape[-1]
                 v[k] = (m["_w"][idx].sum(-1) + AJUSTES["ajuste_muestra"]["k_tasa"] * 0.5) / (n + AJUSTES["ajuste_muestra"]["k_tasa"])
             else:
-                x = m[k][idx]
+                x, wx = m[k][idx], w[idx]
                 # Un jugador sin dato en más de la mitad de sus partidas no tiene valor.
-                ok = (~np.isnan(x)).sum(-1)
-                v[k] = np.where(ok * 2 >= idx.shape[-1], np.nanmean(x, -1), np.nan)
+                ok = ~np.isnan(x)
+                media = np.nansum(x * wx, -1) / np.where(ok, wx, 0).sum(-1)
+                v[k] = np.where(ok.sum(-1) * 2 >= idx.shape[-1], media, np.nan)
     return v
 
 
@@ -158,12 +164,18 @@ class Celda:
         self.n_jugadores = len(jugadores)
         todas = [f for g in jugadores for f in g]
         mt = _matriz(todas)
+        # Sesgo de selección: cada jugador entra por su rango actual, y sus últimas partidas son las
+        # que lo dejaron ahí (en Hierro–Bronce ganaron el 39 %: vienen de bajar). El emparejamiento
+        # apunta al 50 %, así que victorias y derrotas se ponderan para pesar como un 50 % cada una.
+        self.winrate_crudo = float(mt["_w"].mean()) if len(todas) else None
+        p = min(max(self.winrate_crudo or 0.5, 0.05), 0.95)
         # Por partida: base de la "nota" de consistencia.
         self.partida = {k: np.sort(mt[k][~np.isnan(mt[k])]) for k in NOTA}
         vals = defaultdict(list)
         for g in jugadores:
             m = _matriz(g)
-            v = _valores(m, np.arange(len(g))[None, :])
+            peso = np.where(m["_w"] > 0, 0.5 / p, 0.5 / (1 - p))
+            v = _valores(m, np.arange(len(g))[None, :], peso)
             for k, x in v.items():
                 vals[k].append(x[0])
             vals["consistencia"].append(-self.dispersion(m, np.arange(len(g))[None, :])[0])
@@ -334,6 +346,7 @@ def _rol(filas: list[dict], rol: str, franja: str, celdas: dict) -> dict | None:
                       "meta": meta, "consejo": _consejo(c["clave"], rol)})
 
     return {"n": n, "confianza": est.confianza(n), "franja": franja, "n_ref": celda.n_jugadores,
+            "ref_winrate_crudo": _r(celda.winrate_crudo),
             "performance": {"v": _r(ev["perf"][0]), "lo": lo, "hi": hi, "por_franja": por_franja,
                             "como": como, "pisan": pisan},
             "componentes": comps, "metricas": metricas,

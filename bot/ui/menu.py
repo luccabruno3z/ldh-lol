@@ -6,8 +6,8 @@ from __future__ import annotations
 
 import discord
 
-ACCIONES = {"perfil": "Mi perfil", "buscar": "Buscar jugador", "top": "Rankings", "toprol": "Top por rol",
-            "comparar": "Comparar", "ayuda": "Ayuda"}
+ACCIONES = {"perfil": "Mi perfil", "grafico": "Mis gráficos", "buscar": "Buscar jugador", "top": "Rankings",
+            "toprol": "Top por rol", "comparar": "Comparar", "ayuda": "Ayuda"}
 
 
 class BuscarModal(discord.ui.Modal, title="Buscar jugador"):
@@ -67,6 +67,25 @@ class MenuBoton(discord.ui.DynamicItem[discord.ui.Button], template=r"lm:(?P<acc
             from bot.cogs.extra import AyudaVista
             await interaction.response.send_message(view=AyudaVista(), ephemeral=True)
             return
+        if self.accion == "grafico":
+            # La evolución siempre que haya 20+ partidas; el radar (la "rosa") cuando haya referencia.
+            pid = bot.get_cog("Perfil").vinculos.get(str(self.owner))
+            if not pid:
+                await interaction.response.send_message(
+                    "Primero vinculate con `-vincular <tu nombre o Riot ID>`, o usá `-grafico <jugador>`.", ephemeral=True)
+                return
+            from bot.cogs.extra import armar_grafico
+            await interaction.response.defer(thinking=True)
+            p = await bot.datos.perfil(pid)
+            enviados = 0
+            for tipo in ("evolucion", "radar"):
+                view, png = await armar_grafico(bot, p, tipo, None)
+                if png is not None:
+                    await interaction.followup.send(view=view, file=discord.File(png, "grafico.png"))
+                    enviados += 1
+                elif tipo == "radar" or not enviados:
+                    await interaction.followup.send(view, ephemeral=True)
+            return
         if self.accion == "perfil":
             pid = bot.get_cog("Perfil").vinculos.get(str(self.owner))
             if not pid:
@@ -89,8 +108,8 @@ def menu(owner: int) -> discord.ui.LayoutView:
     view.add_item(discord.ui.Container(
         discord.ui.TextDisplay("## LDH Stats LoL\nElegí qué querés ver. Los números llevan su intervalo y su n; "
                                "si algo dice **ruido**, con esas partidas no se puede sacar conclusiones."),
-        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("perfil", "buscar", "top")]),
-        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("toprol", "comparar", "ayuda")]),
+        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("perfil", "grafico", "buscar")]),
+        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("top", "toprol", "comparar", "ayuda")]),
         discord.ui.ActionRow(discord.ui.Button(label="Abrir la web", url="https://luccabruno3z.github.io/ldh-lol/")),
         accent_colour=0x00CCCC))
     return view
