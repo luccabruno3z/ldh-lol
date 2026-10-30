@@ -32,7 +32,7 @@ REPS = AJUSTES["bootstrap_reps"]
 SEMILLA = AJUSTES["bootstrap_semilla"]
 FRANJAS = list(REF["franjas"])
 CONSEJOS = json.loads((RAIZ / "config" / "consejos.json").read_text(encoding="utf-8"))
-VERSION_FILAS = 3
+VERSION_FILAS = 4  # 4: recalcular sin la cuenta que pasó a privada
 
 # clave: (etiqueta, función por partida, más es mejor, decimales, unidad)
 METRICAS: dict[str, tuple] = {

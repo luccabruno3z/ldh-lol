@@ -11,6 +11,14 @@ export async function initInicio() {
         `datos actualizados ${hace(Date.parse(meta.generado))}` +
         (ing && ing.cuentas_con_pendientes ? ` · todavía se están bajando partidas de ${ing.cuentas_con_pendientes} cuentas` : '');
 
+    // "Cómo leer los números" abre el glosario en lugar de navegar (el hash lo usa el router).
+    document.querySelector('[data-abrir="como-leer"]')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        const d = document.getElementById('como-leer');
+        d.open = true;
+        d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
     const ordenadas = [...personas].sort((a, b) => (b.n > 0) - (a.n > 0) || b.n - a.n);
     document.getElementById('grupo-lista').innerHTML = ordenadas.map(p => `
         <a class="card persona" href="#/jugadores/${encodeURIComponent(p.id)}">

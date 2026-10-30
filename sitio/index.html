@@ -18,7 +18,7 @@
 <body>
 <a class="skip" href="#main">Saltar al contenido</a>
 <header class="site-header">
-  <a class="brand" href="#/inicio">LDH <span>Stats</span> <small>LoL</small></a>
+  <a class="brand" href="#/inicio"><img class="brand-logo" src="img/logo.svg" alt="" width="28" height="28">LDH <span>Stats</span> <small>LoL</small></a>
   <nav class="main-nav" aria-label="Secciones">
     <a href="#/inicio" data-view="inicio">Inicio</a>
     <a href="#/jugadores" data-view="jugadores">Jugadores</a>
@@ -33,6 +33,34 @@
       <h1 class="view-title">Inicio</h1>
       <p class="view-sub" id="meta-linea">Cargando datos…</p>
     </header>
+    <section class="arranque" aria-label="Por dónde empezar">
+      <a class="arranque-card" href="#/jugadores" id="arranque-perfil">
+        <span class="arranque-num">1</span><strong>Buscá tu perfil</strong>
+        <span class="dim">Tu forma reciente, tus roles, tus campeones y qué mejorar.</span></a>
+      <a class="arranque-card" href="#/rankings">
+        <span class="arranque-num">2</span><strong>Mirá los rankings</strong>
+        <span class="dim">Quién viene mejor esta semana, por rol y en dúo.</span></a>
+      <a class="arranque-card" href="#como-leer" data-abrir="como-leer">
+        <span class="arranque-num">3</span><strong>Cómo leer los números</strong>
+        <span class="dim">Qué es "ajustado", el intervalo y cuándo algo es ruido.</span></a>
+    </section>
+    <details class="section como-leer" id="como-leer">
+      <summary><h2>Cómo leer los números</h2></summary>
+      <dl class="glosario">
+        <dt>Valor grande y valor chico</dt>
+        <dd>El número grande es el que importa. Debajo, en gris, va el rango donde está el valor real (el intervalo): si es ancho, todavía hay pocas partidas.</dd>
+        <dt>Ajustado</dt>
+        <dd>Con pocas partidas, el winrate y el KDA se acercan al promedio. Así nadie queda primero con 2 de 2. El valor "real" va al lado.</dd>
+        <dt>Confianza</dt>
+        <dd><span class="tag conf-alta">alta</span> 15 partidas o más · <span class="tag conf-media">media</span> de 8 a 14 · <span class="tag conf-baja">baja</span> menos de 8. Con confianza baja algo no puede ser "tu mejor" nada.</dd>
+        <dt>Ruido</dt>
+        <dd>La diferencia existe en los números, pero con estas partidas podría ser azar. No se puede decir que cambió nada.</dd>
+        <dt>Muestra chica</dt>
+        <dd>Menos de 10 partidas: se muestra al final o plegado, y no se sacan conclusiones.</dd>
+        <dt>Tu franja y el percentil</dt>
+        <dd>Te comparamos con jugadores de tu rango (Hierro–Bronce, Plata–Oro o Platino–Esmeralda) en tu mismo rol. "Mejor que el 70 %" es contra ellos, no contra el grupo.</dd>
+      </dl>
+    </details>
     <section class="section" id="grupo">
       <h2>El grupo</h2>
       <div id="grupo-lista" class="cards"><div class="skeleton"></div></div>

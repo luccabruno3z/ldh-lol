@@ -49,6 +49,41 @@ function cabecera(p) {
     </section>`;
 }
 
+let observadorIndice = null;
+
+/** Lo importante de un vistazo: rango, winrate de la cola principal, mejor rol y forma reciente. */
+function resumen(p) {
+    const todos = (p.kpis?.todas || []).filter(f => f.rol === 'Todos');
+    const principal = todos.sort((a, b) => b.n - a.n)[0];
+    const solo = Object.values(p.rango || {}).map(c => c.solo).filter(Boolean).sort((a, b) => (b.valor ?? -1) - (a.valor ?? -1))[0];
+    const mejor = principal && p.mejor_rol?.[principal.cola];
+    const f = p.forma, dif = f?.comparacion?.winrate?.dif;
+    const tarjeta = (titulo, valor, detalle, clase = '') =>
+        `<div class="res-card ${clase}"><span class="res-tit">${titulo}</span><span class="res-val">${valor}</span><span class="res-det">${detalle}</span></div>`;
+    return `<div class="resumen">
+      ${tarjeta('Solo/Dúo', solo ? escapeHtml(rangoTexto(solo).split(' · ')[0]) : 'Sin clasificar',
+                solo ? `${solo.lp} LP · ${solo.wins} V / ${solo.losses} D` : 'todavía sin rango', tierClase(solo))}
+      ${principal ? tarjeta(`Winrate en ${escapeHtml(nombreCola(principal.cola))}`, conIntervalo(principal.winrate, 'pct'), `${principal.n} partidas`) : ''}
+      ${tarjeta('Mejor rol', mejor ? escapeHtml(mejor.rol) : '—',
+                mejor ? `${Math.round(mejor.winrate_aj * 100)} % ajustado en ${mejor.n} partidas` : 'ningún rol con confianza media todavía')}
+      ${f ? tarjeta('Últimas 10', conIntervalo(f.comparacion.winrate.ultimas, 'pct'),
+                dif?.ruido ? 'igual que tu resto (ruido)' : dif?.v > 0 ? 'mejor que tu resto' : 'peor que tu resto',
+                dif?.ruido ? '' : dif?.v > 0 ? 'res-bien' : 'res-mal') : ''}
+    </div>`;
+}
+
+/** Índice fijo con las secciones que efectivamente cargaron (cada bloque llega por su lado). */
+function armarIndice(cont) {
+    const nav = cont.querySelector('#perfil-indice');
+    if (!nav) return;
+    const secciones = [...cont.querySelectorAll('section.section h3')].filter(h => h.offsetParent !== null);
+    nav.innerHTML = secciones.map((h, i) => {
+        const sec = h.closest('section');
+        sec.id = sec.id || `sec-${i}`;
+        return `<button type="button" class="indice-chip" data-ir="${sec.id}">${escapeHtml(h.childNodes[0]?.textContent.split('·')[0].trim() || h.textContent)}</button>`;
+    }).join('');
+}
+
 /** Colas presentes, la más jugada primero (por la fila "Todos"). */
 function colasKpis(filas) {
     return [...new Set(filas.map(f => f.cola))].sort((a, b) =>
@@ -180,6 +215,8 @@ async function mostrar(id) {
     // Orden: lo que se lee de un vistazo (forma) y lo que ayuda a mejorar (coaching, roles, pool)
     // antes que la tabla de KPIs, que es el detalle.
     cont.innerHTML = `${cabecera(p)}
+      ${resumen(p)}
+      <nav class="perfil-indice" id="perfil-indice" aria-label="Ir a una sección del perfil"></nav>
       ${forma(p.forma)}
       <div id="fase3"></div>
       <div id="fase2"></div>
@@ -192,6 +229,20 @@ async function mostrar(id) {
         <div id="kpi-tabla">${tablaKpis(p.kpis.todas, colaK)}</div>
       </section>
       <div id="historial"></div>`;
+    // El índice se rearma cuando termina de llegar cada bloque.
+    // Se ignoran los cambios del propio índice (si no, se rearmaría sin fin) y se corta el del perfil anterior.
+    let pendiente;
+    observadorIndice?.disconnect();
+    observadorIndice = new MutationObserver((ms) => {
+        if (ms.every(m => m.target.closest?.('#perfil-indice'))) return;
+        clearTimeout(pendiente);
+        pendiente = setTimeout(() => armarIndice(cont), 150);
+    });
+    observadorIndice.observe(cont, { childList: true, subtree: true });
+    cont.querySelector('#perfil-indice').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-ir]');
+        if (b) document.getElementById(b.dataset.ir)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     bloquesFase3(p, document.getElementById('fase3')).catch(err => console.error('[coaching]', err));
     bloquesFase2(p, document.getElementById('fase2'));
     const pintarKpis = () => { document.getElementById('kpi-tabla').innerHTML = tablaKpis(p.kpis[cuenta] || [], colaK); };
