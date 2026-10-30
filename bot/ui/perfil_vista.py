@@ -68,7 +68,7 @@ async def _cuerpo(bot, p: dict, tab: str, cuenta: dict | None) -> str:
         if cuenta:
             return ("## Coaching\nEl coaching necesita muestra y una franja por rango: se calcula con todas tus "
                     "cuentas juntas. Tocá **Todas las cuentas** para verlo.")
-        d = await datos.coaching(p["id"])
+        d = await datos.coaching_auto(p["id"])
         if not d:
             return "Todavía no hay coaching publicado."
         perf, mejora = _texto(co.tarjeta_performance(p, d, None)), _texto(co.tarjeta_mejora(p, d, None))

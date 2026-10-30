@@ -74,11 +74,11 @@ function lineaLp(lp) {
     </svg>`;
 }
 
-/** Sección "Tu evolución": una pestaña por cola con 20+ partidas y el LP abajo. */
-export function seccionEvolucion(evo) {
+/** Sección "Tu evolución": una pestaña por cola con 20+ partidas y el LP abajo. Con modo, solo esa. */
+export function seccionEvolucion(evo, modo = null) {
     if (!evo) return '';
-    const colas = COLAS.filter(c => evo.colas?.[c]);
-    if (!colas.length && !evo.lp?.length) return '';
+    const colas = (modo ? [modo] : COLAS).filter(c => evo.colas?.[c]);
+    if (!modo && !colas.length && !evo.lp?.length) return '';
     const principal = colas.sort((a, b) => evo.colas[b].n - evo.colas[a].n)[0];
     return `<section class="section evolucion">
       <div class="section-head"><h3>Tu evolución</h3>
@@ -87,6 +87,7 @@ export function seccionEvolucion(evo) {
       ${colas.map(c => `<div class="evo-panel" data-panel="${c}"${c === principal ? '' : ' hidden'}>
           ${lecturaEvo(evo.colas[c], evo.ventana)}
           ${lineaWinrate({ ...evo.colas[c], cola: c }, evo.ventana)}</div>`).join('')}
+      ${modo && !colas.length ? `<p class="empty-state">Menos de ${evo.ventana} partidas en este modo: todavía no hay línea.</p>` : ''}
       ${colas.length ? `<p class="nota">Cada punto es tu winrate en las ${evo.ventana} partidas anteriores a esa fecha: si la línea sube, venías ganando más. La banda es el margen de error; la línea punteada gris es el 50 % y la naranja, tu promedio de toda la temporada. Si la banda cubre tu promedio, ese tramo no se distingue de tu nivel de siempre.</p>` : ''}
       ${evo.lp?.length ? `<h4>LP en solo/dúo</h4>${lineaLp(evo.lp)}` : ''}
     </section>`;
@@ -105,7 +106,7 @@ document.addEventListener('click', (e) => {
 
 /** t: {puntos [{t, v}], recta {desde, hasta}, pendiente, lo, hi, veredicto, inicio, ahora, ventana, n}. */
 export function seccionTendencia(t, rol, franja) {
-    if (!t) return `<p class="dim">Hacen falta 30 partidas de ${escapeHtml(rol)} en solo/dúo para medir una tendencia.</p>`;
+    if (!t) return `<p class="dim">Hacen falta 30 partidas de ${escapeHtml(rol)} en este modo para medir una tendencia.</p>`;
     const W = 640, H = 210, m = { l: 34, r: 12, t: 14, b: 24 };
     // Eje = número de partida (la recta se ajusta por partida); los meses quedan como rótulos.
     const n1 = Math.max(1, t.n - 1);

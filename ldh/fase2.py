@@ -18,8 +18,20 @@ from .ajustes import AJUSTES, INICIO_HISTORIAL
 MIN = AJUSTES["min_partidas"]
 AJ = AJUSTES["ajuste_muestra"]
 GRIETA = ("solo", "flex", "normal")
+# "todo" junta las tres colas de la Grieta: para quien juega poco de cada una, es la única vista
+# con muestra. Las colas por separado siguen siendo la comparación limpia (regla 4).
+MODOS = (*GRIETA, "todo")
 ROLES = ["Top", "Jungla", "Mid", "ADC", "Support"]
 DIA_MS = 86_400_000
+
+
+def colas_de(f: dict) -> list[str]:
+    """Las colas en las que cuenta una fila: la suya y, si es de la Grieta, "todo"."""
+    return [f["cola"], "todo"] if f["cola"] in GRIETA else [f["cola"]]
+
+
+def en(f: dict, cola: str) -> bool:
+    return f["cola"] == cola or (cola == "todo" and f["cola"] in GRIETA)
 
 # Métrica propia de cada rol: (clave, etiqueta, campo de la fila). La primera es la del ranking.
 METRICA_ROL = {
@@ -72,7 +84,8 @@ def _medianas_kda(filas_por: dict[str, list[dict]], clave: Callable[[dict], tupl
     por = defaultdict(lambda: defaultdict(list))
     for pid, filas in filas_por.items():
         for f in filas:
-            por[clave(f)][pid].append(f)
+            for k in clave(f):
+                por[k][pid].append(f)
     out = {}
     for k, personas in por.items():
         vals = [_kda_crudo(g) for g in personas.values() if len(g) >= MIN] or \
@@ -109,7 +122,8 @@ def _medianas_rol(filas_por: dict[str, list[dict]]) -> dict:
     for pid, filas in filas_por.items():
         for f in filas:
             if f["rol_ldh"]:
-                por[(f["cola"], f["rol_ldh"])][pid].append(f)
+                for c in colas_de(f):
+                    por[(c, f["rol_ldh"])][pid].append(f)
     out = {}
     for (cola, rol), personas in por.items():
         con = {p: g for p, g in personas.items() if len(g) >= MIN}
@@ -129,14 +143,15 @@ def roles(filas: list[dict], med_kda: dict, med_rol: dict) -> dict:
     grupos = defaultdict(list)
     for f in filas:
         if f["cola"] in GRIETA and f["rol_ldh"]:
-            grupos[(f["cola"], f["rol_ldh"])].append(f)
+            for c in colas_de(f):
+                grupos[(c, f["rol_ldh"])].append(f)
     tabla = []
     for (cola, rol), g in grupos.items():
         tabla.append({"cola": cola, "rol": rol, **_resumen(g, med_kda.get((cola, rol)), rol),
                       "referencia": med_rol.get(f"{cola}|{rol}")})
-    tabla.sort(key=lambda t: (t["muestra_chica"], GRIETA.index(t["cola"]), ROLES.index(t["rol"])))
+    tabla.sort(key=lambda t: (t["muestra_chica"], MODOS.index(t["cola"]), ROLES.index(t["rol"])))
     mejor = {}
-    for cola in GRIETA:
+    for cola in MODOS:
         cand = [t for t in tabla if t["cola"] == cola and t["confianza"] != "baja"]
         if cand:
             m = max(cand, key=lambda t: t["winrate_aj"])
@@ -150,17 +165,19 @@ def campeones(filas: list[dict], med_kda: dict) -> list[dict]:
     grupos = defaultdict(list)
     for f in filas:
         if f["cola"] in GRIETA:
-            grupos[(f["cola"], f["champion_id"], f["rol_ldh"])].append(f)
+            for c in colas_de(f):
+                grupos[(c, f["champion_id"], f["rol_ldh"])].append(f)
     por_cola = defaultdict(int)
     for f in filas:
-        por_cola[f["cola"]] += 1
+        for c in colas_de(f):
+            por_cola[c] += 1
     tabla = []
     for (cola, champ, rol), g in grupos.items():
         g.sort(key=lambda f: f["inicio_ms"])
         tabla.append({"cola": cola, "champ": champ, "rol": rol, **_resumen(g, med_kda.get((cola, rol)), rol),
                       "popularidad": est._r(len(g) / por_cola[cola]), "ultimo_parche": g[-1].get("patch"),
                       "ultima": g[-1]["inicio_ms"]})
-    return sorted(tabla, key=lambda t: (GRIETA.index(t["cola"]), *_orden(t)))
+    return sorted(tabla, key=lambda t: (MODOS.index(t["cola"]), *_orden(t)))
 
 
 def pool(filas: list[dict]) -> dict:
@@ -177,18 +194,18 @@ def pool(filas: list[dict]) -> dict:
         previas[clave].append(t)
     completo = datetime.fromtimestamp(INICIO_HISTORIAL + cfg["dias"] * 86400, timezone.utc).strftime("%Y-%m")
     out = {}
-    for cola in GRIETA:
-        de = [(f, en) for f, en in marcadas if f["cola"] == cola]
+    for cola in MODOS:
+        de = [(f, dentro) for f, dentro in marcadas if en(f, cola)]
         if not de:
             continue
-        dentro = [f for f, en in de if en]
-        fuera = [f for f, en in de if not en]
+        dentro = [f for f, ok in de if ok]
+        fuera = [f for f, ok in de if not ok]
         wd, wf = sum(f["win"] for f in dentro), sum(f["win"] for f in fuera)
         meses = defaultdict(lambda: [0, 0])
-        for f, en in de:
+        for f, ok in de:
             m = datetime.fromtimestamp(f["inicio_ms"] / 1000, timezone.utc).strftime("%Y-%m")
             meses[m][0] += 1
-            meses[m][1] += not en
+            meses[m][1] += not ok
         out[cola] = {
             "dentro": est.wilson(wd, len(dentro)), "fuera": est.wilson(wf, len(fuera)),
             "dif": est.diferencia([float(f["win"]) for f in dentro], [float(f["win"]) for f in fuera]),
@@ -253,10 +270,10 @@ def rankings(filas_por: dict[str, list[dict]], ahora_ms: int, med_kda_cola: dict
     for periodo, dias in cfg["periodos"].items():
         desde = ahora_ms - dias * DIA_MS if dias else 0
         por_cola = {}
-        for cola in GRIETA:
+        for cola in MODOS:
             filas = []
             for pid, fs in filas_por.items():
-                g = [f for f in fs if f["cola"] == cola and f["inicio_ms"] >= desde]
+                g = [f for f in fs if en(f, cola) and f["inicio_ms"] >= desde]
                 if g:
                     filas.append({"persona": pid, **_resumen(g, med_kda_cola.get(cola), None)})
             ok = sorted((r for r in filas if r["n"] >= cfg["min"][periodo]), key=_orden)
@@ -278,12 +295,12 @@ def rankings_rol(filas_por: dict[str, list[dict]], ahora_ms: int) -> dict:
     for nombre, dias in (("historico", None), ("reciente", cfg["dias_rol_reciente"])):
         desde = ahora_ms - dias * DIA_MS if dias else 0
         por = {}
-        for cola in GRIETA:
+        for cola in MODOS:
             for rol in ROLES:
                 clave, etiqueta, campo = METRICA_ROL[rol][0]
                 filas = []
                 for pid, fs in filas_por.items():
-                    g = [f for f in fs if f["cola"] == cola and f["rol_ldh"] == rol and f["inicio_ms"] >= desde]
+                    g = [f for f in fs if en(f, cola) and f["rol_ldh"] == rol and f["inicio_ms"] >= desde]
                     conf = est.confianza(len(g), [f["kills"] + f["assists"] for f in g])
                     if len(g) >= cfg["min_rol"] and conf != "baja":
                         m = est.media([f.get(campo) for f in g])
@@ -310,8 +327,8 @@ def por_cuenta(filas: list[dict]) -> dict:
 def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: Callable) -> dict:
     """Escribe roles/, campeones/, sinergia.json y rankings/. Devuelve lo que el perfil resume."""
     _enriquecer(db, filas_por)
-    med_kda = _medianas_kda(filas_por, lambda f: (f["cola"], f["rol_ldh"]))
-    med_kda_cola = _medianas_kda(filas_por, lambda f: f["cola"])
+    med_kda = _medianas_kda(filas_por, lambda f: [(c, f["rol_ldh"]) for c in colas_de(f)])
+    med_kda_cola = _medianas_kda(filas_por, colas_de)
     med_rol = _medianas_rol(filas_por)
     _MEDIANAS.update(kda=med_kda, rol=med_rol)
     sin = sinergia(filas_por)

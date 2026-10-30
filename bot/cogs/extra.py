@@ -48,24 +48,25 @@ AYUDA = {
     "Perfil": "`-perfil [jugador]` perfil con pestañas: resumen, roles, campeones, coaching y partidas. "
               "Si tenés varias cuentas, hay botones para ver cada una\n`-roles` · `-campeones` · `-sinergia` `[jugador]` "
               "abren esa pestaña directo",
-    "Coaching": "`-performance [jugador] [rol]` tu índice y sus 7 componentes contra tu franja\n"
-                "`-mejora [jugador] [rol]` las 3 brechas más grandes como metas en números\n"
-                "`-temprano [jugador] [rol]` CS, oro y XP a los 10 y 15 contra tu rival directo\n"
+    "Coaching": "`-performance [jugador] [rol] [solo|normal|todo]` tu índice y sus 7 componentes contra tu franja\n"
+                "`-mejora [jugador] [rol] [solo|normal|todo]` las 3 brechas más grandes como metas en números\n"
+                "`-temprano [jugador] [rol] [solo|normal|todo]` CS, oro y XP a los 10 y 15 contra tu rival directo\n"
+                "-# Sin modo: solo/dúo si te alcanza, si no `todo` (solo/dúo, flex y normales juntas).\n"
                 "`-tips <rol>` consejos del rol",
-    "Gráficos": "`-grafico [jugador] tendencia [rol]` ¿estás mejorando? Tu índice por partida contra tu franja y su tendencia\n"
-                "`-grafico [jugador] evolucion` ¿venís mejor o peor? Tu winrate de las últimas 20 contra tu temporada\n"
-                "`-grafico [jugador] radar [rol]` la rosa de tus 7 componentes contra tu franja\n"
+    "Gráficos": "`-grafico [jugador] tendencia [rol] [modo]` ¿estás mejorando? Tu índice por partida contra tu franja y su tendencia\n"
+                "`-grafico [jugador] evolucion [modo]` ¿venís mejor o peor? Tu winrate de las últimas 20 contra tu temporada\n"
+                "`-grafico [jugador] radar [rol] [modo]` la rosa de tus 7 componentes contra tu franja\n"
                 "-# En `-menu`, **Mis gráficos** manda los tres.",
     "Equipos y mapa": "`-ideal` el 5 ideal del grupo: una persona por rol con 10+ partidas ahí\n"
                       "`-inhouse <10 jugadores separados por coma>` dos equipos parejos, cada uno en un rol que conoce\n"
                       "`-matchups [jugador] [cola]` cómo te va contra cada campeón rival directo\n"
                       "`-jungla [jugador]` de qué buff arrancás y qué tan predecible sos, por lado\n"
                       "`-mapa [jugador] [muertes|kills] [azul|rojo]` dónde morís o matás, sobre el minimapa",
-    "Rankings": "`-top [semana|mes|temporada] [cola]` con menús para cambiar período y cola\n"
+    "Rankings": "`-top [semana|mes|temporada] [solo|flex|normal|todo]` con menús para cambiar período y cola\n"
                 "`-top_rol [rol] [cola]` la métrica de cada rol contra el rival directo\n"
                 "`-comparar <jugador> <otro> [cola] [rol]` métrica por métrica\n"
                 "`-competencia <desde dd/mm> [hasta dd/mm] [cola]` quién rindió mejor entre dos fechas\n"
-                "`-mejoraron` quién más mejoró, cada uno contra su propia franja",
+                "`-mejoraron [solo|normal|todo]` quién más mejoró, cada uno contra su propia franja",
     "Servidor": "`-canal_feed #canal` publica cada partida del grupo (resultado, KDA y LP) y los ascensos y descensos\n"
                 "`-canal_ranking #canal` publica el top de la semana y lo destacado cada lunes\n"
                 "`-canal_sugerencias #canal` adónde llegan las `-sugerencia <texto>`\n"
@@ -148,19 +149,22 @@ async def tarjeta_tips(bot, rol: str) -> discord.ui.LayoutView:
     return tarjeta_simple(lineas, WEB)
 
 
-async def armar_grafico(bot, p: dict, tipo: str, rol: str | None):
-    """(vista, png) del gráfico pedido, o (mensaje, None) si todavía no se puede dibujar."""
+async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | None = None):
+    """(vista, png) del gráfico pedido, o (mensaje, None) si todavía no se puede dibujar.
+    modo: solo, normal o todo; sin modo, solo/dúo si alcanza y si no todo junto."""
     from bot.services import graficos
+    from bot.cogs.coaching import EN_MODO
     nombre = p["nombre"]
     if tipo.lower().startswith("ten"):
-        d = await bot.datos.coaching(p["id"])
+        d = await bot.datos.coaching_auto(p["id"], modo)
+        en = EN_MODO.get((d or {}).get("modo") or "solo")
         rol_n = ROLES.get((rol or "").lower()) or (d or {}).get("rol_con_referencia") or (d or {}).get("rol_principal")
         r = ((d or {}).get("roles") or {}).get(rol_n) or {}
         t = r.get("tendencia")
         if not t:
             return (f"Todavía no se puede medir la tendencia de {nombre} en {rol_n or 'ningún rol'}: hacen falta 30 "
-                    "partidas de solo/dúo en el rol y referencia en su franja."), None
-        png = graficos.tendencia(t, f"{nombre} · {rol_n} contra {d['franja']}", d["franja"])
+                    f"partidas de {en} en el rol y referencia en su franja."), None
+        png = graficos.tendencia(t, f"{nombre} · {rol_n} en {en} contra {d['franja']}", d["franja"])
         signo = lambda v: f"{'+' if v > 0 else ''}{F.num(v, 1)}"
         texto = (f"## {discord.utils.escape_markdown(nombre)} · ¿estás mejorando?\n"
                  f"De **{F.num(t['inicio'], 0)}** a **{F.num(t['ahora'], 0)}** → **{t['veredicto']}** "
@@ -168,13 +172,14 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None):
                  f"-# Índice de 0 a 100 por partida: tus percentiles en {', '.join(t['metricas']).lower()} contra "
                  f"{d['franja']} en {rol_n}. Mide cómo jugás, no si ganaste. 50 = la mitad de tu franja.")
     elif tipo.lower().startswith("rad"):
-        d = await bot.datos.coaching(p["id"])
+        d = await bot.datos.coaching_auto(p["id"], modo)
+        en = EN_MODO.get((d or {}).get("modo") or "solo")
         rol_n = ROLES.get((rol or "").lower()) or (d or {}).get("rol_con_referencia") or (d or {}).get("rol_principal")
         r = ((d or {}).get("roles") or {}).get(rol_n)
         if not r or r.get("sin_referencia"):
             return (f"Todavía no hay referencia para el radar de {nombre} en {rol_n or 'ningún rol'}: hacen falta "
-                    "10+ partidas de solo/dúo en el rol y 20 jugadores de referencia en su franja."), None
-        png = graficos.radar(r["componentes"], f"{nombre} · {rol_n} contra {d['franja']}")
+                    f"10+ partidas de {en} en el rol y 20 jugadores de referencia en su franja."), None
+        png = graficos.radar(r["componentes"], f"{nombre} · {rol_n} en {en} contra {d['franja']}")
         texto = (f"## {discord.utils.escape_markdown(nombre)} · radar\n-# Performance {round(r['performance']['v'] * 100)}/100. "
                  f"El anillo punteado es 50, la mitad de su franja ({d['franja']}). Detalle en `-performance`.")
     else:
@@ -182,7 +187,10 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None):
         colas = evo.get("colas") or {}
         if not colas:
             return f"{nombre} todavía no tiene {evo.get('ventana', 20)} partidas en ninguna cola de Grieta.", None
-        cola = max(colas, key=lambda c: colas[c]["n"])
+        if modo and modo not in colas:
+            return f"{nombre} todavía no tiene {evo.get('ventana', 20)} partidas en {EN_MODO.get(modo, modo)}.", None
+        # Sin modo, la cola más jugada (no "todo", que siempre sería la más grande).
+        cola = modo or max((c for c in colas if c != "todo"), key=lambda c: colas[c]["n"], default="todo")
         nc = (await bot.datos.ajustes()).get("nombres_cola", {})
         png = graficos.evolucion(evo, cola, nc.get(cola, cola), nombre)
         c = colas[cola]
@@ -283,7 +291,7 @@ class Extra(commands.Cog):
     async def comparar(self, ctx: commands.Context, jugador: str, otro: str, cola: str | None = None, rol: str | None = None):
         pa, pb = await self.datos.buscar(jugador), await self.datos.buscar(otro)
         if not pa or not pb:
-            await ctx.reply("No encontré a alguno de los dos. Uso: `-comparar <jugador> <otro> [solo|flex|normal] [rol]`", ephemeral=True)
+            await ctx.reply("No encontré a alguno de los dos. Uso: `-comparar <jugador> <otro> [solo|flex|normal|todo] [rol]`", ephemeral=True)
             return
         await ctx.defer()
         await ctx.reply(view=await tarjeta_comparar(self.bot, pa["id"], pb["id"],
@@ -291,14 +299,19 @@ class Extra(commands.Cog):
 
     @commands.hybrid_command(name="grafico", description="Evolución del winrate, tendencia de mejora o radar de tus componentes")
     @app_commands.autocomplete(jugador=autocompletar_jugador, tipo=autocompletar_opciones("tendencia", "evolucion", "radar"),
-                               rol=autocompletar_opciones("top", "jungla", "mid", "adc", "support"))
-    async def grafico(self, ctx: commands.Context, jugador: str | None = None, tipo: str = "evolucion", rol: str | None = None):
+                               rol=autocompletar_opciones("top", "jungla", "mid", "adc", "support"),
+                               modo=autocompletar_opciones("solo", "normal", "todo"))
+    async def grafico(self, ctx: commands.Context, jugador: str | None = None, tipo: str = "evolucion", rol: str | None = None,
+                      modo: str | None = None):
         if jugador and jugador.lower() in ("evolucion", "evolución", "radar", "tendencia"):  # -grafico radar
             jugador, tipo = None, jugador
         if not (p := await self._persona(ctx, jugador, "grafico")):
             return
         await ctx.defer()  # dibujar el PNG puede pasar los 3 s
-        view, png = await armar_grafico(self.bot, p, tipo, rol)
+        from bot.cogs.coaching import MODOS
+        if rol and rol.lower() in MODOS and not modo:  # -grafico lucca radar todo
+            rol, modo = None, rol
+        view, png = await armar_grafico(self.bot, p, tipo, rol, MODOS.get((modo or "").lower()))
         if png is None:
             await ctx.reply(view)
             return

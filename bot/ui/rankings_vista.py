@@ -11,7 +11,7 @@ import discord
 from bot.cogs.perfil import WEB
 from bot.cogs.rankings import PERIODOS, tarjeta_top, tarjeta_top_rol
 
-COLAS = {"solo": "Ranked Solo/Dúo", "flex": "Ranked Flex", "normal": "Normales"}
+COLAS = {"solo": "Ranked Solo/Dúo", "flex": "Ranked Flex", "normal": "Normales", "todo": "Todo (solo, flex y normales)"}
 ROLES = ("Top", "Jungla", "Mid", "ADC", "Support")
 VENTANAS = {"historico": "Temporada", "reciente": "Últimos 30 días"}
 # Qué menús tiene cada ranking y en qué orden van los valores dentro del estado.

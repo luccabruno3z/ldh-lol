@@ -9,7 +9,7 @@ from bot.cogs.perfil import WEB, tarjeta_simple
 from bot.services import formato as F
 
 PERIODOS = {"semana": "últimos 7 días", "mes": "últimos 30 días", "temporada": "temporada"}
-COLAS = {"solo": "solo", "soloq": "solo", "flex": "flex", "normal": "normal", "normales": "normal"}
+COLAS = {"solo": "solo", "soloq": "solo", "flex": "flex", "normal": "normal", "normales": "normal", "todo": "todo", "todas": "todo"}
 ROLES = {"top": "Top", "jungla": "Jungla", "jg": "Jungla", "mid": "Mid", "adc": "ADC", "bot": "ADC",
          "support": "Support", "supp": "Support", "sup": "Support"}
 MEDALLAS = ["🥇", "🥈", "🥉"]
@@ -50,14 +50,17 @@ def tarjeta_top_rol(v: dict, cola: str, rol: str, nombres: dict, nombre_cola: di
     return tarjeta_simple(lineas, f"{WEB}#/rankings/roles")
 
 
-def tarjeta_mejora(d: dict, nombres: dict) -> discord.ui.LayoutView:
-    lineas = ["## Quién más mejoró", "-# Índice por partida contra su propia franja, en solo/dúo · puntos cada 100 partidas"]
-    for i, x in enumerate(d["tabla"][:10], 1):
+def tarjeta_mejora(d: dict, nombres: dict, modo: str = "solo") -> discord.ui.LayoutView:
+    from bot.cogs.coaching import EN_MODO
+    tabla = (d.get("modos") or {}).get(modo, d["tabla"] if modo == "solo" else [])
+    en = EN_MODO.get(modo, modo)
+    lineas = ["## Quién más mejoró", f"-# Índice por partida contra su propia franja, en {en} · puntos cada 100 partidas"]
+    for i, x in enumerate(tabla[:10], 1):
         tag = {"mejorando": "**mejorando**", "empeorando": "empeorando"}.get(x["veredicto"], "sin tendencia clara")
         lineas += [f"`{i}.` **{nombres.get(x['persona'], x['persona'])}** · {x['rol']} · {F.num(x['inicio'], 0)} → {F.num(x['ahora'], 0)} · {tag}",
                    f"-# {F.num(x['pendiente'], 1, True)} cada 100 partidas ({F.num(x['lo'], 1, True)} a {F.num(x['hi'], 1, True)}) · {x['n']} partidas"]
-    if not d["tabla"]:
-        lineas.append("Nadie tiene 30+ partidas de solo/dúo en un rol con referencia.")
+    if not tabla:
+        lineas.append(f"Nadie tiene 30+ partidas de {en} en un rol con referencia.")
     lineas.append("-# Mejorando solo si todo el intervalo está arriba de cero. Cada uno contra su franja: se puede comparar entre rangos.")
     return tarjeta_simple(lineas, f"{WEB}#/rankings/mejora")
 
@@ -78,7 +81,7 @@ class Rankings(commands.Cog):
     async def top(self, ctx: commands.Context, periodo: str = "mes", cola: str = "solo"):
         periodo, cola = periodo.lower(), COLAS.get(cola.lower())
         if periodo not in PERIODOS or not cola:
-            await ctx.reply("Uso: `-top [semana|mes|temporada] [solo|flex|normal]`", ephemeral=True)
+            await ctx.reply("Uso: `-top [semana|mes|temporada] [solo|flex|normal|todo]`", ephemeral=True)
             return
         from bot.ui.rankings_vista import TopVista
         await ctx.defer()
@@ -90,7 +93,7 @@ class Rankings(commands.Cog):
     async def top_rol(self, ctx: commands.Context, rol: str = "top", cola: str = "solo", ventana: str = "temporada"):
         rol, cola = ROLES.get(rol.lower()), COLAS.get(cola.lower())
         if not rol or not cola:
-            await ctx.reply("Uso: `-top_rol <top|jungla|mid|adc|support> [solo|flex|normal] [temporada|reciente]`", ephemeral=True)
+            await ctx.reply("Uso: `-top_rol <top|jungla|mid|adc|support> [solo|flex|normal|todo] [temporada|reciente]`", ephemeral=True)
             return
         from bot.ui.rankings_vista import TopRolVista
         await ctx.defer()
@@ -100,10 +103,14 @@ class Rankings(commands.Cog):
 
 
     @commands.hybrid_command(name="mejoraron", description="Quién más mejoró: la tendencia de cada uno contra su franja")
-    async def mejoraron(self, ctx: commands.Context):
+    async def mejoraron(self, ctx: commands.Context, modo: str = "solo"):
+        from bot.cogs.coaching import MODOS
+        if (m := MODOS.get(modo.lower())) is None:
+            await ctx.reply("Uso: `-mejoraron [solo|normal|todo]`", ephemeral=True)
+            return
         await ctx.defer()
         nombres, _ = await self._contexto()
-        await ctx.reply(view=tarjeta_mejora(await self.datos.ranking("mejora") or {"tabla": []}, nombres))
+        await ctx.reply(view=tarjeta_mejora(await self.datos.ranking("mejora") or {"tabla": []}, nombres, m))
 
 
 async def setup(bot: commands.Bot):

@@ -13,10 +13,11 @@ from . import fase2, fase3, fase4
 from .ajustes import AJUSTES, RAIZ, SALIDA
 from .almacen import cargar_estado
 from .base import RUTA_BASE, valor_rango
+from .fase2 import MODOS, colas_de, en
 from .coach.static_data import get_static
 
 API = SALIDA / "api"
-COLAS_ORDEN = ["solo", "flex", "normal", "aram", "otra"]
+COLAS_ORDEN = ["solo", "flex", "normal", "todo", "aram", "otra"]
 ROLES_ORDEN = ["Top", "Jungla", "Mid", "ADC", "Support"]
 MIN = AJUSTES["min_partidas"]
 
@@ -55,8 +56,9 @@ def _tabla(filas: list[dict]) -> list[dict]:
     """Una fila por cola × rol. Las de poca muestra van al final aunque tengan el mejor número."""
     grupos: dict[tuple[str, str], list[dict]] = defaultdict(list)
     for f in filas:
-        grupos[(f["cola"], f["rol_ldh"] or "Sin rol")].append(f)
-        grupos[(f["cola"], "Todos")].append(f)
+        for c in colas_de(f):
+            grupos[(c, f["rol_ldh"] or "Sin rol")].append(f)
+            grupos[(c, "Todos")].append(f)
     tabla = [{"cola": c, "rol": r, **_bloque(g)} for (c, r), g in grupos.items()]
 
     def orden(t):
@@ -107,8 +109,8 @@ def _evolucion(filas: list[dict], lp: list[dict]) -> dict:
     cfg = AJUSTES["evolucion"]
     v, paso = cfg["ventana"], cfg["paso"]
     colas = {}
-    for cola in ("solo", "flex", "normal"):
-        g = sorted((f for f in filas if f["cola"] == cola), key=lambda f: f["inicio_ms"])
+    for cola in MODOS:
+        g = sorted((f for f in filas if en(f, cola)), key=lambda f: f["inicio_ms"])
         if len(g) < v:
             continue
         puntos = []

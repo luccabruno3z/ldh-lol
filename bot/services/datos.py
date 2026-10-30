@@ -96,8 +96,19 @@ class Datos:
     async def consejos(self) -> dict:
         return await self._json("consejos.json") or {}
 
-    async def coaching(self, persona_id: str) -> dict | None:
-        return await self._json(f"coaching/{quote(persona_id)}.json")
+    async def coaching(self, persona_id: str, modo: str = "solo") -> dict | None:
+        """modo: solo, normal o todo (solo/dúo, flex y normales juntas)."""
+        sub = "" if modo == "solo" else f"{modo}/"
+        return await self._json(f"coaching/{sub}{quote(persona_id)}.json")
+
+    async def coaching_auto(self, persona_id: str, modo: str | None = None) -> dict | None:
+        """El modo pedido; sin pedido, solo/dúo si algún rol tiene referencia, si no todo junto."""
+        if modo:
+            return await self.coaching(persona_id, modo)
+        d = await self.coaching(persona_id, "solo")
+        if d and d.get("rol_con_referencia"):
+            return d
+        return await self.coaching(persona_id, "todo") or d
 
     async def sinergia(self) -> dict:
         return await self._json("sinergia.json") or {"filas": []}

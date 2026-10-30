@@ -1,5 +1,6 @@
 """Coaching (fase 3): Performance, plan de mejora y primeros 15 minutos. Mismos JSON que la web
-(api/coaching/<id>.json); los percentiles son contra la franja de rango y el rol en solo/dúo."""
+(api/coaching/[modo/]<id>.json). Los percentiles son contra ranked solo/dúo de la franja y el rol; el modo
+(solo, normal o todo) elige qué partidas de la persona entran."""
 
 from __future__ import annotations
 
@@ -19,14 +20,33 @@ def _val(m: dict, x: float | None) -> str:
     return _num(x, m.get("dec", 2), signo=m.get("clave", "").startswith("dif")) + (f" {m['unidad']}" if m.get("unidad") else "")
 
 
-def _jugador_y_rol(texto: str | None) -> tuple[str | None, str | None]:
-    """'-mejora seagranda jungla' → ('seagranda', 'Jungla'). El rol va al final y es opcional."""
-    if not texto:
-        return None, None
-    partes = texto.split()
-    if ROLES.get(partes[-1].lower()):
-        return (" ".join(partes[:-1]) or None), ROLES[partes[-1].lower()]
-    return texto, None
+MODOS = {"solo": "solo", "soloq": "solo", "normal": "normal", "normales": "normal", "todo": "todo", "todas": "todo"}
+EN_MODO = {"solo": "solo/dúo", "normal": "normales", "todo": "todas las colas"}
+
+
+def _jugador_rol_modo(texto: str | None) -> tuple[str | None, str | None, str | None]:
+    """'-mejora seagranda jungla normal' → ('seagranda', 'Jungla', 'normal'). Rol y modo van al final,
+    en cualquier orden, y son opcionales."""
+    partes = (texto or "").split()
+    rol = modo = None
+    while partes:
+        w = partes[-1].lower()
+        if not rol and ROLES.get(w):
+            rol = ROLES[w]
+        elif not modo and w in MODOS:
+            modo = MODOS[w]
+        else:
+            break
+        partes.pop()
+    return (" ".join(partes) or None), rol, modo
+
+
+def _en(d: dict) -> str:
+    return EN_MODO.get(d.get("modo") or "solo", "solo/dúo")
+
+
+def _pie_modo(d: dict) -> list[str]:
+    return [f"-# {d['nota_modo']}"] if d.get("nota_modo") else []
 
 
 def _rol(d: dict, pedido: str | None) -> tuple[str | None, dict | None]:
@@ -40,7 +60,8 @@ def _sin_dato(p: dict, d: dict, rol: str | None, r: dict | None) -> list[str] | 
         return [f"## {nombre}", "Sin rango de solo/dúo: no hay franja contra la cual compararte."]
     if r is None:
         roles = ", ".join(d.get("roles") or {}) or "ninguno"
-        return [f"## {nombre}", f"No tenés 10+ partidas de solo/dúo en {rol or 'ningún rol'}. Roles con muestra: {roles}."]
+        otro = "" if d.get("modo") == "todo" else " Probá con `todo` al final: junta solo/dúo, flex y normales."
+        return [f"## {nombre}", f"No tenés 10+ partidas de {_en(d)} en {rol or 'ningún rol'}. Roles con muestra: {roles}.{otro}"]
     if r.get("sin_referencia"):
         return [f"## {nombre} · {rol}",
                 f"La referencia de {d['franja']} en {rol} tiene {r['n_ref']} jugadores; hacen falta 20 para dar percentiles."]
@@ -54,7 +75,7 @@ def tarjeta_performance(p: dict, d: dict, pedido: str | None) -> discord.ui.Layo
         return tarjeta_simple(aviso, url)
     pf = r["performance"]
     lineas = [f"## {discord.utils.escape_markdown(p['nombre'])} · Performance",
-              f"-# {rol} en solo/dúo · {r['n']} partidas · contra {d['franja']}",
+              f"-# {rol} en {_en(d)} · {r['n']} partidas · contra {d['franja']}",
               f"# {_num(pf['v'] * 100)}/100",
               f"-# {F.rango(pf, 0, k=100)} · confianza {r['confianza']}"]
     # Solo contra la propia franja: "rendís como un X" sería estimar un rango (Riot prohíbe MMR/ELO).
@@ -68,7 +89,7 @@ def tarjeta_performance(p: dict, d: dict, pedido: str | None) -> discord.ui.Layo
         lineas += [f"**{c['nombre']}**: {_num(c['nivel'] * 100)} · puede sumar {_num(c['margen'] * 100, 1)}",
                    f"-# {F.rango(c, 0, k=100)} · peso {_num(c['peso'] * 100)}"]
     lineas.append(f"-# Percentiles contra {r['n_ref']} jugadores de {d['franja']} en {rol}. 50 = la mitad de tu franja.")
-    return tarjeta_simple(lineas, url)
+    return tarjeta_simple(lineas + _pie_modo(d), url)
 
 
 def tarjeta_mejora(p: dict, d: dict, pedido: str | None) -> discord.ui.LayoutView:
@@ -76,7 +97,7 @@ def tarjeta_mejora(p: dict, d: dict, pedido: str | None) -> discord.ui.LayoutVie
     url = f"{WEB}#/jugadores/{p['id']}"
     if (aviso := _sin_dato(p, d, rol, r)):
         return tarjeta_simple(aviso, url)
-    lineas = [f"## {discord.utils.escape_markdown(p['nombre'])} · plan de mejora", f"-# {rol} en solo/dúo · contra {d['franja']}"]
+    lineas = [f"## {discord.utils.escape_markdown(p['nombre'])} · plan de mejora", f"-# {rol} en {_en(d)} · contra {d['franja']}"]
     # Las 3 brechas más grandes contra la franja: las métricas con el percentil más bajo y su intervalo entero abajo.
     for i, m in enumerate(r["mejorar"][:3], 1):
         lineas += [f"\n**{i}. {m['nombre']}**: de {_val(m, m['v'])} a {_val(m, m['mediana'])}",
@@ -94,19 +115,19 @@ def tarjeta_mejora(p: dict, d: dict, pedido: str | None) -> discord.ui.LayoutVie
                               f"{_val(meta, meta['hasta'])} (mediana de {meta['franja']})")
             lineas.append(f"> {s['consejo']}")
     lineas.append("-# Solo entra una métrica si todo su intervalo de percentil queda abajo de 40.")
-    return tarjeta_simple(lineas, url)
+    return tarjeta_simple(lineas + _pie_modo(d), url)
 
 
 def tarjeta_temprano(p: dict, d: dict, pedido: str | None) -> discord.ui.LayoutView:
     url = f"{WEB}#/jugadores/{p['id']}"
-    solo = (d.get("temprano") or {}).get("solo") or {}
-    rol = pedido or d.get("rol_principal") or max(solo, key=lambda k: solo[k]["n"], default=None)
-    t = solo.get(rol)
+    del_modo = (d.get("temprano") or {}).get(d.get("modo") or "solo") or {}
+    rol = pedido or d.get("rol_principal") or max(del_modo, key=lambda k: del_modo[k]["n"], default=None)
+    t = del_modo.get(rol)
     nombre = discord.utils.escape_markdown(p["nombre"])
     if not t:
-        return tarjeta_simple([f"## {nombre}", f"Menos de 10 partidas de solo/dúo en {rol or 'ningún rol'}."], url)
+        return tarjeta_simple([f"## {nombre}", f"Menos de 10 partidas de {_en(d)} en {rol or 'ningún rol'}."], url)
     ref = ((d.get("roles") or {}).get(rol) or {}).get("metricas") or {}
-    lineas = [f"## {nombre} · primeros 15 minutos", f"-# {rol} en solo/dúo · {t['n']} partidas · contra el rival directo"]
+    lineas = [f"## {nombre} · primeros 15 minutos", f"-# {rol} en {_en(d)} · {t['n']} partidas · contra el rival directo"]
     lin = t["linea"]
     if lin["gana"]["n"] and lin["pierde"]["n"]:
         # Lo más útil primero: si la partida se pierde en la línea o después.
@@ -121,7 +142,7 @@ def tarjeta_temprano(p: dict, d: dict, pedido: str | None) -> discord.ui.LayoutV
         extra = f" · mejor que el {round(ref[k]['pct'] * 100)} % de {d['franja']}" if k in ref else ""
         lineas += [f"**{m['nombre']}**: {_val(mm, m['v'])}{extra}",
                    f"-# {F.rango(m, m.get('dec', 0), k.startswith('dif'))}" if m.get("lo") is not None else None]
-    return tarjeta_simple(lineas, url)
+    return tarjeta_simple(lineas + _pie_modo(d), url)
 
 
 class Coaching(commands.Cog):
@@ -129,32 +150,32 @@ class Coaching(commands.Cog):
         self.bot = bot
 
     async def _cargar(self, ctx: commands.Context, texto: str | None, comando: str):
-        jugador, rol = _jugador_y_rol(texto)
+        jugador, rol, modo = _jugador_rol_modo(texto)
         p = await self.bot.get_cog("Perfil")._persona(ctx, jugador, comando)
         if not p:
             return None, None, None
         await ctx.defer()
-        d = await self.bot.datos.coaching(p["id"])
+        d = await self.bot.datos.coaching_auto(p["id"], modo)
         if not d:
             await ctx.reply("Todavía no hay coaching publicado para este jugador.", ephemeral=True)
             return None, None, None
         return p, d, rol
 
     @commands.hybrid_command(name="performance", description="Performance y sus 7 componentes contra tu franja de rango")
-    async def performance(self, ctx: commands.Context, *, jugador_y_rol: str | None = None):
-        p, d, rol = await self._cargar(ctx, jugador_y_rol, "performance")
+    async def performance(self, ctx: commands.Context, *, jugador_rol_y_modo: str | None = None):
+        p, d, rol = await self._cargar(ctx, jugador_rol_y_modo, "performance")
         if p:
             await ctx.reply(view=tarjeta_performance(p, d, rol))
 
     @commands.hybrid_command(name="mejora", description="Las 3 brechas más grandes contra tu franja, como metas en números")
-    async def mejora(self, ctx: commands.Context, *, jugador_y_rol: str | None = None):
-        p, d, rol = await self._cargar(ctx, jugador_y_rol, "mejora")
+    async def mejora(self, ctx: commands.Context, *, jugador_rol_y_modo: str | None = None):
+        p, d, rol = await self._cargar(ctx, jugador_rol_y_modo, "mejora")
         if p:
             await ctx.reply(view=tarjeta_mejora(p, d, rol))
 
     @commands.hybrid_command(name="temprano", description="CS, oro y XP a los 10 y 15 contra tu rival directo")
-    async def temprano(self, ctx: commands.Context, *, jugador_y_rol: str | None = None):
-        p, d, rol = await self._cargar(ctx, jugador_y_rol, "temprano")
+    async def temprano(self, ctx: commands.Context, *, jugador_rol_y_modo: str | None = None):
+        p, d, rol = await self._cargar(ctx, jugador_rol_y_modo, "temprano")
         if p:
             await ctx.reply(view=tarjeta_temprano(p, d, rol))
 

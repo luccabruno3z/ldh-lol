@@ -2,7 +2,7 @@
    Ruta: #/comparar/<a>/<b>. Sin las partidas de cada uno no hay prueba de diferencia: se dice
    "se separan" solo si los dos intervalos no se pisan, que es más exigente que una prueba. */
 
-import { state, loadPerfil, cachedFetch } from './data.js';
+import { state, loadPerfil, cachedFetch, rutaCoaching, MODOS, EN_MODO } from './data.js';
 import { onRoute, go } from './router.js';
 import { escapeHtml, nombreCola, conIntervalo, num } from './utils.js';
 import { radar } from './graficos.js';
@@ -34,12 +34,14 @@ function fila(nombre, tipo, ma, mb) {
     </div>`;
 }
 
-async function radarComun(a, b, rol) {
+async function radarComun(a, b, rol, cola) {
     if (rol === 'Todos') return '<p class="nota">Elegí un rol para comparar el Performance de los dos contra su franja.</p>';
-    const [ca, cb] = await Promise.all([a, b].map(id => cachedFetch(`coaching/${encodeURIComponent(id)}.json`).catch(() => null)));
+    // El Performance está calculado para los tres modos (solo/dúo, normales y todo), no para flex sola.
+    if (!MODOS[cola]) return `<p class="nota">El radar de Performance está en Solo/Dúo, Normales y Todo; flex va dentro de Todo.</p>`;
+    const [ca, cb] = await Promise.all([a, b].map(id => cachedFetch(rutaCoaching(id, cola)).catch(() => null)));
     const ra = ca?.roles?.[rol], rb = cb?.roles?.[rol];
     if (!ra || !rb || ra.sin_referencia || rb.sin_referencia) {
-        return `<p class="nota">El radar de Performance necesita que los dos tengan 10+ partidas de ${escapeHtml(rol)} en solo/dúo y referencia en su franja.</p>`;
+        return `<p class="nota">El radar de Performance necesita que los dos tengan 10+ partidas de ${escapeHtml(rol)} en ${escapeHtml(EN_MODO[cola])} y referencia en su franja.</p>`;
     }
     if (ca.franja !== cb.franja) {
         return `<p class="nota">Están en franjas distintas (${escapeHtml(ca.franja)} y ${escapeHtml(cb.franja)}): cada Performance se mide contra su propia franja, así que superponerlos engañaría.</p>`;
@@ -88,7 +90,7 @@ async function render() {
     cont.querySelector('#cmp-cola')?.addEventListener('change', e => { sel.cola = e.target.value; render(); });
     cont.querySelector('#cmp-rol')?.addEventListener('change', e => { sel.rol = e.target.value; render(); });
     const r = cont.querySelector('#cmp-radar');
-    if (r) r.innerHTML = await radarComun(sel.a, sel.b, sel.rol);
+    if (r) r.innerHTML = await radarComun(sel.a, sel.b, sel.rol, sel.cola);
 }
 
 export function initComparar() {

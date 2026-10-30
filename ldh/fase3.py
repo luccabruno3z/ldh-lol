@@ -6,7 +6,7 @@ Referencias que se usan (regla 8, siempre el par correcto):
   con 10+ partidas de solo/dúo (ldh.referencia). Se compara el promedio de la persona con
   los promedios de esos jugadores, nunca con partidas sueltas.
 - Contra tu campeón: los desconocidos que jugaron el mismo campeón en el mismo rol en las
-  partidas de solo/dúo del grupo. Es por partida (casi todos aparecen una vez), así que se
+  partidas del grupo en el mismo modo. Es por partida (casi todos aparecen una vez), así que se
   compara media contra media con su intervalo y la columna de jugadores distintos (regla 2).
 """
 
@@ -24,7 +24,8 @@ import numpy as np
 
 from . import estadistica as est
 from .ajustes import AJUSTES, CACHE, DATOS, RAIZ
-from .almacen import _escribir_atomico, _json_compacto, _ruta
+from .almacen import _escribir_atomico, _json_compacto, _ruta, anon_id
+from .fase2 import GRIETA, colas_de
 from .referencia import CONF as REF, ROLES, cargar_filas, fila_de, franja_de
 
 MIN = AJUSTES["min_partidas"]
@@ -85,8 +86,8 @@ def _componentes(rol: str) -> list[tuple[str, str, list[str]]]:
 
 # ------------------------------------------------------------------ las filas
 
-def _filas_solo(db: sqlite3.Connection) -> list[dict]:
-    """Una fila por jugador y partida de solo/dúo guardada (amigos y desconocidos).
+def _filas_grieta(db: sqlite3.Connection) -> list[dict]:
+    """Una fila por jugador y partida de la Grieta guardada (solo, flex y normales; amigos y desconocidos).
 
     Se cachean por partida: recalcular las ~35.000 filas tarda un minuto y medio.
     """
@@ -96,9 +97,15 @@ def _filas_solo(db: sqlite3.Connection) -> list[dict]:
         c = json.loads(gzip.decompress(ruta.read_bytes()))
         if c.get("version") == VERSION_FILAS:
             cache = c["partidas"]
-    vinc = dict(db.execute("SELECT puuid, persona_id FROM cuentas"))
+    # Las partidas guardadas antes de que alguien se vinculara lo tienen anonimizado: se lo reconoce
+    # por su anon_id (como en base.reconstruir), si no esas partidas no contaban como suyas.
+    vinc, real = {}, {}
+    for puuid, pid in db.execute("SELECT puuid, persona_id FROM cuentas"):
+        vinc[puuid] = vinc[anon_id(puuid)] = pid
+        real[anon_id(puuid)] = puuid
     salida, nuevas = [], 0
-    for mid, inicio in db.execute("SELECT match_id, inicio_ms FROM partidas WHERE cola='solo' AND tiene_timeline=1"):
+    for mid, inicio, cola in db.execute("SELECT match_id, inicio_ms, cola FROM partidas "
+                                        "WHERE cola IN ('solo','flex','normal') AND tiene_timeline=1"):
         if mid not in cache:
             m = json.loads(gzip.decompress(_ruta("partidas", mid, inicio).read_bytes()))
             tl = json.loads(gzip.decompress(_ruta("timelines", mid, inicio).read_bytes()))
@@ -111,8 +118,9 @@ def _filas_solo(db: sqlite3.Connection) -> list[dict]:
             cache[mid] = filas
             nuevas += 1
         for f in cache[mid]:
-            salida.append({**f, "persona": vinc.get(f["puuid"]), "rival_vinculado": f.get("rival") in vinc,
-                           "inicio_ms": inicio})
+            salida.append({**f, "puuid": real.get(f["puuid"], f["puuid"]), "persona": vinc.get(f["puuid"]),
+                           "rival_vinculado": f.get("rival") in vinc,
+                           "inicio_ms": inicio, "cola": cola})
     if nuevas:
         _escribir_atomico(ruta, gzip.compress(_json_compacto({"version": VERSION_FILAS, "partidas": cache}), 6))
     return salida
@@ -213,10 +221,15 @@ class Celda:
         return float(np.median(r)) if r is not None and len(r) else None
 
 
+# Sin rango en solo ni en flex no hay franja: se compara contra toda la referencia del rol junta.
+TODAS = "Hierro a Esmeralda"
+
+
 def _celdas() -> dict[tuple[str, str], Celda]:
     por = defaultdict(list)
     for f in cargar_filas():
         por[(f["franja"], f["role"])].append(f)
+        por[(TODAS, f["role"])].append(f)
     return {k: Celda(v) for k, v in por.items()}
 
 
@@ -394,7 +407,7 @@ def _rol(filas: list[dict], rol: str, franja: str, celdas: dict) -> dict | None:
             mejor = METRICAS.get(k, (None, None, True))[2]
             objetivo, franja_meta = x["mediana"], franja
             ya = x["v"] >= objetivo if mejor else x["v"] <= objetivo
-            if ya and FRANJAS.index(franja) + 1 < len(FRANJAS):
+            if ya and franja in FRANJAS and FRANJAS.index(franja) + 1 < len(FRANJAS):
                 arriba = celdas.get((FRANJAS[FRANJAS.index(franja) + 1], rol))
                 if arriba and arriba.disponible(k):
                     objetivo, franja_meta = _r(arriba.mediana(k), x["dec"] + 1), FRANJAS[FRANJAS.index(franja) + 1]
@@ -418,8 +431,9 @@ def temprano(filas: list[dict]) -> dict:
     out = defaultdict(dict)
     grupos = defaultdict(list)
     for f in filas:
-        if f["cola"] in ("solo", "flex", "normal") and f.get("rol_ldh") in ROLES:
-            grupos[(f["cola"], f["rol_ldh"])].append(f)
+        if f["cola"] in GRIETA and f.get("rol_ldh") in ROLES:
+            for c in colas_de(f):
+                grupos[(c, f["rol_ldh"])].append(f)
     for (cola, rol), g in grupos.items():
         if len(g) < MIN:
             continue
@@ -442,7 +456,7 @@ def temprano(filas: list[dict]) -> dict:
 
 
 def contra_campeon(mias: list[dict], otros: list[dict]) -> list[dict]:
-    """Tus pares (campeón, rol) de solo/dúo con 10+ partidas contra los desconocidos que jugaron
+    """Tus pares (campeón, rol) del modo con 10+ partidas contra los desconocidos que jugaron
     lo mismo en las partidas del grupo. Se sacan los que tenían a alguien del grupo de rival directo."""
     por = defaultdict(list)
     for f in otros:
@@ -477,60 +491,85 @@ def contra_campeon(mias: list[dict], otros: list[dict]) -> list[dict]:
 
 # -------------------------------------------------------------------- generar
 
+# Los tres modos del sitio. Fuera de solo/dúo la referencia sigue siendo de ranked solo/dúo de tu
+# franja (la única que hay): en normales el emparejamiento es otro, así que es una orientación.
+MODOS = {"solo": ("solo",), "normal": ("normal",), "todo": GRIETA}
+NOTA_MODO = {
+    "solo": None,
+    "normal": "En normales te comparo igual contra jugadores de ranked solo/dúo de tu franja: el emparejamiento "
+              "de normales es otro y se juega más suelto, así que tomalo como orientación.",
+    "todo": "Junta solo/dúo, flex y normales. La referencia es ranked solo/dúo de tu franja: con normales en la "
+            "mezcla, tomalo como orientación.",
+}
+
+
+def ruta_coaching(pid: str, modo: str) -> str:
+    return f"coaching/{pid}.json" if modo == "solo" else f"coaching/{modo}/{pid}.json"
+
+
+def _franja_persona(cuentas: dict) -> tuple[str, dict | None, str]:
+    """Franja por el mejor rango de solo/dúo; si no tiene, el de flex; si tampoco, toda la referencia."""
+    for cola in ("solo", "flex"):
+        mejor = max((c[cola] for c in cuentas.values() if cola in c), key=lambda r: r["valor"] or -1, default=None)
+        if mejor and franja_de(mejor["tier"]):
+            return franja_de(mejor["tier"]), mejor, cola
+    return TODAS, None, "sin_rango"
+
+
 def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], rangos: dict, escribir: Callable) -> None:
     celdas = _celdas()
-    solo = _filas_solo(db)
+    grieta = _filas_grieta(db)
     por_persona = defaultdict(list)
     franja_partida = defaultdict(set)  # match -> franjas del grupo en esa partida
-    franja_persona = {}
-    for pid, cuentas in rangos.items():
-        mejor = max((c["solo"] for c in cuentas.values() if "solo" in c), key=lambda r: r["valor"] or -1, default=None)
-        franja_persona[pid] = (franja_de(mejor["tier"]) if mejor else None, mejor)
-    for f in solo:
+    franja_persona = {pid: _franja_persona(cuentas) for pid, cuentas in rangos.items()}
+    for f in grieta:
         if f["persona"]:
             por_persona[f["persona"]].append(f)
-            if franja_persona.get(f["persona"], (None,))[0]:
+            if f["persona"] in franja_persona:
                 franja_partida[f["match_id"]].add(franja_persona[f["persona"]][0])
 
     escribir("referencia.json", {
         "franjas": REF["franjas"], "min_jugadores": REF["min_jugadores"], "min_partidas": REF["min_partidas"],
         "celdas": [{"franja": fr, "rol": rol, "jugadores": c.n_jugadores,
                     "medianas": {k: _r(c.mediana(k), 4) for k in c.por_jugador if not k.startswith("_")}}
-                   for (fr, rol), c in sorted(celdas.items())],
+                   for (fr, rol), c in sorted(celdas.items()) if fr != TODAS],
         "bajada": max((f.get("bajada", "") for f in cargar_filas()), default=None)})
 
-    mejora = []
+    mejora = {m: [] for m in MODOS}
     for pid, filas in filas_por.items():
-        franja, rango = franja_persona.get(pid, (None, None))
-        mias = sorted(por_persona.get(pid, []), key=lambda f: f["inicio_ms"])
-        roles = {}
-        if franja:
+        franja, rango, fuente = franja_persona.get(pid, (TODAS, None, "sin_rango"))
+        early = temprano(filas)
+        for modo, colas in MODOS.items():
+            mias = sorted((f for f in por_persona.get(pid, []) if f["cola"] in colas), key=lambda f: f["inicio_ms"])
             por_rol = defaultdict(list)
             for f in mias:
                 por_rol[f["role"]].append(f)
-            for rol, g in por_rol.items():
-                if rol in ROLES and len(g) >= MIN:
-                    roles[rol] = _rol(g, rol, franja, celdas)
-        otros = [f for f in solo if franja in franja_partida.get(f["match_id"], ())] if franja else []
-        escribir(f"coaching/{pid}.json", {
-            "franja": franja, "rango": rango and {k: rango[k] for k in ("tier", "division", "lp")},
-            "roles": roles,
-            "rol_principal": max(roles, key=lambda r: roles[r]["n"]) if roles else None,
-            # El que se muestra por defecto: el de más partidas entre los que tienen referencia. Si el
-            # principal cae en una celda sin referencia, se ve el siguiente en vez de "no hay datos".
-            "rol_con_referencia": max((r for r in roles if not roles[r].get("sin_referencia")),
-                                      key=lambda r: roles[r]["n"], default=None),
-            "temprano": temprano(filas),
-            "campeones": contra_campeon(mias, otros) if franja else [],
-        })
-        for rol, r in roles.items():
-            if (t := r.get("tendencia")):
-                mejora.append({"persona": pid, "rol": rol, "franja": franja, "n": t["n"], "pendiente": t["pendiente"],
-                               "lo": t["lo"], "hi": t["hi"], "veredicto": t["veredicto"], "inicio": t["inicio"],
-                               "ahora": t["ahora"]})
+            roles = {rol: _rol(g, rol, franja, celdas) for rol, g in por_rol.items() if rol in ROLES and len(g) >= MIN}
+            otros = [f for f in grieta if f["cola"] in colas
+                     and (franja == TODAS or franja in franja_partida.get(f["match_id"], ()))]
+            escribir(ruta_coaching(pid, modo), {
+                "modo": modo, "nota_modo": NOTA_MODO[modo],
+                "franja": franja, "fuente_franja": fuente,
+                "rango": rango and {k: rango[k] for k in ("tier", "division", "lp")},
+                "n_modo": len(mias),
+                "roles": roles,
+                "rol_principal": max(roles, key=lambda r: roles[r]["n"]) if roles else None,
+                # El que se muestra por defecto: el de más partidas entre los que tienen referencia. Si el
+                # principal cae en una celda sin referencia, se ve el siguiente en vez de "no hay datos".
+                "rol_con_referencia": max((r for r in roles if not roles[r].get("sin_referencia")),
+                                          key=lambda r: roles[r]["n"], default=None),
+                "temprano": early,
+                "campeones": contra_campeon(mias, otros),
+            })
+            for rol, r in roles.items():
+                if (t := r.get("tendencia")):
+                    mejora[modo].append({"persona": pid, "rol": rol, "franja": franja, "n": t["n"],
+                                         "pendiente": t["pendiente"], "lo": t["lo"], "hi": t["hi"],
+                                         "veredicto": t["veredicto"], "inicio": t["inicio"], "ahora": t["ahora"]})
     # Quién más mejoró: por la pendiente de la tendencia (puntos cada 100 partidas contra su propia
     # franja), así no se comparan winrates de franjas distintas. Primero los que se separan del ruido.
+    orden = {m: sorted(t, key=lambda x: (x["veredicto"] != "mejorando", -x["lo"])) for m, t in mejora.items()}
     escribir("rankings/mejora.json", {
-        "nota": "Pendiente del índice por partida (0–100, contra la propia franja y rol) en solo/dúo, en puntos "
+        "nota": "Pendiente del índice por partida (0–100, contra la propia franja y rol), en puntos "
                 "cada 100 partidas. 'Mejorando' solo si todo el intervalo está arriba de cero.",
-        "tabla": sorted(mejora, key=lambda x: (x["veredicto"] != "mejorando", -x["lo"]))})
+        "tabla": orden["solo"], "modos": orden})

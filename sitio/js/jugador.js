@@ -1,7 +1,7 @@
 /* jugador.js — perfil: cabecera con rango, KPIs por cola y rol (con n e intervalo),
    forma reciente con su prueba, los bloques de la fase 2 (fase2.js), el coaching (fase3.js) e historial. */
 
-import { state, loadPerfil, loadHistorial, cachedFetch } from './data.js';
+import { state, loadPerfil, loadHistorial, cachedFetch, MODOS, modoGuardado, guardarModo } from './data.js';
 import { seccionEvolucion } from './graficos.js';
 import { onRoute, go } from './router.js';
 import { bloquesFase2 } from './fase2.js';
@@ -51,10 +51,9 @@ function cabecera(p) {
     </section>`;
 }
 
-/** Lo importante de un vistazo: rango, winrate de la cola principal, mejor rol y forma reciente. */
-function resumen(p) {
-    const todos = (p.kpis?.todas || []).filter(f => f.rol === 'Todos');
-    const principal = todos.sort((a, b) => b.n - a.n)[0];
+/** Lo importante de un vistazo: rango, winrate del modo elegido, mejor rol y forma reciente. */
+function resumen(p, modo) {
+    const principal = (p.kpis?.todas || []).find(f => f.rol === 'Todos' && f.cola === modo);
     const solo = Object.values(p.rango || {}).map(c => c.solo).filter(Boolean).sort((a, b) => (b.valor ?? -1) - (a.valor ?? -1))[0];
     const mejor = principal && p.mejor_rol?.[principal.cola];
     const f = p.forma, dif = f?.comparacion?.winrate?.dif;
@@ -63,7 +62,7 @@ function resumen(p) {
     return `<div class="resumen">
       ${tarjeta('Solo/Dúo', solo ? escapeHtml(rangoTexto(solo).split(' · ')[0]) : 'Sin clasificar',
                 solo ? `${solo.lp} LP · ${solo.wins} V / ${solo.losses} D` : 'todavía sin rango', tierClase(solo))}
-      ${principal ? tarjeta(`Winrate en ${escapeHtml(nombreCola(principal.cola))}`, conIntervalo(principal.winrate, 'pct'), `${principal.n} partidas`) : ''}
+      ${tarjeta(`Winrate en ${escapeHtml(MODOS[modo])}`, principal ? conIntervalo(principal.winrate, 'pct') : '—', principal ? `${principal.n} partidas` : 'sin partidas en este modo')}
       ${tarjeta('Mejor rol', mejor ? escapeHtml(mejor.rol) : '—',
                 mejor ? `${Math.round(mejor.winrate_aj * 100)} % ajustado en ${mejor.n} partidas` : 'ningún rol con confianza media todavía')}
       ${f ? tarjeta('Últimas 10', conIntervalo(f.comparacion.winrate.ultimas, 'pct'),
@@ -72,10 +71,21 @@ function resumen(p) {
     </div>`;
 }
 
-/** Colas presentes, la más jugada primero (por la fila "Todos"). */
-function colasKpis(filas) {
-    return [...new Set(filas.map(f => f.cola))].sort((a, b) =>
-        (filas.find(f => f.cola === b && f.rol === 'Todos')?.n || 0) - (filas.find(f => f.cola === a && f.rol === 'Todos')?.n || 0));
+/** Partidas de cada modo (fila "Todos" de los KPIs). */
+const nModo = (p, m) => (p.kpis?.todas || []).find(f => f.cola === m && f.rol === 'Todos')?.n || 0;
+
+/** El modo guardado por quien mira; si no hay, el de solo/dúo cuando alcanza para el coaching, si no Todo. */
+function modoInicial(p) {
+    return modoGuardado() || (nModo(p, 'solo') >= 30 ? 'solo' : 'todo');
+}
+
+/** Solo/Dúo · Normales · Todo, con cuántas partidas tiene cada uno. Maneja todo el perfil. */
+function barraModo(p, modo) {
+    return `<div class="modo-bar" role="group" aria-label="Qué partidas mirar">
+      <span class="modo-tit">Modo</span>
+      ${Object.entries(MODOS).map(([m, l]) => `<button type="button" class="modo-btn${m === modo ? ' is-active' : ''}" data-modo="${m}"
+        aria-pressed="${m === modo}" title="${m === 'todo' ? 'Solo/dúo, flex y normales juntas' : escapeHtml(l)}">${l} <span class="dim">${nModo(p, m)}</span></button>`).join('')}
+    </div>`;
 }
 
 function filasKpis(filas) {
@@ -90,7 +100,7 @@ function filasKpis(filas) {
 /** Una cola por vez; las filas con muestra chica quedan plegadas al final (antes eran la mitad de la tabla). */
 function tablaKpis(filas, cola) {
     const deCola = filas.filter(f => f.cola === cola);
-    if (!deCola.length) return '<p class="empty-state">Sin partidas en este filtro.</p>';
+    if (!deCola.length) return '<p class="empty-state">Sin partidas en este modo.</p>';
     const grandes = deCola.filter(f => !f.muestra_chica), chicas = deCola.filter(f => f.muestra_chica);
     const cab = `<thead><tr><th>Rol</th><th class="num">n</th>${COLS.map(([, l]) => `<th class="num">${l}</th>`).join('')}</tr></thead>`;
     return `<div class="table-wrap"><table class="data-table kpis">${cab}<tbody>${filasKpis(grandes)}</tbody></table></div>
@@ -234,33 +244,32 @@ function botonesCuenta(p, vista) {
 }
 
 /** Arma el perfil entero. vista = null (todas las cuentas) o el índice de una cuenta. */
-async function pintarPerfil(cont, base, vista, tabInicial = 'resumen') {
+async function pintarPerfil(cont, base, vista, tabInicial = 'resumen', modoElegido = null) {
     let p = base;
     if (vista != null) {
         const c = await cachedFetch(`cuenta/${encodeURIComponent(base.id)}/${vista}.json`);
         p = { ...base, cuentas: [{ riot_id: c.riot_id, n: c.n }], rango: c.rango, n: c.n, ultima: c.ultima,
               kpis: { todas: c.kpis }, forma: c.forma, evolucion: c.evolucion, mejor_rol: c.mejor_rol, _cuenta: c };
     }
-    let colaK = colasKpis(p.kpis.todas)[0];
+    const modo = modoElegido || modoInicial(p);
     // Orden: lo que se lee de un vistazo (forma) y lo que ayuda a mejorar (coaching, roles, pool)
     // antes que la tabla de KPIs, que es el detalle.
     const ruta = (tab, v = vista) => `#/jugadores/${encodeURIComponent(base.id)}/${tab}${v != null ? `/${v}` : ''}`;
     cont.innerHTML = `${cabecera(p)}
       ${botonesCuenta(base, vista)}
-      ${resumen(p)}
+      ${barraModo(p, modo)}
+      ${resumen(p, modo)}
       <nav class="perfil-tabs" role="tablist" aria-label="Secciones del perfil">${Object.entries(PESTANAS).map(([k, l]) =>
         `<a class="perfil-tab" role="tab" data-tab="${k}" href="${ruta(k)}">${l}</a>`).join('')}</nav>
-      <div data-pestana="resumen">${forma(p.forma)}${seccionEvolucion(p.evolucion)}</div>
+      <div data-pestana="resumen">${forma(p.forma)}${seccionEvolucion(p.evolucion, modo)}</div>
       <div data-pestana="coaching"><div id="fase3"></div></div>
       <div data-pestana="campeones"><div id="fase2"></div><div id="f4-matchups"></div></div>
       <div data-pestana="mapa"><div id="f4-heatmap"></div><div id="f4-jungla"></div>
         ${p._cuenta ? '<p class="empty-state">El mapa y la jungla se calculan con todas tus cuentas juntas.</p>' : ''}</div>
       <div data-pestana="partidas">
         <section class="section">
-          <div class="section-head"><h3>KPIs por rol</h3>
-            <label class="selector">Cola <select id="kpi-cola">${colasKpis(p.kpis.todas).map(c => `<option value="${escapeHtml(c)}">${escapeHtml(nombreCola(c))}</option>`).join('')}</select></label>
-          </div>
-          <div id="kpi-tabla">${tablaKpis(p.kpis.todas, colaK)}</div>
+          <h3>KPIs por rol <span class="dim">· ${escapeHtml(MODOS[modo])}</span></h3>
+          <div id="kpi-tabla">${tablaKpis(p.kpis.todas, modo)}</div>
         </section>
         <div id="historial"></div></div>`;
     // Las cuentas cambian la URL: el router vuelve a entrar y arma la vista de esa cuenta.
@@ -269,15 +278,18 @@ async function pintarPerfil(cont, base, vista, tabInicial = 'resumen') {
         const tab = cont.querySelector('.perfil-tab.is-active')?.dataset.tab || 'resumen';
         location.hash = ruta(tab, v);
     }));
+    // El modo cambia todo el perfil: se vuelve a armar en la misma pestaña (los JSON ya están en caché).
+    cont.querySelectorAll('.modo-btn').forEach(btn => btn.addEventListener('click', () => {
+        if (btn.dataset.modo === modo) return;
+        guardarModo(btn.dataset.modo);
+        const tab = cont.querySelector('.perfil-tab.is-active')?.dataset.tab || 'resumen';
+        pintarPerfil(cont, base, vista, tab, btn.dataset.modo).catch(err => console.error('[perfil]', err));
+    }));
     mostrarPestana(tabInicial);
-    bloquesFase3(p, document.getElementById('fase3')).catch(err => console.error('[coaching]', err));
-    bloquesFase2(p, document.getElementById('fase2'));
+    bloquesFase3(p, document.getElementById('fase3'), modo).catch(err => console.error('[coaching]', err));
+    bloquesFase2(p, document.getElementById('fase2'), modo);
     bloquesFase4(p, { matchups: document.getElementById('f4-matchups'), heatmap: document.getElementById('f4-heatmap'),
-                      jungla: document.getElementById('f4-jungla') });
-    document.getElementById('kpi-cola')?.addEventListener('change', (e) => {
-        colaK = e.target.value;
-        document.getElementById('kpi-tabla').innerHTML = tablaKpis(p.kpis.todas, colaK);
-    });
+                      jungla: document.getElementById('f4-jungla') }, modo);
     await historial(p, document.getElementById('historial'));
 }
 

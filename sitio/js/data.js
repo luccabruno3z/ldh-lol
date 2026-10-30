@@ -37,3 +37,17 @@ export async function loadBase() {
 export const loadPerfil = (id) => cachedFetch(`perfil/${encodeURIComponent(id)}.json`);
 export const loadHistorial = (id, pagina) => cachedFetch(`historial/${encodeURIComponent(id)}/${pagina}.json`);
 export const loadRecientes = () => cachedFetch('recientes.json', { silent: true });
+
+// Modo del perfil (solo/dúo, normales o todo junto). Se recuerda en el navegador de quien mira; si el
+// almacenamiento no anda, se arranca en el modo con más partidas de cada jugador.
+export const MODOS = { solo: 'Solo/Dúo', normal: 'Normales', todo: 'Todo' };
+export function modoGuardado() {
+    try { const m = localStorage.getItem('ldh-modo'); return MODOS[m] ? m : null; } catch { return null; }
+}
+export function guardarModo(m) {
+    try { localStorage.setItem('ldh-modo', m); } catch { /* sin almacenamiento: queda en memoria */ }
+}
+export const rutaCoaching = (id, modo = 'solo') =>
+    modo === 'solo' ? `coaching/${encodeURIComponent(id)}.json` : `coaching/${modo}/${encodeURIComponent(id)}.json`;
+// Para frases: "en solo/dúo", "en normales", "en todas las colas".
+export const EN_MODO = { solo: 'solo/dúo', normal: 'normales', todo: 'todas las colas' };

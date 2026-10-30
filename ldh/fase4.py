@@ -20,6 +20,7 @@ from typing import Callable
 from . import estadistica as est
 from .ajustes import AJUSTES, CACHE
 from .almacen import _ruta
+from .fase2 import colas_de
 
 CFG = AJUSTES["fase4"]
 ROLES = ["Top", "Jungla", "Mid", "ADC", "Support"]
@@ -90,7 +91,8 @@ def matchups(db: sqlite3.Connection, filas: list[dict]) -> list[dict]:
     for f in filas:
         rc = rivales.get((f["match_id"], f.get("team_id"), f.get("team_position")))
         if rc is not None and f["cola"] in GRIETA and f["rol_ldh"]:
-            grupos[(f["cola"], f["rol_ldh"], rc)].append(f)
+            for c in colas_de(f):
+                grupos[(c, f["rol_ldh"], rc)].append(f)
     out = []
     for (cola, rol, rc), g in grupos.items():
         w = sum(f["win"] for f in g)

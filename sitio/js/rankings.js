@@ -2,7 +2,7 @@
    Rutas: #/rankings/periodo, #/rankings/roles, #/rankings/duos. Todo dentro de
    cada cola; el valor principal es el ajustado, así nadie sube al podio con dos partidas. */
 
-import { state, cachedFetch } from './data.js';
+import { state, cachedFetch, MODOS, EN_MODO } from './data.js';
 import { onRoute } from './router.js';
 import { escapeHtml, nombreCola, conIntervalo, num } from './utils.js';
 import { nombrePersona, pct, chipConf, winrateAj, difWinrate, senal } from './fase2.js';
@@ -12,7 +12,7 @@ const ROLES = ['Top', 'Jungla', 'Mid', 'ADC', 'Support'];
 const PERIODOS = { semana: 'Últimos 7 días', mes: 'Últimos 30 días', temporada: 'Temporada' };
 const TABS = { periodo: 'Por período', roles: 'Por rol', duos: 'Dúos', mejora: 'Quién más mejoró' };
 
-const sel = { tab: 'periodo', periodo: 'mes', cola: 'solo', ventana: 'historico' };
+const sel = { tab: 'periodo', periodo: 'mes', cola: 'solo', ventana: 'historico', modo: 'solo' };
 
 const persona = (id) => `<a href="#/jugadores/${encodeURIComponent(id)}">${escapeHtml(nombrePersona(id))}</a>`;
 
@@ -21,7 +21,8 @@ function opciones(id, valores, actual, etiqueta) {
         `<option value="${v}"${v === actual ? ' selected' : ''}>${escapeHtml(l)}</option>`).join('')}</select></label>`;
 }
 
-const colas = () => Object.fromEntries(GRIETA.map(c => [c, nombreCola(c)]));
+// "Todo" junta solo, flex y normales: así entra quien juega poco de cada una.
+const colas = (conTodo = true) => Object.fromEntries([...GRIETA, ...(conTodo ? ['todo'] : [])].map(c => [c, nombreCola(c)]));
 
 async function porPeriodo(cont) {
     const d = await cachedFetch(`rankings/${sel.periodo}.json`);
@@ -68,8 +69,10 @@ async function porRol(cont) {
 async function duos(cont) {
     const d = await cachedFetch('sinergia.json');
     // Un par aparece dos veces (A con B y B con A): se muestra una fila con las dos diferencias.
+    // Los dúos se prueban cola por cola (sumar "todo" duplicaría las pruebas).
+    const cola = GRIETA.includes(sel.cola) ? sel.cola : 'solo';
     const pares = new Map();
-    d.filas.filter(r => r.cola === sel.cola).forEach(r => {
+    d.filas.filter(r => r.cola === cola).forEach(r => {
         const k = [r.persona, r.companero].sort().join('|');
         const e = pares.get(k) || { a: null, b: null };
         if (r.persona < r.companero) e.a = r; else e.b = r;
@@ -77,7 +80,7 @@ async function duos(cont) {
     });
     const filas = [...pares.values()].filter(e => e.a && e.b).sort((x, y) => y.a.juntos - x.a.juntos);
     cont.innerHTML = `
-      <div class="section-head">${opciones('rk-cola', colas(), sel.cola, 'Cola')}</div>
+      <div class="section-head">${opciones('rk-cola', colas(false), cola, 'Cola')}</div>
       ${filas.length ? `<div class="table-wrap"><table class="data-table">
         <thead><tr><th>Dúo</th><th class="num">Juntos</th><th class="num">Winrate juntos</th><th class="num">Para el primero</th><th class="num">Para el segundo</th></tr></thead>
         <tbody>${filas.map(({ a, b }) => `<tr class="${a.muestra_chica ? 'chica' : ''}">
@@ -93,15 +96,17 @@ async function duos(cont) {
 
 async function mejora(cont) {
     const d = await cachedFetch('rankings/mejora.json');
+    const tabla = d.modos?.[sel.modo] || d.tabla;
     const signo = (v) => `${v > 0 ? '+' : ''}${num(v, 1)}`;
-    cont.innerHTML = d.tabla.length ? `<div class="table-wrap"><table class="data-table">
+    cont.innerHTML = `<div class="section-head">${d.modos ? opciones('rk-modo', MODOS, sel.modo, 'Modo') : ''}</div>` + (tabla.length ? `<div class="table-wrap"><table class="data-table">
       <thead><tr><th>Jugador</th><th>Rol</th><th class="num">Partidas</th><th class="num">De → a</th><th class="num">Cada 100 partidas</th><th></th></tr></thead>
-      <tbody>${d.tabla.map(x => `<tr class="${x.veredicto === 'mejorando' ? '' : 'chica'}"><td>${persona(x.persona)}</td><td>${escapeHtml(x.rol)}</td>
+      <tbody>${tabla.map(x => `<tr class="${x.veredicto === 'mejorando' ? '' : 'chica'}"><td>${persona(x.persona)}</td><td>${escapeHtml(x.rol)}</td>
         <td class="num mono">${x.n}</td><td class="num mono">${num(x.inicio, 0)} → ${num(x.ahora, 0)}</td>
         <td class="num"><span class="v">${signo(x.pendiente)}</span><span class="ic">${signo(x.lo)} a ${signo(x.hi)}</span></td>
         <td><span class="tag ${x.veredicto === 'mejorando' ? 'win' : x.veredicto === 'empeorando' ? 'loss' : ''}">${escapeHtml(x.veredicto)}</span></td></tr>`).join('')}</tbody></table></div>
       <p class="nota">${escapeHtml(d.nota)} Cada uno se mide contra su propia franja, así que se puede comparar a un Hierro con un Esmeralda.</p>`
-      : '<p class="empty-state">Nadie tiene 30+ partidas de solo/dúo en un rol con referencia.</p>';
+      : `<p class="empty-state">Nadie tiene 30+ partidas de ${escapeHtml(EN_MODO[sel.modo])} en un rol con referencia.</p>`);
+    cont.querySelector('#rk-modo')?.addEventListener('change', (e) => { sel.modo = e.target.value; render(); });
 }
 
 function render() {

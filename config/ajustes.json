@@ -34,6 +34,7 @@
     "solo": "Ranked Solo/Dúo",
     "flex": "Ranked Flex",
     "normal": "Normales",
+    "todo": "Todo (solo, flex y normales)",
     "aram": "ARAM",
     "otra": "Otras colas"
   },

@@ -1,10 +1,9 @@
 /* fase2.js — bloques del perfil de la fase 2: roles, campeones (con el pool) y
    sinergia. Cada bloque carga su JSON y falla solo: si uno no anda, el resto sí. */
 
-import { state, cachedFetch } from './data.js';
+import { state, cachedFetch, rutaCoaching, MODOS } from './data.js';
 import { escapeHtml, nombreCola, conIntervalo, iconoCampeon, campeon, num } from './utils.js';
 
-const GRIETA = ['solo', 'flex', 'normal'];
 const CONF = { alta: 'Confianza alta (15+ partidas)', media: 'Confianza media (8 a 14)', baja: 'Confianza baja: menos de 8 partidas o una sola partida pesa demasiado' };
 
 export const nombrePersona = (id) => state.personas.find(p => p.id === id)?.nombre || id;
@@ -18,17 +17,7 @@ export function winrateAj(t) {
 
 const kdaAj = (t) => `<span class="v">${num(t.kda_aj, 2)}</span><span class="ic">real ${num(t.kda.v, 2)}</span>`;
 
-function selectorCola(id, colas, actual) {
-    return `<label class="selector">Cola <select id="${id}">${colas.map(c =>
-        `<option value="${c}"${c === actual ? ' selected' : ''}>${escapeHtml(nombreCola(c))}</option>`).join('')}</select></label>`;
-}
-
-/** La cola con más partidas, para arrancar el selector ahí. */
-function colaPrincipal(filas) {
-    const n = {};
-    filas.forEach(t => { n[t.cola] = (n[t.cola] || 0) + t.n; });
-    return GRIETA.filter(c => n[c]).sort((a, b) => n[b] - n[a])[0];
-}
+const sinPartidas = (modo) => `<p class="empty-state">Sin partidas en ${escapeHtml(MODOS[modo] || modo)}. Probá otro modo arriba.</p>`;
 
 function metrica(m, clave) {
     const dec = clave.startsWith('dif_oro') ? 0 : clave.startsWith('dif_cs') ? 1 : 2;
@@ -41,15 +30,15 @@ function metrica(m, clave) {
 
 function tablaRoles(d, cola, co) {
     const filas = d.tabla.filter(t => t.cola === cola);
-    if (!filas.length) return '<p class="empty-state">Sin partidas en esta cola.</p>';
+    if (!filas.length) return sinPartidas(cola);
     return `<div class="table-wrap"><table class="data-table">
       <thead><tr><th>Rol</th><th class="num">n</th><th class="num">Winrate ajustado</th><th class="num">KDA ajustado</th>
-        <th>Métrica del rol</th><th class="num">${cola === 'solo' && co ? 'Contra tu franja' : 'Mediana del grupo'}</th><th>Confianza</th></tr></thead>
+        <th>Métrica del rol</th><th class="num">${co ? 'Contra tu franja' : 'Mediana del grupo'}</th><th>Confianza</th></tr></thead>
       <tbody>${filas.map(t => {
         const ms = d.metricas[t.rol] || [];
         const ref = t.referencia || {};
-        // En solo/dúo hay referencia de tu franja (fase 3): mejor que la mediana de un grupo de amigos.
-        const fr = cola === 'solo' && co?.roles?.[t.rol]?.metricas?.[ms[0]?.clave];
+        // Con referencia de tu franja (fase 3) se usa esa: mejor que la mediana de un grupo de amigos.
+        const fr = co?.roles?.[t.rol]?.metricas?.[ms[0]?.clave];
         return `<tr class="${t.muestra_chica ? 'chica' : ''}">
           <td>${escapeHtml(t.rol)}${t.muestra_chica ? ' <span class="tag">muestra chica</span>' : ''}</td>
           <td class="num mono">${t.n}</td>
@@ -61,35 +50,28 @@ function tablaRoles(d, cola, co) {
     }).join('')}</tbody></table></div>`;
 }
 
-async function roles(p, cont) {
+async function roles(p, cont, cola) {
     // En la vista de una cuenta, los roles vienen calculados con solo esas partidas.
     const d = p._cuenta ? p._cuenta.roles : await cachedFetch(`roles/${encodeURIComponent(p.id)}.json`);
-    const co = p._cuenta ? null : await cachedFetch(`coaching/${encodeURIComponent(p.id)}.json`).catch(() => null);
-    let cola = colaPrincipal(d.tabla);
-    if (!cola) return;
+    const co = p._cuenta ? null : await cachedFetch(rutaCoaching(p.id, cola)).catch(() => null);
     const mejor = () => {
         const m = d.mejor[cola];
-        return m ? `Mejor rol en ${escapeHtml(nombreCola(cola))}: <strong>${escapeHtml(m.rol)}</strong> (${pct(m.winrate_aj)} ajustado, ${m.n} partidas).`
-            : 'Ningún rol llega a confianza media en esta cola: no hay "mejor rol" todavía.';
+        return m ? `Mejor rol en ${escapeHtml(MODOS[cola] || nombreCola(cola))}: <strong>${escapeHtml(m.rol)}</strong> (${pct(m.winrate_aj)} ajustado, ${m.n} partidas).`
+            : 'Ningún rol llega a confianza media en este modo: no hay "mejor rol" todavía.';
     };
     cont.innerHTML = `<section class="section">
-      <div class="section-head"><h3>Tus roles</h3>${selectorCola('roles-cola', GRIETA, cola)}</div>
+      <h3>Tus roles</h3>
       <p class="lead" id="roles-mejor">${mejor()}</p>
       <div id="roles-tabla">${tablaRoles(d, cola, co)}</div>
-      <p class="nota">El winrate ajustado suma ${state.ajustes?.ajuste_muestra?.k_tasa ?? 10} partidas al 50 % y el KDA ajustado ${state.ajustes?.ajuste_muestra?.k_muertes ?? 20} muertes a la mediana del rol: con poca muestra el valor se acerca al centro. La métrica de cada rol se mide contra el rival directo de la misma partida. La referencia es la mediana del grupo en la misma cola y rol, entre quienes tienen ${state.ajustes?.min_partidas ?? 10}+ partidas.</p>
+      <p class="nota">El winrate ajustado suma ${state.ajustes?.ajuste_muestra?.k_tasa ?? 10} partidas al 50 % y el KDA ajustado ${state.ajustes?.ajuste_muestra?.k_muertes ?? 20} muertes a la mediana del rol: con poca muestra el valor se acerca al centro. La métrica de cada rol se mide contra el rival directo de la misma partida. "Contra tu franja" es tu percentil entre jugadores de tu franja y rol (ver Coaching); sin esa referencia va la mediana del grupo en el mismo modo y rol, entre quienes tienen ${state.ajustes?.min_partidas ?? 10}+ partidas.</p>
     </section>`;
-    cont.querySelector('#roles-cola').addEventListener('change', (e) => {
-        cola = e.target.value;
-        cont.querySelector('#roles-tabla').innerHTML = tablaRoles(d, cola, co);
-        cont.querySelector('#roles-mejor').innerHTML = mejor();
-    });
 }
 
 // ---- Campeones y pool ----
 
 function tablaCampeones(filas, todos) {
     const vis = todos ? filas : filas.slice(0, 12);
-    if (!vis.length) return '<p class="empty-state">Sin partidas en esta cola.</p>';
+    if (!vis.length) return '<p class="empty-state">Sin partidas en este modo.</p>';
     return `<div class="table-wrap"><table class="data-table">
       <thead><tr><th>Campeón</th><th>Posición</th><th class="num">n</th><th class="num">Winrate ajustado</th>
         <th class="num">KDA ajustado</th><th class="num">De tus partidas</th><th>Último parche</th><th>Confianza</th></tr></thead>
@@ -135,10 +117,9 @@ function bloquePool(pool, cola) {
     <p class="nota">${escapeHtml(pool.regla)} Los meses en gris todavía no tienen 90 días de historia atrás: ahí casi todo cuenta como "fuera".</p>`;
 }
 
-async function campeones(p, cont) {
+async function campeones(p, cont, cola) {
     const d = p._cuenta ? p._cuenta.campeones : await cachedFetch(`campeones/${encodeURIComponent(p.id)}.json`);
-    let cola = colaPrincipal(d.tabla), todos = false;
-    if (!cola) return;
+    let todos = false;
     const pintar = () => {
         const filas = d.tabla.filter(t => t.cola === cola);
         cont.querySelector('#camp-tabla').innerHTML = tablaCampeones(filas, todos);
@@ -147,12 +128,11 @@ async function campeones(p, cont) {
         cont.querySelector('#camp-pool').innerHTML = bloquePool(d.pool, cola);
     };
     cont.innerHTML = `<section class="section">
-      <div class="section-head"><h3>Tus campeones</h3>${selectorCola('camp-cola', GRIETA, cola)}</div>
+      <h3>Tus campeones</h3>
       <div id="camp-tabla"></div><button class="btn" type="button" id="camp-mas" hidden></button>
       <p class="nota">Cada fila es un campeón en una posición: un Darius en bot cuenta como ADC. Ordenado por winrate ajustado; "de tus partidas" es la popularidad, que no es rendimiento.</p>
       <h4>Dentro y fuera de tu pool</h4><div id="camp-pool"></div>
     </section>`;
-    cont.querySelector('#camp-cola').addEventListener('change', (e) => { cola = e.target.value; pintar(); });
     cont.querySelector('#camp-mas').addEventListener('click', () => { todos = !todos; pintar(); });
     pintar();
 }
@@ -167,10 +147,11 @@ export function difWinrate(d) {
 
 export const senal = (r) => (r.senal ? `<span class="tag ${r.dif.v > 0 ? 'win' : 'loss'}">señal</span>` : '<span class="tag">ruido</span>');
 
-async function sinergia(p, cont) {
+async function sinergia(p, cont, modo) {
     if (p._cuenta) return;  // la sinergia es de la persona: se compara con y sin cada amigo en todas sus cuentas
     const d = await cachedFetch('sinergia.json');
-    const filas = d.filas.filter(r => r.persona === p.id);
+    // Se prueba cola por cola (sumar "todo" duplicaría las pruebas); en Todo se ven las tres.
+    const filas = d.filas.filter(r => r.persona === p.id && (modo === 'todo' || r.cola === modo));
     if (!filas.length) return;
     const mc = p.mejor_companero;
     cont.innerHTML = `<section class="section">
@@ -195,8 +176,8 @@ async function sinergia(p, cont) {
 }
 
 /** Los tres bloques en contenedores propios, cada uno aislado. */
-export function bloquesFase2(p, cont) {
+export function bloquesFase2(p, cont, modo) {
     cont.innerHTML = '<div id="f2-roles"></div><div id="f2-campeones"></div><div id="f2-sinergia"></div>';
     [['roles', roles], ['campeones', campeones], ['sinergia', sinergia]].forEach(([n, fn]) =>
-        fn(p, cont.querySelector(`#f2-${n}`)).catch(err => console.error(`[${n}]`, err)));
+        fn(p, cont.querySelector(`#f2-${n}`), modo).catch(err => console.error(`[${n}]`, err)));
 }

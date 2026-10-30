@@ -1,13 +1,12 @@
 /* fase3.js — bloques de coaching del perfil: Performance, tu juego en una mirada, cómo sumar,
    los primeros 15 minutos y contra tu campeón. Todo sale de coaching/<id>.json; cada bloque
-   falla solo. Los percentiles son contra jugadores de tu franja de rango y tu rol en solo/dúo. */
+   falla solo. Los percentiles son contra jugadores de ranked solo/dúo de tu franja de rango y tu rol;
+   el modo (solo/dúo, normales o todo) elige qué partidas tuyas entran. */
 
-import { state, cachedFetch } from './data.js';
-import { escapeHtml, nombreCola, iconoCampeon, campeon, num } from './utils.js';
+import { state, cachedFetch, rutaCoaching, MODOS, EN_MODO } from './data.js';
+import { escapeHtml, iconoCampeon, campeon, num } from './utils.js';
 import { pct, chipConf } from './fase2.js';
 import { radar, seccionTendencia } from './graficos.js';
-
-const COLAS = ['solo', 'flex', 'normal'];
 
 /** Valor de una métrica con su formato: signo en las diferencias, % donde corresponde. */
 function fmt(m, x) {
@@ -102,27 +101,27 @@ function sumar(r) {
 
 function temprano(d, cola, rol) {
     const t = d.temprano?.[cola]?.[rol];
-    if (!t) return `<p class="empty-state">Menos de ${state.ajustes?.min_partidas ?? 10} partidas de ${escapeHtml(rol)} en esta cola.</p>`;
-    const ref = cola === 'solo' ? d.roles?.[rol]?.metricas || {} : {};
+    if (!t) return `<p class="empty-state">Menos de ${state.ajustes?.min_partidas ?? 10} partidas de ${escapeHtml(rol)} en ${escapeHtml(MODOS[cola])}.</p>`;
+    const ref = d.roles?.[rol]?.metricas || {};
     const l = t.linea;
     const lineaTxt = l.gana.n && l.pierde.n
         ? `Vas arriba en oro contra tu rival a los 15 en ${pct(l.pct_gana.v)} de las partidas. Cuando vas arriba ganás ${pct(l.gana.v)} (${l.gana.n} partidas); cuando vas abajo, ${pct(l.pierde.v)} (${l.pierde.n}). ${l.senal ? '' : 'La diferencia no se separa del ruido. '}<span class="dim">Fisher p = ${num(l.p, 3)}</span>`
         : '';
     return `<div class="table-wrap"><table class="data-table">
-      <thead><tr><th>Métrica</th><th class="num">Tu promedio</th>${cola === 'solo' ? '<th>Contra tu franja</th><th class="num">Mediana de tu franja</th>' : ''}</tr></thead>
+      <thead><tr><th>Métrica</th><th class="num">Tu promedio</th><th>Contra tu franja</th><th class="num">Mediana de tu franja</th></tr></thead>
       <tbody>${Object.entries(t.metricas).map(([k, m]) => {
         const mm = { ...m, clave: k }, r = ref[k];
         return `<tr><td>${escapeHtml(m.nombre)}</td><td class="num">${valorIc(mm)} <span class="dim">n = ${m.n}</span></td>
-          ${cola === 'solo' ? `<td>${r ? `${barra(r.pct, r.pct_lo, r.pct_hi)} <span class="dim small">${mejorQue(r)}</span>` : '<span class="dim">sin referencia</span>'}</td>
-          <td class="num mono">${r ? fmt({ ...r, clave: k }, r.mediana) : '—'}</td>` : ''}</tr>`;
+          <td>${r ? `${barra(r.pct, r.pct_lo, r.pct_hi)} <span class="dim small">${mejorQue(r)}</span>` : '<span class="dim">sin referencia</span>'}</td>
+          <td class="num mono">${r ? fmt({ ...r, clave: k }, r.mediana) : '—'}</td></tr>`;
     }).join('')}</tbody></table></div>
       ${lineaTxt ? `<p class="lead">${lineaTxt}</p>` : ''}
-      <p class="nota">Las diferencias son contra el rival directo de la misma partida (la misma posición del otro equipo). ${cola === 'solo' ? '' : 'Fuera de solo/dúo no hay franja de rango: no hay percentiles.'}</p>`;
+      <p class="nota">Las diferencias son contra el rival directo de la misma partida (la misma posición del otro equipo).</p>`;
 }
 
 // ---- Contra tu campeón ----
 
-function contraCampeon(lista) {
+function contraCampeon(lista, modo) {
     if (!lista.length) return '';
     const bloques = lista.map(c => `<div class="campeon-ref">
       <div class="fd-cab">${iconoCampeon(c.campeon_id, 28)}<strong>${escapeHtml(campeon(c.campeon_id))}</strong> <span class="dim">${escapeHtml(c.rol)} · tus ${c.n} partidas contra ${c.n_ref} de ${c.jugadores_ref} jugadores distintos</span></div>
@@ -140,59 +139,61 @@ function contraCampeon(lista) {
     // Los dos con más partidas a la vista; el resto plegado (con 9 campeones el bloque era media página).
     return bloques.slice(0, 2).join('') +
         (bloques.length > 2 ? `<details class="plegable"><summary>${bloques.length - 2} campeones más</summary>${bloques.slice(2).join('')}</details>` : '') +
-        '<p class="nota">"Ellos" son los desconocidos que jugaron el mismo campeón en el mismo rol en las partidas de solo/dúo del grupo, en tu franja; se sacan las partidas donde su rival directo era alguien del grupo. Es por partida (casi todos aparecen una vez), por eso va la columna de jugadores distintos. Son compañeros y rivales del grupo en partes iguales y en total ganan el 50 %, así que jugar con o contra ustedes no los sesga.</p>';
+        `<p class="nota">"Ellos" son los desconocidos que jugaron el mismo campeón en el mismo rol en las partidas del grupo (${escapeHtml(EN_MODO[modo])}), en tu franja; se sacan las partidas donde su rival directo era alguien del grupo. Es por partida (casi todos aparecen una vez), por eso va la columna de jugadores distintos. Son compañeros y rivales del grupo en partes iguales y en total ganan el 50 %, así que jugar con o contra ustedes no los sesga.</p>`;
 }
 
 // ---- Armado ----
 
-export async function bloquesFase3(p, cont) {
+/** De dónde sale la franja: rango de solo/dúo, de flex o, sin rango, toda la referencia del rol. */
+function textoFranja(d) {
+    if (d.fuente_franja === 'sin_rango') {
+        return `Sin rango en solo/dúo ni en flex: te comparo contra toda la referencia del rol, de <strong>${escapeHtml(d.franja)}</strong> (no es tu franja).`;
+    }
+    const de = d.fuente_franja === 'flex' ? 'tu rango de flex (no tenés de solo/dúo)' : 'tu rango de solo/dúo';
+    return `Te comparo contra jugadores de ranked solo/dúo de <strong>${escapeHtml(d.franja)}</strong>, tu franja por ${de}.`;
+}
+
+export async function bloquesFase3(p, cont, modo = 'solo') {
     if (p._cuenta) {
         // El coaching necesita muestra y una franja por rango: se calcula con todas las cuentas juntas.
         cont.innerHTML = '<section class="section"><h3>Coaching</h3><p class="empty-state">El coaching, los primeros 15 minutos y la sinergia se calculan con todas tus cuentas juntas. Volvé a "Todas las cuentas" para verlos.</p></section>';
         return;
     }
-    const d = await cachedFetch(`coaching/${encodeURIComponent(p.id)}.json`);
+    const d = await cachedFetch(rutaCoaching(p.id, modo));
     const roles = Object.keys(d.roles || {});
     let rol = d.rol_con_referencia || d.rol_principal || roles[0];
-    const colasT = COLAS.filter(c => d.temprano?.[c]);
-    let colaT = colasT.includes('solo') ? 'solo' : colasT[0];
-    const rolesT = () => Object.keys(d.temprano?.[colaT] || {});
-    let rolT = rolesT().includes(rol) ? rol : rolesT()[0];
+    const rolesT = Object.keys(d.temprano?.[modo] || {});
+    let rolT = rolesT.includes(rol) ? rol : rolesT[0];
+    const nombreModo = MODOS[modo];
 
-    const sinFranja = !d.franja
-        ? '<p class="empty-state">Sin rango de solo/dúo: no hay franja contra la cual compararte. Los primeros 15 minutos sí están.</p>' : '';
     const coaching = () => {
         const r = d.roles[rol];
         if (r.sin_referencia) {
             return `<p class="empty-state">La referencia de ${escapeHtml(d.franja)} en ${escapeHtml(rol)} tiene ${r.n_ref} jugadores con ${state.ajustes?.referencia?.min_partidas ?? 10}+ partidas; hacen falta ${state.ajustes?.referencia?.min_jugadores ?? 20}. Sin eso no se muestran percentiles.</p>`;
         }
-        return `<h4>Tu Performance <span class="dim">· ${escapeHtml(rol)} en solo/dúo · ${r.n} partidas</span> ${chipConf(r.confianza)}</h4>${performance(r, d.franja)}
+        return `<h4>Tu Performance <span class="dim">· ${escapeHtml(rol)} en ${escapeHtml(EN_MODO[modo])} · ${r.n} partidas</span> ${chipConf(r.confianza)}</h4>${performance(r, d.franja)}
           <h4>Tu juego en una mirada</h4>${mirada(r)}
           <h4>¿Estás mejorando?</h4>${seccionTendencia(r.tendencia, rol, d.franja)}
           <h4>Cómo sumar</h4>${sumar(r)}`;
     };
+    const vacio = `<p class="empty-state">Ningún rol con ${state.ajustes?.min_partidas ?? 10}+ partidas en ${escapeHtml(EN_MODO[modo])}${d.n_modo ? ` (tenés ${d.n_modo} en total)` : ''}.${modo !== 'todo' ? ' Probá el modo Todo, arriba: junta todas tus partidas de la Grieta.' : ''}</p>`;
     cont.innerHTML = `<section class="section" id="f3-coaching">
         <div class="section-head"><h3>Coaching</h3>${roles.length > 1 ? selector('f3-rol', 'Rol', roles, rol) : ''}</div>
-        ${d.franja ? `<p class="dim">Te comparo contra jugadores de <strong>${escapeHtml(d.franja)}</strong> en solo/dúo, tu franja por rango.</p>` : ''}
-        ${sinFranja}<div id="f3-cuerpo">${roles.length ? coaching() : (d.franja ? `<p class="empty-state">Ningún rol con ${state.ajustes?.min_partidas ?? 10}+ partidas de solo/dúo.</p>` : '')}</div>
+        <p class="dim">${textoFranja(d)}</p>
+        ${d.nota_modo ? `<p class="aviso-modo">${escapeHtml(d.nota_modo)}</p>` : ''}
+        <div id="f3-cuerpo">${roles.length ? coaching() : vacio}</div>
       </section>
-      ${colasT.length ? `<section class="section">
-        <div class="section-head"><h3>Tus primeros 15 minutos</h3>
-          <span>${selector('f3-colaT', 'Cola', colasT, colaT, nombreCola)} <span id="f3-rolT-wrap">${selector('f3-rolT', 'Rol', rolesT(), rolT)}</span></span></div>
-        <div id="f3-temprano">${temprano(d, colaT, rolT)}</div></section>` : ''}
-      ${d.campeones?.length ? `<section class="section"><h3>Contra tu campeón</h3>${contraCampeon(d.campeones)}</section>` : ''}`;
+      ${rolesT.length ? `<section class="section">
+        <div class="section-head"><h3>Tus primeros 15 minutos</h3>${rolesT.length > 1 ? selector('f3-rolT', 'Rol', rolesT, rolT) : ''}</div>
+        <div id="f3-temprano">${temprano(d, modo, rolT)}</div></section>` : ''}
+      ${d.campeones?.length ? `<section class="section"><h3>Contra tu campeón</h3>${contraCampeon(d.campeones, modo)}</section>` : ''}`;
 
     cont.querySelector('#f3-rol')?.addEventListener('change', (e) => {
         rol = e.target.value;
         cont.querySelector('#f3-cuerpo').innerHTML = coaching();
     });
-    const pintarT = () => { cont.querySelector('#f3-temprano').innerHTML = temprano(d, colaT, rolT); };
-    cont.querySelector('#f3-colaT')?.addEventListener('change', (e) => {
-        colaT = e.target.value;
-        if (!rolesT().includes(rolT)) rolT = rolesT()[0];
-        cont.querySelector('#f3-rolT-wrap').innerHTML = selector('f3-rolT', 'Rol', rolesT(), rolT);
-        cont.querySelector('#f3-rolT').addEventListener('change', (ev) => { rolT = ev.target.value; pintarT(); });
-        pintarT();
+    cont.querySelector('#f3-rolT')?.addEventListener('change', (e) => {
+        rolT = e.target.value;
+        cont.querySelector('#f3-temprano').innerHTML = temprano(d, modo, rolT);
     });
-    cont.querySelector('#f3-rolT')?.addEventListener('change', (e) => { rolT = e.target.value; pintarT(); });
 }
