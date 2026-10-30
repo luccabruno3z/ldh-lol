@@ -91,13 +91,18 @@ def _semillas(api: RiotClient, est: dict, rng: random.Random) -> list[tuple[str,
     for tiers in CONF["franjas"].values():
         for tier in tiers:
             for div in DIVISIONES:
-                clave = f"{tier}|{div}"
-                if clave not in est["semillas"]:
-                    url = f"{platform_host('la2')}/lol/league/v4/entries/RANKED_SOLO_5x5/{tier}/{div}"
-                    est["semillas"][clave] = [e["puuid"] for e in api._get(url, {"page": 1}) if e.get("puuid")]
-                    _guardar_estado(est)
-                ps = [p for p in est["semillas"][clave] if p not in vinculados]
-                rng.shuffle(ps)
+                url = f"{platform_host('la2')}/lol/league/v4/entries/RANKED_SOLO_5x5/{tier}/{div}"
+                ps: list[str] = []
+                # Página 1 con la clave de siempre (ya bajada); las siguientes se suman cuando la meta
+                # por celda sube y no alcanzan los ~200 jugadores de una página (mid de Hierro–Bronce).
+                for pagina in range(1, CONF.get("paginas_semillas", 1) + 1):
+                    clave = f"{tier}|{div}" + ("" if pagina == 1 else f"|p{pagina}")
+                    if clave not in est["semillas"]:
+                        est["semillas"][clave] = [e["puuid"] for e in api._get(url, {"page": pagina}) if e.get("puuid")]
+                        _guardar_estado(est)
+                    nuevos = [p for p in est["semillas"][clave] if p not in vinculados]
+                    rng.shuffle(nuevos)
+                    ps += nuevos
                 por_div.append([(p, tier, div) for p in ps])
     # Round-robin entre divisiones: cada franja se llena parejo con todas sus divisiones.
     salida = []

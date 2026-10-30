@@ -101,7 +101,7 @@
       "BOTTOM": "ADC",
       "UTILITY": "Support"
     },
-    "meta_por_celda": 25,
+    "meta_por_celda": 50,
     "min_partidas": 10,
     "partidas_por_jugador": 10,
     "partidas_para_decidir": 5,
@@ -116,7 +116,8 @@
         95,
         120.0
       ]
-    ]
+    ],
+    "paginas_semillas": 3
   },
   "performance": {
     "_": "Fase 3. Cada componente es un percentil (0–1) contra jugadores de la misma franja y rol; el índice es la suma con pesos. La sigmoide acerca a 0,5 el de quien tiene pocas partidas (n=15 queda a mitad de camino). Fortaleza: intervalo del percentil entero arriba de 0,6; a mejorar: entero abajo de 0,4.",
