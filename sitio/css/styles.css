@@ -423,3 +423,15 @@ section.section { scroll-margin-top: calc(var(--header-h) + 56px); }
 .cp-sw-muerte { background: var(--danger); border-radius: 50%; } .cp-sw-kill { background: var(--success); border-radius: 50%; }
 .cp-lectura { margin: 0 0 6px; font-size: .92rem; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Curva de aprendizaje */
+.cv-svg { width: 100%; height: auto; }
+.cv-banda { fill: var(--text-muted); fill-opacity: .15; }
+.cv-grupo { fill: none; stroke: var(--text-muted); stroke-width: 2; stroke-dasharray: 5 4; }
+.cv-grupo-p { fill: var(--text-muted); }
+.cv-banda-p { fill: var(--accent-dim); }
+.cv-propio { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+.cv-propio-p { fill: var(--accent); }
+.cv-sw-grupo { background: var(--text-muted); } .cv-sw-propio { background: var(--accent); }
+.cv-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.cv-chip { display: inline-flex; align-items: center; gap: 6px; }

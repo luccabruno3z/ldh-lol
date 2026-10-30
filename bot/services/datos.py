@@ -137,6 +137,12 @@ class Datos:
             logger.warning("No pude bajar el minimapa de Data Dragon")
         return getattr(self, "_mapa", None)
 
+    async def curvas(self, persona_id: str) -> dict | None:
+        return await self._json(f"curvas/{quote(persona_id)}.json")
+
+    async def curvas_grupo(self) -> dict | None:
+        return await self._json("curvas/grupo.json")
+
     async def rachas(self, persona_id: str) -> dict | None:
         return await self._json(f"rachas/{quote(persona_id)}.json")
 

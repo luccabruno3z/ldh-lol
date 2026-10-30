@@ -2,7 +2,7 @@
    solo. Cada persona se compara consigo misma: si no, el que juega peor aparece más en las rachas. */
 
 import { cachedFetch, EN_MODO } from './data.js';
-import { escapeHtml, num } from './utils.js';
+import { escapeHtml, num, campeon } from './utils.js';
 
 const pct = (v) => (v == null ? '—' : `${num(v * 100, 0)} %`);
 const pts = (v) => `${v > 0 ? '+' : ''}${num(v * 100, 1)}`;
@@ -150,6 +150,66 @@ export function curvaPartida(d, pid) {
         <line x1="${m.l}" x2="${W - m.r}" y1="${y(0.5)}" y2="${y(0.5)}" class="g-medio"/>
         <polyline points="${linea}" class="g-linea"/>${marcas}${marcasY}${marcasX}</svg>
       <p class="fr-leyenda"><span class="fr-item"><span class="fr-sw cp-sw-muerte"></span>tus muertes (más grande, más costó)</span> <span class="fr-item"><span class="fr-sw cp-sw-kill"></span>tus kills</span> <span class="dim">· B Barón, A Ancestral, D dragón, H Heraldo, I inhibidor (abajo tu equipo, arriba el rival)</span></p></div>`;
+}
+
+// ---- Curva de aprendizaje: cuánto rendís con un campeón según cuántas partidas llevás con él ----
+
+function grafCurva(tramos, propio) {
+    const W = 560, H = 200, m = { l: 34, r: 10, t: 14, b: 26 };
+    const vals = [...tramos, ...(propio || [])].flatMap(t => [t.lo, t.hi, t.v]).filter(v => v != null);
+    const lim = Math.max(6, ...vals.map(Math.abs)) * 1.1;
+    const n = tramos.length, paso = (W - m.l - m.r) / n;
+    const x = (i) => m.l + paso * (i + 0.5), y = (v) => m.t + (1 - (v + lim) / (2 * lim)) * (H - m.t - m.b);
+    const banda = (ts, cls) => {
+        const ok = ts.map((t, i) => [t, i]).filter(([t]) => t.lo != null);
+        if (ok.length < 2) return '';
+        return `<polygon points="${[...ok.map(([t, i]) => `${x(i)},${y(t.hi)}`), ...ok.reverse().map(([t, i]) => `${x(i)},${y(t.lo)}`)].join(' ')}" class="${cls}"/>`;
+    };
+    const linea = (ts, cls) => `<polyline points="${ts.map((t, i) => [t, i]).filter(([t]) => t.v != null).map(([t, i]) => `${x(i)},${y(t.v)}`).join(' ')}" class="${cls}"/>`
+        + ts.map((t, i) => (t.v == null ? '' : `<circle cx="${x(i)}" cy="${y(t.v)}" r="3.5" class="${cls}-p"><title>Partidas ${t.tramo}: ${t.v > 0 ? '+' : ''}${num(t.v, 1)} (${t.n} partidas)</title></circle>`)).join('');
+    return `<svg class="g-evo cv-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rendimiento contra tu nivel normal según cuántas partidas llevás con el campeón">
+      <line x1="${m.l}" x2="${W - m.r}" y1="${y(0)}" y2="${y(0)}" class="g-medio"/>
+      <text x="${m.l - 5}" y="${y(0) + 4}" class="g-eje" text-anchor="end">0</text>
+      <text x="${m.l - 5}" y="${y(lim * 0.8) + 4}" class="g-eje" text-anchor="end">+${num(lim * 0.8, 0)}</text>
+      <text x="${m.l - 5}" y="${y(-lim * 0.8) + 4}" class="g-eje" text-anchor="end">−${num(lim * 0.8, 0)}</text>
+      ${banda(tramos, 'cv-banda')}${linea(tramos, 'cv-grupo')}
+      ${propio ? banda(propio, 'cv-banda-p') + linea(propio, 'cv-propio') : ''}
+      ${tramos.map((t, i) => `<text x="${x(i)}" y="${H - 8}" class="g-eje" text-anchor="middle">${t.tramo}</text>`).join('')}
+    </svg>`;
+}
+
+export async function bloqueCurvas(p, cont, modo) {
+    if (p._cuenta) return;
+    const [d, g] = await Promise.all([cachedFetch(`curvas/${encodeURIComponent(p.id)}.json`, { silent: true }),
+                                      cachedFetch('curvas/grupo.json', { silent: true })]);
+    const gr = g?.modos?.[modo];
+    if (!gr) { cont.innerHTML = ''; return; }
+    const camps = d?.modos?.[modo]?.campeones || [];
+    let sel = camps[0] ? `${camps[0].champ}|${camps[0].rol}` : '';
+    const t0 = gr.tramos[0], tN = gr.tramos[gr.tramos.length - 1];
+    const cruza = gr.tramos.find(t => t.v != null && t.v >= 0);
+    const ESTADO = { 'por encima': 'win', 'por debajo': 'loss', 'a tu nivel': '' };
+    const pintar = () => {
+        const c = camps.find(x => `${x.champ}|${x.rol}` === sel);
+        cont.querySelector('#cv-graf').innerHTML = grafCurva(gr.tramos, c?.tramos)
+            + `<p class="fr-leyenda"><span class="fr-item"><span class="fr-sw cv-sw-grupo"></span>el grupo, con campeones nuevos</span>${c ? ` <span class="fr-item"><span class="fr-sw cv-sw-propio"></span>vos con ${escapeHtml(campeon(c.champ))}</span>` : ''} <span class="dim">· 0 = tu nivel normal en el rol</span></p>`
+            + (c ? `<p>Con <strong>${escapeHtml(campeon(c.champ))}</strong> (${escapeHtml(c.rol)}, ${c.n} partidas), en tus últimas ${c.ahora.n} estás <span class="tag ${ESTADO[c.estado]}">${escapeHtml(c.estado)}</span> de tu nivel normal: ${c.ahora.v > 0 ? '+' : ''}${num(c.ahora.v, 1)} <span class="dim">(${num(c.ahora.lo, 1)} a ${num(c.ahora.hi, 1)})</span>.</p>` : '');
+    };
+    cont.innerHTML = `<section class="section">
+      <div class="section-head"><h3>¿Cuánto te lleva aprender un campeón? <span class="dim">· ${escapeHtml(EN_MODO[modo])}</span></h3>
+        ${camps.length ? `<label class="selector">Campeón <select id="cv-sel">${camps.map(c => `<option value="${c.champ}|${escapeHtml(c.rol)}">${escapeHtml(campeon(c.champ))} · ${escapeHtml(c.rol)} (${c.n})</option>`).join('')}</select></label>` : ''}</div>
+      <p class="lead">En el grupo, las primeras ${t0.tramo} partidas con un campeón nuevo se juega <strong>${num(Math.abs(t0.v), 1)} puntos por debajo</strong> del nivel normal (gana ${pct(t0.winrate.v)})${cruza ? `; desde la partida <strong>${escapeHtml(cruza.tramo.split(/[–+]/)[0])}</strong> ya se está en el nivel normal` : ''}, y con ${tN.tramo} partidas, ${tN.v > 0 ? '+' : ''}${num(tN.v, 1)} (gana ${pct(tN.winrate.v)}).</p>
+      <div id="cv-graf"></div>
+      ${camps.length ? `<h4>Tus campeones (10+ partidas)</h4><div class="cv-chips">${camps.map(c => `<button type="button" class="chip-cola cv-chip" data-c="${c.champ}|${escapeHtml(c.rol)}">${escapeHtml(campeon(c.champ))} <span class="tag ${ESTADO[c.estado]}">${escapeHtml(c.estado)}</span></button>`).join('')}</div>` : '<p class="dim">Todavía no tenés campeones con 10+ partidas en este modo.</p>'}
+      <p class="nota">${escapeHtml(d?.nota || g.nota)} ${escapeHtml(g.nota_grupo)} La franja es el intervalo del 95 %. "Por encima" o "por debajo" solo cuando el intervalo de tus últimas 10 partidas con ese campeón no toca el cero. Parecido a lo que muestran los análisis de maestría (iTero): se aprende rápido las primeras ~20 partidas y después se aplana.</p></section>`;
+    pintar();
+    cont.querySelector('#cv-sel')?.addEventListener('change', (e) => { sel = e.target.value; pintar(); });
+    cont.querySelectorAll('.cv-chip').forEach(b => b.addEventListener('click', () => {
+        sel = b.dataset.c;
+        const s = cont.querySelector('#cv-sel');
+        if (s) s.value = sel;
+        pintar();
+    }));
 }
 
 /** Al tocar el botón de una fila del historial se abre debajo el gráfico de esa partida. */

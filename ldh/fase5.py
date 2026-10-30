@@ -4,6 +4,8 @@ A. Rachas y pausas: ¿te conviene seguir después de 2 derrotas? Cada persona se
    (si no, el que juega peor aparece más en las rachas y parece que la racha hace perder).
 B. Probabilidad de ganar minuto a minuto (ldh.victoria): se entrena, se valida y se publica con su calibración.
 C. Cuánto te costó cada muerte (la regla 9 del doc de lecciones, medida) y el gráfico de cada partida.
+D. Curva de aprendizaje: cuánto rendís con un campeón según cuántas partidas llevás con él, contra tu nivel
+   normal en ese rol (cada uno contra sí mismo, como en las curvas de maestría de iTero).
 """
 
 from __future__ import annotations
@@ -329,9 +331,112 @@ def muertes(muertes_por: dict, filas_por: dict) -> tuple[dict, dict]:
     return por, mediana
 
 
+# ---------------------------------------------------------------- D. curvas de aprendizaje
+
+TRAMOS_CURVA = ((1, 3), (4, 7), (8, 15), (16, 30), (31, 10_000))
+DIA_MS = 86_400_000
+
+
+def _tramo(n: int) -> int:
+    return next(i for i, (a, b) in enumerate(TRAMOS_CURVA) if a <= n <= b)
+
+
+def _boot_media(grupos: list[list[float]], reps: int, rng) -> tuple[float | None, float | None, float | None]:
+    """Media de todas las partidas con IC bootstrap que remuestrea grupos (persona y campeón): las partidas de un
+    mismo par no son independientes."""
+    import numpy as np
+    vals = [v for g in grupos for v in g]
+    if len(vals) < 3:
+        return None, None, None
+    medias = []
+    for _ in range(reps):
+        g = [grupos[i] for i in rng.integers(0, len(grupos), len(grupos))]
+        x = [v for gg in g for v in gg]
+        if x:
+            medias.append(sum(x) / len(x))
+    lo, hi = np.percentile(medias, (2.5, 97.5))
+    return round(sum(vals) / len(vals), 2), round(float(lo), 2), round(float(hi), 2)
+
+
+def curvas(indices: dict) -> tuple[dict, dict]:
+    """(por persona, grupo) por modo. Cada partida se ubica por cuántas llevabas con ese campeón en ese rol
+    (contando todas las colas) y se mide como tu índice menos tu nivel normal en el rol. El grupo usa solo
+    campeones que aparecen después del primer mes del historial: antes no se sabe si eran nuevos."""
+    import numpy as np
+    from .ajustes import INICIO_HISTORIAL
+    corte = (INICIO_HISTORIAL + 30 * 86_400) * 1000
+    reps = AJUSTES["bootstrap_reps"] // 4
+    rng = np.random.default_rng(AJUSTES["bootstrap_semilla"])
+    por, grupo_pares = {}, {m: defaultdict(list) for m in MODOS}
+    for pid, filas in indices.items():
+        cuenta, primera = defaultdict(int), {}
+        numeradas = []
+        for inicio, cola, rol, champ, idx, win in filas:
+            cuenta[(champ, rol)] += 1
+            primera.setdefault((champ, rol), inicio)
+            numeradas.append((cuenta[(champ, rol)], inicio, cola, rol, champ, idx, win))
+        por[pid] = {}
+        for modo, colas in MODOS.items():
+            sub = [x for x in numeradas if x[2] in colas and x[5] is not None]
+            normal = defaultdict(list)
+            for n, _, _, rol, _, idx, _ in sub:
+                normal[rol].append(idx)
+            normal = {r: sum(v) / len(v) for r, v in normal.items() if len(v) >= AJUSTES["min_partidas"]}
+            pares = defaultdict(list)
+            for n, inicio, _, rol, champ, idx, win in sub:
+                if rol in normal:
+                    pares[(champ, rol)].append((n, idx - normal[rol], win))
+            campeones = []
+            for (champ, rol), g in pares.items():
+                nuevo = primera[(champ, rol)] >= corte
+                if nuevo:
+                    grupo_pares[modo][(pid, champ, rol)] = g
+                if len(g) < AJUSTES["min_partidas"]:
+                    continue
+                tramos = []
+                for t, (a, b) in enumerate(TRAMOS_CURVA):
+                    xs = [d for n, d, _ in g if a <= n <= b]
+                    wins = [w for n, _, w in g if a <= n <= b]
+                    v, lo, hi = _boot_media([[x] for x in xs], reps, rng) if len(xs) >= 3 else (None, None, None)
+                    tramos.append({"tramo": f"{a}–{b}" if b < 10_000 else f"{a}+", "n": len(xs), "v": v, "lo": lo, "hi": hi,
+                                   "winrate": est.wilson(sum(wins), len(wins))})
+                # Cómo rendís hoy con él: tus últimas 10 partidas con ese campeón contra tu nivel normal. Los tramos
+                # de 3 partidas tienen intervalos tan anchos que "en qué partida llegaste" no se puede decir.
+                ult = [d for _, d, _ in g[-AJUSTES["min_partidas"]:]]
+                v, lo, hi = _boot_media([[x] for x in ult], reps, rng)
+                estado = "por encima" if lo is not None and lo > 0 else "por debajo" if hi is not None and hi < 0 else "a tu nivel"
+                campeones.append({"champ": champ, "rol": rol, "n": len(g), "nuevo": nuevo, "tramos": tramos,
+                                  "ahora": {"v": v, "lo": lo, "hi": hi, "n": len(ult)}, "estado": estado})
+            por[pid][modo] = {"normal": {r: round(v, 1) for r, v in normal.items()},
+                              "campeones": sorted(campeones, key=lambda c: -c["n"])}
+    grupo = {}
+    for modo, pares in grupo_pares.items():
+        tramos = []
+        for t, (a, b) in enumerate(TRAMOS_CURVA):
+            grupos = [[d for n, d, _ in g if a <= n <= b] for g in pares.values()]
+            grupos = [g for g in grupos if g]
+            v, lo, hi = _boot_media(grupos, reps, rng)
+            wins = [w for g in pares.values() for n, _, w in g if a <= n <= b]
+            tramos.append({"tramo": f"{a}–{b}" if b < 10_000 else f"{a}+", "n": sum(len(g) for g in grupos),
+                           "pares": len(grupos), "v": v, "lo": lo, "hi": hi,
+                           "winrate": est.wilson(sum(wins), len(wins))})
+        grupo[modo] = {"tramos": tramos, "pares": len(pares)}
+    return por, grupo
+
+
 # ---------------------------------------------------------------- generar
 
-def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: Callable) -> None:
+def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: Callable, indices: dict | None = None) -> None:
+    if indices is not None:
+        cp, cg = curvas(indices)
+        nota = ("Tu índice por partida (el de la tendencia, contra tu franja y rol) menos tu nivel normal en ese rol, "
+                "según cuántas partidas llevabas con el campeón en ese rol. 0 = tu nivel normal.")
+        tramos = [f"{a}–{b}" if b < 10_000 else f"{a}+" for a, b in TRAMOS_CURVA]
+        escribir("curvas/grupo.json", {"modos": cg, "tramos": tramos, "nota": nota,
+                                       "nota_grupo": "Solo campeones que aparecen después del primer mes del historial "
+                                                     "(el historial arranca el 8/1: antes no se sabe si eran nuevos)."})
+        for pid, d in cp.items():
+            escribir(f"curvas/{pid}.json", {"modos": d, "tramos": tramos, "nota": nota})
     m = modelo(db)
     escribir("modelo_victoria.json", {**m, "equivalencias": _equivalencias(m)})
     if m["validacion"]["aprobado"]:  # sin un modelo validado no se publica nada que dependa de él

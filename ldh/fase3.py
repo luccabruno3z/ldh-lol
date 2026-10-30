@@ -564,7 +564,29 @@ def _franja_persona(cuentas: dict) -> tuple[str, dict | None, str]:
     return TODAS, None, "sin_rango"
 
 
-def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], rangos: dict, escribir: Callable) -> None:
+def indices(por_persona: dict, franja_persona: dict, celdas: dict) -> dict:
+    """El índice de cada partida (0–100, el de la tendencia) contra la franja y el rol de la persona, para
+    la curva de aprendizaje de la fase 5. Una fila por partida: (inicio, cola, rol, campeón, índice, ganó)."""
+    out = {}
+    for pid, filas in por_persona.items():
+        franja = franja_persona.get(pid, (TODAS,))[0]
+        por_rol = defaultdict(list)
+        for f in filas:
+            if f["role"] in ROLES:
+                por_rol[f["role"]].append(f)
+        filas_out = []
+        for rol, g in por_rol.items():
+            celda = celdas.get((franja, rol))
+            if celda is None or celda.n_jugadores < REF["min_jugadores"]:
+                continue
+            idx = celda.indice(_matriz(g), rol)
+            filas_out += [(f["inicio_ms"], f["cola"], rol, f["champion_id"], None if np.isnan(i) else float(i), int(f["win"]))
+                          for f, i in zip(g, idx)]
+        out[pid] = sorted(filas_out)
+    return out
+
+
+def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], rangos: dict, escribir: Callable) -> dict:
     celdas = _celdas()
     grieta = _filas_grieta(db)
     por_persona = defaultdict(list)
@@ -621,3 +643,4 @@ def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], rangos: di
         "nota": "Pendiente del índice por partida (0–100, contra la propia franja y rol), en puntos "
                 "cada 100 partidas. 'Mejorando' solo si todo el intervalo está arriba de cero.",
         "tabla": orden["solo"], "modos": orden})
+    return {"indices": indices(por_persona, franja_persona, celdas)}

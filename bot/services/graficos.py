@@ -304,3 +304,27 @@ def mapa_muertes(puntos: list, mapa: bytes | None, titulo: str) -> io.BytesIO:
               labelcolor=TEXTO, fontsize=9)
     ax.set_title(titulo, color=TEXTO, fontsize=12, loc="left")
     return _png(fig)
+
+
+def curvas(grupo: list[dict], propias: list[tuple[str, list[dict]]], titulo: str) -> io.BytesIO:
+    """Curva de aprendizaje: el grupo (punteado, con su banda) y hasta 3 campeones propios."""
+    xs = list(range(len(grupo)))
+    fig, ax = _figura(8, 3.8)
+    ax.axhline(0, color=TENUE, lw=1, ls=(0, (4, 4)))
+    ok = [(i, t) for i, t in enumerate(grupo) if t["lo"] is not None]
+    ax.fill_between([i for i, _ in ok], [t["lo"] for _, t in ok], [t["hi"] for _, t in ok], color=TENUE, alpha=0.18, lw=0)
+    ax.plot([i for i, _ in ok], [t["v"] for _, t in ok], color=TENUE, lw=2, ls=(0, (5, 4)), marker="o", ms=4,
+            label="el grupo, con campeones nuevos")
+    for j, (nombre, ts) in enumerate(propias[:3]):
+        pts = [(i, t["v"]) for i, t in enumerate(ts) if t["v"] is not None]
+        if pts:
+            ax.plot([i for i, _ in pts], [v for _, v in pts], color=(ACENTO, *COLOR_FRANJA[1:])[j], lw=2.2, marker="o", ms=5,
+                    label=nombre)
+    ax.set_xticks(xs)
+    ax.set_xticklabels([t["tramo"] for t in grupo])
+    ax.set_xlabel("partidas con el campeón", color=TENUE)
+    ax.set_ylabel("contra tu nivel normal", color=TENUE)
+    ax.grid(color=GRILLA, lw=0.6)
+    ax.legend(loc="upper left", frameon=False, labelcolor=TEXTO, fontsize=9)
+    ax.set_title(titulo, color=TEXTO, fontsize=12, loc="left")
+    return _png(fig)

@@ -191,9 +191,9 @@ def publicar() -> dict:
             "losses": r["losses"], "t": r["t"], "valor": r["valor"]}
 
     resumen_f2 = fase2.generar(db, filas_por, _escribir)
-    fase3.generar(db, filas_por, rangos, _escribir)
+    salida_f3 = fase3.generar(db, filas_por, rangos, _escribir)
     fase4.generar(db, filas_por, dict(db.execute("SELECT id, nombre FROM personas")), _escribir)
-    fase5.generar(db, filas_por, _escribir)
+    fase5.generar(db, filas_por, _escribir, salida_f3["indices"])
 
     resumen_personas = []
     por_pag = AJUSTES["historial_por_pagina"]

@@ -60,6 +60,7 @@ AYUDA = {
                 "`-grafico [jugador] franjas [rol] [modo]` tus números al lado de la mediana de cada franja de elo\n"
                 "`-grafico [jugador] muertes [modo]` dónde morís y cuánto te cuesta cada muerte, sobre el minimapa\n"
                 "`-partida [jugador] [n]` la probabilidad de ganar minuto a minuto de tu última partida, con ◀ ▶\n"
+                "`-grafico [jugador] curva [rol] [modo]` cuánto te lleva aprender un campeón, con tus 3 más jugados\n"
                 "`-rachas [jugador] [modo]` ¿te conviene seguir después de 2 derrotas? Tu winrate según cómo venías\n"
                 "-# Todos traen menús para cambiar de gráfico, rol y modo sin volver a escribir el comando.\n"
                 "-# En `-menu`, **Mis gráficos** manda los tres.",
@@ -177,6 +178,33 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
                  f"({signo(t['pendiente'])} puntos cada 100 partidas, {signo(t['lo'])} a {signo(t['hi'])})\n"
                  f"-# Índice de 0 a 100 por partida: tus percentiles en {', '.join(t['metricas']).lower()} contra "
                  f"{d['franja']} en {rol_n}. Mide cómo jugás, no si ganaste. 50 = la mitad de tu franja.")
+    elif tipo.lower().startswith("cur"):
+        modo_c = modo or "todo"
+        c = ((await bot.datos.curvas(p["id"]) or {}).get("modos") or {}).get(modo_c) or {}
+        g = ((await bot.datos.curvas_grupo() or {}).get("modos") or {}).get(modo_c)
+        if not g:
+            return "Todavía no hay curvas de aprendizaje publicadas.", None
+        champs = await bot.datos.campeones()
+        nom = lambda cid: (champs.get(str(cid)) or {}).get("nombre", cid)  # noqa: E731
+        rol_c = ROLES.get((rol or "").lower()) or rol
+        mios = [x for x in c.get("campeones", []) if not rol_c or x["rol"] == rol_c][:3]
+        png = graficos.curvas(g["tramos"], [(f"{nom(x['champ'])} ({x['n']})", x["tramos"]) for x in mios],
+                              f"{nombre} · ¿cuánto te lleva aprender un campeón? · {EN_MODO.get(modo_c)}")
+        t0, tN = g["tramos"][0], g["tramos"][-1]
+        lineas = [f"## {discord.utils.escape_markdown(nombre)} · curva de aprendizaje",
+                  f"En el grupo, las primeras {t0['tramo']} partidas con un campeón nuevo se juega "
+                  f"**{F.num(abs(t0['v']), 1)} pts por debajo** del nivel normal (gana {F.pct(t0['winrate']['v'])}); "
+                  f"con {tN['tramo']}, {F.num(tN['v'], 1, True)} (gana {F.pct(tN['winrate']['v'])})."]
+        for x in mios:
+            a = x["ahora"]
+            lineas.append(f"**{nom(x['champ'])}** ({x['rol']}, {x['n']} partidas): en tus últimas {a['n']}, **{x['estado']}** "
+                          f"de tu nivel ({F.num(a['v'], 1, True)}, {F.num(a['lo'], 1, True)} a {F.num(a['hi'], 1, True)})")
+        if not mios:
+            lineas.append("Todavía no tenés campeones con 10+ partidas en ese rol y modo.")
+        lineas.append("-# Tus líneas saltan porque cada tramo tiene pocas partidas: mirá hacia dónde van, no cada punto. "
+                      "0 = tu nivel normal en el rol. El grupo usa solo campeones que aparecen después del primer mes "
+                      "del historial (antes no se sabe si eran nuevos).")
+        texto = "\n".join(lineas)
     elif tipo.lower().startswith("mue"):
         from bot.ui.partida_vista import OBJ
         r = await bot.datos.muertes(p["id"]) or {}
@@ -367,12 +395,12 @@ class Extra(commands.Cog):
                                                     COLAS.get((cola or "").lower()), ROLES.get((rol or "").lower())))
 
     @commands.hybrid_command(name="grafico", description="Evolución del winrate, tendencia de mejora o radar de tus componentes")
-    @app_commands.autocomplete(jugador=autocompletar_jugador, tipo=autocompletar_opciones("tendencia", "evolucion", "radar", "franjas", "rachas", "muertes"),
+    @app_commands.autocomplete(jugador=autocompletar_jugador, tipo=autocompletar_opciones("tendencia", "evolucion", "radar", "franjas", "rachas", "muertes", "curva"),
                                rol=autocompletar_opciones("top", "jungla", "mid", "adc", "support"),
                                modo=autocompletar_opciones("solo", "normal", "todo"))
     async def grafico(self, ctx: commands.Context, jugador: str | None = None, tipo: str = "evolucion", rol: str | None = None,
                       modo: str | None = None):
-        if jugador and jugador.lower() in ("evolucion", "evolución", "radar", "tendencia", "franjas", "rachas", "muertes"):  # -grafico radar
+        if jugador and jugador.lower() in ("evolucion", "evolución", "radar", "tendencia", "franjas", "rachas", "muertes", "curva"):  # -grafico radar
             jugador, tipo = None, jugador
         if not (p := await self._persona(ctx, jugador, "grafico")):
             return
@@ -381,7 +409,7 @@ class Extra(commands.Cog):
         from bot.ui.coaching_vista import responder
         if rol and rol.lower() in MODOS and not modo:  # -grafico lucca radar todo
             rol, modo = None, rol
-        vista = {"ten": "gten", "rad": "grad", "fra": "gfra", "rac": "grac", "mue": "gmue"}.get(tipo.lower()[:3], "gevo")
+        vista = {"ten": "gten", "rad": "grad", "fra": "gfra", "rac": "grac", "mue": "gmue", "cur": "gcur"}.get(tipo.lower()[:3], "gevo")
         # Con menús para cambiar de gráfico, rol y modo sin volver a escribir el comando.
         await responder(ctx, self.bot, vista, p["id"], ROLES.get((rol or "").lower()), MODOS.get((modo or "").lower()))
 
