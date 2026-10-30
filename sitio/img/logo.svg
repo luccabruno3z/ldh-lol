@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="LDH Stats LoL">
+  <rect width="512" height="512" rx="96" fill="#0d1420"/>
+  <polygon points="256,66 420.5,161 420.5,351 256,446 91.5,351 91.5,161" fill="none" stroke="#00e5e5" stroke-width="26" stroke-linejoin="round"/>
+  <rect x="166" y="270" width="46" height="70" rx="8" fill="#00e5e5"/>
+  <rect x="233" y="210" width="46" height="130" rx="8" fill="#00e5e5"/>
+  <rect x="300" y="150" width="46" height="190" rx="8" fill="#ffa500"/>
+</svg>
