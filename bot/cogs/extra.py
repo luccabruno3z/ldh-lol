@@ -181,10 +181,12 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
         if not filas:
             return (f"Todavía no hay comparación por franja para {nombre} en {rol_n or 'ningún rol'}: hacen falta "
                     f"10+ partidas de {en} en el rol."), None
-        png = graficos.franjas(filas, f"{nombre} · {rol_n} en {en} · tus números y la mediana de cada franja")
+        png = graficos.franjas(filas, f"{nombre} · {rol_n} en {en} · tus números y la mediana de cada franja",
+                               d.get("franja"))
         texto = (f"## {discord.utils.escape_markdown(nombre)} · contra cada franja\n"
                  f"-# Tu promedio al lado de la mediana de los jugadores de referencia de cada franja en {rol_n} "
-                 "(ranked solo/dúo de LAS). No dice a qué franja te parecés: Riot no permite estimar rangos.")
+                 "(ranked solo/dúo de LAS). Mejor siempre a la derecha; la barra va de la mediana de tu franja a tu punto "
+                 "(verde arriba, roja abajo). No dice a qué franja te parecés: Riot no permite estimar rangos.")
     elif tipo.lower().startswith("rad"):
         d = await bot.datos.coaching_auto(p["id"], modo)
         en = EN_MODO.get((d or {}).get("modo") or "solo")

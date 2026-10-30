@@ -182,26 +182,32 @@ const ABREV = { 'Hierro–Bronce': 'H–B', 'Plata–Oro': 'P–O', 'Platino–E
 /** Una fila por métrica. Cada una con su escala (unidades distintas), nunca menos de ±25 % de la mediana
     del medio: si no, diferencias chicas ocupaban todo el ancho. Solo pone las medianas al lado; no dice a
     qué franja te parecés (Riot no permite estimar rangos). */
-export function graficoFranjas(filas) {
+export function graficoFranjas(filas, propia = null) {
     if (!filas?.length) return '';
     const franjas = Object.keys(filas[0].medianas);
     const W = 300, H = 22;
     const fmt = (f, x) => `${f.clave.startsWith('dif') && x > 0 ? '+' : ''}${num(x, f.dec)}`;
     const leyenda = `<p class="fr-leyenda"><span class="fr-item"><span class="fr-sw fr-vos"></span>vos</span> ${franjas.map((fr, j) =>
-        `<span class="fr-item"><span class="fr-sw fr-${j}"></span>mediana ${escapeHtml(fr)}</span>`).join(' ')}</p>`;
+        `<span class="fr-item"><span class="fr-sw fr-${j}"></span>mediana ${escapeHtml(fr)}</span>`).join(' ')}
+        ${propia ? `<span class="fr-item"><span class="fr-sw fr-sw--bien"></span>arriba de ${escapeHtml(propia)}</span> <span class="fr-item"><span class="fr-sw fr-sw--mal"></span>abajo</span>` : ''}</p>
+      <p class="fr-sentido"><span>peor ←</span><span>→ mejor</span></p>`;
     const fila = (f) => {
         const vals = [f.v, ...Object.values(f.medianas)];
         const centro = (Math.min(...vals) + Math.max(...vals)) / 2;
         const medio = Object.values(f.medianas)[Math.floor(franjas.length / 2)];
         const mitad = Math.max((Math.max(...vals) - Math.min(...vals)) / 2 * 1.15, f.clave.startsWith('dif') ? 0 : Math.abs(medio) * 0.25, 1e-9);
-        const x = (v) => 8 + ((v - (centro - mitad)) / (2 * mitad)) * (W - 16);
+        // Mejor siempre a la derecha: las de "menos es mejor" se dan vuelta.
+        const t = (v) => (v - (centro - mitad)) / (2 * mitad);
+        const x = (v) => 8 + (f.mejor ? t(v) : 1 - t(v)) * (W - 16);
+        const ref = propia != null ? f.medianas[propia] : null;
+        const barra = ref == null ? '' : `<line x1="${x(ref)}" x2="${x(f.v)}" y1="${H / 2}" y2="${H / 2}" class="fr-gap ${x(f.v) >= x(ref) ? 'fr-gap--bien' : 'fr-gap--mal'}"/>`;
         const marcas = Object.values(f.medianas).map((m, j) => `<line x1="${x(m)}" x2="${x(m)}" y1="3" y2="${H - 3}" class="fr-marca fr-${j}"><title>${escapeHtml(franjas[j])}: ${fmt(f, m)}</title></line>`).join('');
         return `<div class="fr-fila">
           <div class="fr-cab"><span>${escapeHtml(f.nombre)}${f.mejor ? '' : ' <span class="dim small">(menos es mejor)</span>'}</span>
             <span class="fr-nums"><strong>vos ${fmt(f, f.v)}${f.unidad ? ` ${escapeHtml(f.unidad)}` : ''}</strong>
               ${franjas.map(fr => `<span>${ABREV[fr] || escapeHtml(fr)} ${fmt(f, f.medianas[fr])}</span>`).join('')}</span></div>
           <svg viewBox="0 0 ${W} ${H}" class="fr-svg" role="img" aria-label="${escapeHtml(f.nombre)}: vos ${fmt(f, f.v)}; ${franjas.map(fr => `${escapeHtml(fr)} ${fmt(f, f.medianas[fr])}`).join('; ')}">
-            <line x1="8" x2="${W - 8}" y1="${H / 2}" y2="${H / 2}" class="fr-eje"/>${marcas}
+            <line x1="8" x2="${W - 8}" y1="${H / 2}" y2="${H / 2}" class="fr-eje"/>${barra}${marcas}
             <circle cx="${x(f.v)}" cy="${H / 2}" r="5.5" class="fr-punto"/></svg></div>`;
     };
     return `${leyenda}<div class="fr-lista">${filas.map(fila).join('')}</div>`;

@@ -175,8 +175,8 @@ export async function bloquesFase3(p, cont, modo = 'solo') {
             return `<p class="empty-state">La referencia de ${escapeHtml(d.franja)} en ${escapeHtml(rol)} tiene ${r.n_ref} jugadores con ${state.ajustes?.referencia?.min_partidas ?? 10}+ partidas; hacen falta ${state.ajustes?.referencia?.min_jugadores ?? 20}. Sin eso no se muestran percentiles.</p>`;
         }
         return `<h4>Tu Performance <span class="dim">· ${escapeHtml(rol)} en ${escapeHtml(EN_MODO[modo])} · ${r.n} partidas</span> ${chipConf(r.confianza)}</h4>${performance(r, d.franja)}
-          ${r.por_franja?.length ? `<h4>Contra cada franja</h4>${graficoFranjas(r.por_franja)}
-            <p class="nota">Tu promedio al lado de la mediana de los ${r.n_ref} jugadores de referencia de cada franja en ${escapeHtml(rol)} (ranked solo/dúo de LAS, victorias y derrotas al 50 %). Cada fila tiene su escala. Muestra a qué distancia está cada elo; no dice a qué franja te parecés, porque Riot no permite estimar rangos.</p>` : ''}
+          ${r.por_franja?.length ? `<h4>Contra cada franja</h4>${graficoFranjas(r.por_franja, d.franja)}
+            <p class="nota">Tu promedio al lado de la mediana de los ${r.n_ref} jugadores de referencia de cada franja en ${escapeHtml(rol)} (ranked solo/dúo de LAS, victorias y derrotas al 50 %). Cada fila tiene su escala y mejor queda siempre a la derecha; la barra va de la mediana de tu franja a tu punto (verde si estás arriba, roja si estás abajo). Muestra a qué distancia está cada elo; no dice a qué franja te parecés, porque Riot no permite estimar rangos.</p>` : ''}
           <h4>Tu juego en una mirada</h4>${mirada(r)}
           <h4>¿Estás mejorando?</h4>${seccionTendencia(r.tendencia, rol, d.franja)}
           <h4>Cómo sumar</h4>${sumar(r)}`;

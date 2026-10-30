@@ -14,7 +14,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 FONDO, PANEL, TEXTO, TENUE, GRILLA = "#0d1420", "#121a2a", "#e8ecf4", "#7a8296", "#263248"
 ACENTO, SEGUNDO = "#00e5e5", "#ffa500"
-COLOR_FRANJA = ["#c08457", "#c9ced8", "#3fbf9b"]  # bronce, plata, esmeralda
+# Un tono bien distinto por franja (naranja, dorado, violeta), lejos del celeste de "vos".
+COLOR_FRANJA = ["#f0883e", "#f2cc40", "#a78bfa"]
+BIEN, MAL = "#3ddc84", "#ff5c7a"
 
 
 def _figura(ancho=8, alto=4.2, polar=False):
@@ -166,9 +168,11 @@ def _fmt(x: float | None, dec: int, signo: bool = False) -> str:
     return ("+" if signo and x > 0 else "−" if x < 0 else "") + t
 
 
-def franjas(filas: list[dict], titulo: str) -> io.BytesIO:
+def franjas(filas: list[dict], titulo: str, propia: str | None = None) -> io.BytesIO:
     """Contra cada franja: una fila por métrica con tu valor y la mediana de las tres franjas.
-    Cada fila tiene su propia escala (son unidades distintas); los números van a la derecha."""
+    Cada fila tiene su propia escala (son unidades distintas); los números van a la derecha.
+    Para leerlo rápido: mejor siempre a la derecha (las de "menos es mejor" se dan vuelta) y una barra
+    desde la mediana de tu franja hasta tu punto, verde si estás por encima y roja si estás por debajo."""
     nombres_fr = list(filas[0]["medianas"])
     n = len(filas)
     fig, ax = _figura(9, 0.62 * n + 1.3)
@@ -177,6 +181,8 @@ def franjas(filas: list[dict], titulo: str) -> io.BytesIO:
     ax.set_xticks([])
     ax.set_yticks(range(n))
     ax.set_yticklabels([f["nombre"] + ("" if f["mejor"] else "  (menos es mejor)") for f in filas], color=TEXTO, fontsize=9.5)
+    ax.annotate("peor ←", (0, n - 0.5), xytext=(0, -14), textcoords="offset points", color=TENUE, fontsize=8.5)
+    ax.annotate("→ mejor", (1, n - 0.5), xytext=(0, -14), textcoords="offset points", color=TENUE, fontsize=8.5, ha="right")
     for s in ax.spines.values():
         s.set_visible(False)
     for i, f in enumerate(filas):
@@ -187,11 +193,16 @@ def franjas(filas: list[dict], titulo: str) -> io.BytesIO:
         medio = list(f["medianas"].values())[len(f["medianas"]) // 2]
         mitad = max((max(vals) - min(vals)) / 2 * 1.15, 0 if f["clave"].startswith("dif") else abs(medio) * 0.25, 1e-9)
         lo, hi = centro - mitad, centro + mitad
-        x = lambda v: (v - lo) / (hi - lo)
+        x = (lambda v: (v - lo) / (hi - lo)) if f["mejor"] else (lambda v: (hi - v) / (hi - lo))
         ax.plot([0, 1], [i, i], color=GRILLA, lw=1.2, zorder=1)
+        ref = f["medianas"].get(propia)
+        if ref is not None:
+            arriba = x(f["v"]) >= x(ref)
+            ax.plot([x(ref), x(f["v"])], [i, i], color=BIEN if arriba else MAL, lw=6, alpha=0.55,
+                    solid_capstyle="butt", zorder=1.5)
         for j, (fr, med) in enumerate(f["medianas"].items()):
             ax.scatter([x(med)], [i], marker="|", s=320, lw=3, color=COLOR_FRANJA[j], zorder=2)
-        ax.scatter([x(f["v"])], [i], s=90, color=ACENTO, edgecolor=FONDO, lw=1.5, zorder=3)
+        ax.scatter([x(f["v"])], [i], s=110, color=ACENTO, edgecolor=FONDO, lw=1.5, zorder=3)
         signo = f["clave"].startswith("dif")
         u = f" {f['unidad']}" if f["unidad"] else ""
         txt = f"vos {_fmt(f['v'], f['dec'], signo)}{u}   " + "   ".join(
@@ -200,7 +211,10 @@ def franjas(filas: list[dict], titulo: str) -> io.BytesIO:
     marcas = [plt.Line2D([], [], color=ACENTO, marker="o", ls="", ms=8, label="vos")] + [
         plt.Line2D([], [], color=COLOR_FRANJA[j], marker="|", ls="", ms=14, mew=3, label=f"mediana {fr}")
         for j, fr in enumerate(nombres_fr)]
-    ax.legend(handles=marcas, loc="lower left", bbox_to_anchor=(0, 1.0), ncol=4, frameon=False, labelcolor=TEXTO,
-              fontsize=8.5, handletextpad=0.3, columnspacing=1.2)
-    ax.set_title(titulo, color=TEXTO, fontsize=12, loc="left", pad=30)
+    if propia:
+        marcas += [plt.Line2D([], [], color=BIEN, lw=6, alpha=0.55, label=f"arriba de {propia}"),
+                   plt.Line2D([], [], color=MAL, lw=6, alpha=0.55, label="abajo")]
+    ax.legend(handles=marcas, loc="lower left", bbox_to_anchor=(0, 1.0), ncol=3 if propia else 4, frameon=False, labelcolor=TEXTO,
+              fontsize=8.5, handletextpad=0.6, columnspacing=1.6)
+    ax.set_title(titulo, color=TEXTO, fontsize=12, loc="left", pad=48 if propia else 30)
     return _png(fig)

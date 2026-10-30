@@ -354,7 +354,7 @@ section.section { scroll-margin-top: calc(var(--header-h) + 56px); }
 .fr-leyenda { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: .82rem; color: var(--text-muted); margin: 4px 0 10px; }
 .fr-sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
 .fr-sw.fr-vos { border-radius: 50%; background: var(--accent); }
-.fr-sw.fr-0 { background: #b8743f; } .fr-sw.fr-1 { background: #8f99ab; } .fr-sw.fr-2 { background: #23a27e; }
+.fr-sw.fr-0 { background: var(--fr-0); } .fr-sw.fr-1 { background: var(--fr-1); } .fr-sw.fr-2 { background: var(--fr-2); }
 .fr-lista { display: grid; gap: 10px; }
 .fr-cab { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; font-size: .9rem; }
 .fr-nums { display: flex; flex-wrap: wrap; gap: 2px 10px; font-family: var(--mono, monospace); font-size: .82rem; color: var(--text-muted); }
@@ -362,8 +362,17 @@ section.section { scroll-margin-top: calc(var(--header-h) + 56px); }
 .fr-svg { width: 100%; height: 22px; display: block; }
 .fr-eje { stroke: var(--border); stroke-width: 1.5; }
 .fr-marca { stroke-width: 3.5; stroke-linecap: round; }
-.fr-marca.fr-0 { stroke: #b8743f; } .fr-marca.fr-1 { stroke: #8f99ab; } .fr-marca.fr-2 { stroke: #23a27e; }
+.fr-marca.fr-0 { stroke: var(--fr-0); } .fr-marca.fr-1 { stroke: var(--fr-1); } .fr-marca.fr-2 { stroke: var(--fr-2); }
 .fr-punto { fill: var(--accent); stroke: var(--bg, #fff); stroke-width: 2; }
 .g-franja { fill: none; stroke-width: 1.6; stroke-dasharray: 4 3; }
-.g-franja.fr-0 { stroke: #b8743f; } .g-franja.fr-1 { stroke: #8f99ab; } .g-franja.fr-2 { stroke: #23a27e; }
+.g-franja.fr-0 { stroke: var(--fr-0); } .g-franja.fr-1 { stroke: var(--fr-1); } .g-franja.fr-2 { stroke: var(--fr-2); }
 .fr-item { white-space: nowrap; }
+
+/* Colores de las franjas: naranja, dorado y violeta (más oscuros en claro para que contrasten) */
+:root { --fr-0: #c4621a; --fr-1: #a87f00; --fr-2: #7c5ce0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --fr-0: #f0883e; --fr-1: #f2cc40; --fr-2: #a78bfa; } }
+:root[data-theme="dark"] { --fr-0: #f0883e; --fr-1: #f2cc40; --fr-2: #a78bfa; }
+.fr-gap { stroke-width: 7; stroke-opacity: .5; }
+.fr-gap--bien { stroke: var(--success); } .fr-gap--mal { stroke: var(--danger); }
+.fr-sw--bien { background: var(--success); opacity: .6; } .fr-sw--mal { background: var(--danger); opacity: .6; }
+.fr-sentido { display: flex; justify-content: space-between; font-size: .78rem; color: var(--text-muted); margin: -4px 0 6px; }
