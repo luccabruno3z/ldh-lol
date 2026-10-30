@@ -14,7 +14,7 @@ from bot.services.datos import DATA_URL, Datos
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("ldh-lol")
 
-COGS = ["bot.cogs.perfil", "bot.cogs.rankings", "bot.cogs.coaching", "bot.cogs.extra", "bot.cogs.feed"]
+COGS = ["bot.cogs.perfil", "bot.cogs.rankings", "bot.cogs.coaching", "bot.cogs.extra", "bot.cogs.feed", "bot.cogs.fase4"]
 
 
 class Bot(commands.Bot):

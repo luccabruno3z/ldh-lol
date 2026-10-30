@@ -10,7 +10,7 @@ from bot.cogs.perfil import AVISO_RIOT
 
 ACCIONES = {"perfil": "Mi perfil", "grafico": "Mis gráficos", "buscar": "Buscar jugador", "top": "Rankings",
             "toprol": "Top por rol", "competencia": "Competencia del mes", "comparar": "Comparar",
-            "tips": "Tips de mi rol", "glosario": "Glosario", "ayuda": "Ayuda"}
+            "tips": "Tips de mi rol", "glosario": "Glosario", "ayuda": "Ayuda", "inhouse": "Armar inhouse"}
 
 
 class BuscarModal(discord.ui.Modal, title="Buscar jugador"):
@@ -41,6 +41,16 @@ class CompararModal(discord.ui.Modal, title="Comparar dos jugadores"):
         await interaction.followup.send(view=await tarjeta_comparar(interaction.client, pa["id"], pb["id"], None, None))
 
 
+class InhouseModal(discord.ui.Modal, title="Armar una inhouse"):
+    jugadores = discord.ui.TextInput(label="Los 10 jugadores, separados por coma", style=discord.TextStyle.paragraph,
+                                     placeholder="lucca, glarrex, mac55, cristoreyes, shiani, …", max_length=600)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        from bot.cogs.fase4 import tarjeta_inhouse
+        await interaction.response.defer(thinking=True)
+        await interaction.followup.send(view=await tarjeta_inhouse(interaction.client, str(self.jugadores)))
+
+
 class MenuBoton(discord.ui.DynamicItem[discord.ui.Button], template=r"lm:(?P<accion>[a-z]+):(?P<owner>\d+)"):
     def __init__(self, accion: str, owner: int):
         self.accion, self.owner = accion, owner
@@ -65,6 +75,9 @@ class MenuBoton(discord.ui.DynamicItem[discord.ui.Button], template=r"lm:(?P<acc
             return
         if self.accion == "comparar":
             await interaction.response.send_modal(CompararModal())
+            return
+        if self.accion == "inhouse":
+            await interaction.response.send_modal(InhouseModal())
             return
         if self.accion == "ayuda":
             from bot.cogs.extra import AyudaVista
@@ -144,7 +157,7 @@ def menu(owner: int) -> discord.ui.LayoutView:
                                "si algo dice **ruido**, con esas partidas no se puede sacar conclusiones.\n-# " + AVISO_RIOT),
         discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("perfil", "grafico", "buscar")]),
         discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("top", "toprol", "competencia", "comparar")]),
-        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("tips", "glosario", "ayuda")]),
+        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("inhouse", "tips", "glosario", "ayuda")]),
         discord.ui.ActionRow(discord.ui.Button(label="Abrir la web", url="https://luccabruno3z.github.io/ldh-lol/")),
         accent_colour=0x00CCCC))
     return view

@@ -74,6 +74,18 @@ class Datos:
         """Vista de una sola cuenta de alguien con varias (cuenta/<persona>/<i>.json)."""
         return await self._json(f"cuenta/{quote(persona_id)}/{indice}.json")
 
+    async def equipos(self) -> dict:
+        return await self._json("equipos.json") or {}
+
+    async def matchups(self, persona_id: str) -> dict | None:
+        return await self._json(f"matchups/{quote(persona_id)}.json")
+
+    async def heatmap(self, persona_id: str) -> dict | None:
+        return await self._json(f"heatmap/{quote(persona_id)}.json")
+
+    async def jungla(self, persona_id: str) -> dict | None:
+        return await self._json(f"jungla/{quote(persona_id)}.json")
+
     async def recientes(self) -> list[dict]:
         return await self._json("recientes.json") or []
 

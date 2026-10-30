@@ -56,6 +56,11 @@ AYUDA = {
                 "`-grafico [jugador] evolucion` ¿venís mejor o peor? Tu winrate de las últimas 20 contra tu temporada\n"
                 "`-grafico [jugador] radar [rol]` la rosa de tus 7 componentes contra tu franja\n"
                 "-# En `-menu`, **Mis gráficos** manda los tres.",
+    "Equipos y mapa": "`-ideal` el 5 ideal del grupo: una persona por rol con 10+ partidas ahí\n"
+                      "`-inhouse <10 jugadores separados por coma>` dos equipos parejos, cada uno en un rol que conoce\n"
+                      "`-matchups [jugador] [cola]` cómo te va contra cada campeón rival directo\n"
+                      "`-jungla [jugador]` de qué buff arrancás y qué tan predecible sos, por lado\n"
+                      "`-mapa [jugador] [muertes|kills] [azul|rojo]` dónde morís o matás, sobre el minimapa",
     "Rankings": "`-top [semana|mes|temporada] [cola]` con menús para cambiar período y cola\n"
                 "`-top_rol [rol] [cola]` la métrica de cada rol contra el rival directo\n"
                 "`-comparar <jugador> <otro> [cola] [rol]` métrica por métrica\n"

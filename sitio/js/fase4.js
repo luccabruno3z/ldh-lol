@@ -58,10 +58,14 @@ function dibujarHeatmap(puntos, filtro) {
         grilla.set(k, (grilla.get(k) || 0) + 1);
     }
     const max = Math.max(1, ...grilla.values());
+    // Solo las celdas de la mitad de arriba: con todas pintadas, el mapa entero quedaba de un color.
+    const cuentas = [...grilla.values()].sort((a, b) => a - b);
+    const umbral = cuentas.length ? cuentas[Math.floor(cuentas.length / 2)] : 1;
     const color = filtro.tipo === 'muerte' ? 'var(--danger)' : 'var(--success)';
-    const celdas = [...grilla].map(([k, n]) => {
+    const celdas = [...grilla].filter(([, n]) => n >= umbral).map(([k, n]) => {
         const [cx, cy] = k.split(',').map(Number);
-        return `<rect x="${cx * celda}" y="${cy * celda}" width="${celda}" height="${celda}" fill="${color}" fill-opacity="${(0.15 + 0.75 * (n / max)).toFixed(2)}"><title>${n}</title></rect>`;
+        const op = 0.25 + 0.65 * ((n - umbral) / Math.max(1, max - umbral));
+        return `<rect x="${cx * celda}" y="${cy * celda}" width="${celda}" height="${celda}" fill="${color}" fill-opacity="${op.toFixed(2)}"><title>${n}</title></rect>`;
     }).join('');
     const img = `https://ddragon.leagueoflegends.com/cdn/${state.campeones.version}/img/map/map11.png`;
     return `<svg class="g-mapa" viewBox="0 0 ${S} ${S}" role="img" aria-label="${sel.length} ${filtro.tipo === 'muerte' ? 'muertes' : 'kills'} sobre el minimapa">
