@@ -171,6 +171,22 @@ class Coaching(commands.Cog):
     async def temprano(self, ctx: commands.Context, *, jugador_rol_y_modo: str | None = None):
         await self._abrir(ctx, jugador_rol_y_modo, "temprano", "temp")
 
+    @commands.hybrid_command(name="partida", description="Tu probabilidad de ganar minuto a minuto en tu última partida (con ◀ ▶)")
+    async def partida(self, ctx: commands.Context, *, jugador_y_numero: str | None = None):
+        """-partida, -partida 3 (la tercera más reciente), -partida glarrex 2."""
+        from bot.ui.partida_vista import vista_partida
+        partes = (jugador_y_numero or "").split()
+        n = int(partes.pop()) if partes and partes[-1].isdigit() else 1
+        p = await self.bot.get_cog("Perfil")._persona(ctx, " ".join(partes) or None, "partida")
+        if not p:
+            return
+        await ctx.defer()
+        view, png = await vista_partida(self.bot, p["id"], max(n - 1, 0), ctx.author.id)
+        if png:
+            await ctx.reply(view=view, file=discord.File(png, "partida.png"))
+        else:
+            await ctx.reply(view=view)
+
     @commands.hybrid_command(name="rachas", description="¿Te conviene seguir después de 2 derrotas? Tu winrate según cómo venías")
     async def rachas(self, ctx: commands.Context, *, jugador_y_modo: str | None = None):
         await self._abrir(ctx, jugador_y_modo, "rachas", "grac")

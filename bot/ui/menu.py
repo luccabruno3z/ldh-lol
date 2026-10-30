@@ -8,7 +8,7 @@ import discord
 
 from bot.cogs.perfil import AVISO_RIOT
 
-ACCIONES = {"perfil": "Mi perfil", "coaching": "Mi coaching", "rachas": "¿Sigo jugando?", "grafico": "Mis gráficos", "buscar": "Buscar jugador", "top": "Rankings",
+ACCIONES = {"perfil": "Mi perfil", "coaching": "Mi coaching", "rachas": "¿Sigo jugando?", "partida": "Mi última partida", "grafico": "Mis gráficos", "buscar": "Buscar jugador", "top": "Rankings",
             "toprol": "Top por rol", "competencia": "Competencia del mes", "comparar": "Comparar",
             "tips": "Tips de mi rol", "glosario": "Glosario", "ayuda": "Ayuda", "inhouse": "Armar inhouse"}
 
@@ -114,6 +114,20 @@ class MenuBoton(discord.ui.DynamicItem[discord.ui.Button], template=r"lm:(?P<acc
             from bot.cogs.extra import tarjeta_tips
             await interaction.followup.send(view=await tarjeta_tips(bot, rol))
             return
+        if self.accion == "partida":
+            pid = bot.get_cog("Perfil").vinculos.get(str(self.owner))
+            if not pid:
+                await interaction.response.send_message(
+                    "Primero vinculate con `-vincular <tu nombre o Riot ID>`, o usá `-partida <jugador>`.", ephemeral=True)
+                return
+            from bot.ui.partida_vista import vista_partida
+            await interaction.response.defer(thinking=True)
+            view, png = await vista_partida(bot, pid, 0, self.owner)
+            if png:
+                await interaction.followup.send(view=view, file=discord.File(png, "partida.png"))
+            else:
+                await interaction.followup.send(view=view)
+            return
         if self.accion in ("grafico", "coaching", "rachas"):
             # La evolución siempre que haya 20+ partidas; el radar (la "rosa") cuando haya referencia.
             pid = bot.get_cog("Perfil").vinculos.get(str(self.owner))
@@ -152,7 +166,7 @@ def menu(owner: int) -> discord.ui.LayoutView:
     view.add_item(discord.ui.Container(
         discord.ui.TextDisplay("## LDH Stats LoL\nElegí qué querés ver. Los números llevan su intervalo y su n; "
                                "si algo dice **ruido**, con esas partidas no se puede sacar conclusiones.\n-# " + AVISO_RIOT),
-        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("perfil", "coaching", "grafico", "buscar")]),
+        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("perfil", "coaching", "partida", "grafico", "buscar")]),
         discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("rachas", "top", "toprol", "competencia", "comparar")]),
         discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("inhouse", "tips", "glosario", "ayuda")]),
         discord.ui.ActionRow(discord.ui.Button(label="Abrir la web", url="https://luccabruno3z.github.io/ldh-lol/")),

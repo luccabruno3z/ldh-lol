@@ -76,15 +76,16 @@ class Partida:
         self.t_eventos = [e[0] for e in self.eventos]
         self.fin = self.t_frames[-1]
 
-    def estado(self, t: int, sin: tuple | None = None) -> dict:
+    def estado(self, t: int, sin: frozenset = frozenset(), oro_extra: float = 0) -> dict:
         """Diferencias azul − rojo en el instante t. El oro y la XP salen del último frame (cada 60 s).
-        sin: un evento (t, clase, equipo, e) que se saca, para medir cuánto pesó (el costo de una muerte)."""
+        sin: índices de self.eventos que se sacan y oro_extra: oro que se le suma al azul (negativo, al rojo),
+        para medir cuánto pesó algo (el costo de una muerte)."""
         i = max(0, bisect.bisect_right(self.t_frames, t) - 1)
-        s = {"oro": self.oro[i], "xp": self.xp[i], "kills": 0, "torres": 0, "inhib": 0, "dragones": 0, "alma": 0,
+        s = {"oro": self.oro[i] + oro_extra, "xp": self.xp[i], "kills": 0, "torres": 0, "inhib": 0, "dragones": 0, "alma": 0,
              "larvas": 0, "heraldo": 0, "baron": 0, "ancestral": 0}
-        for ev in self.eventos[:bisect.bisect_right(self.t_eventos, t)]:
+        for k, ev in enumerate(self.eventos[:bisect.bisect_right(self.t_eventos, t)]):
             te, clase, eq, e = ev
-            if sin is not None and ev is sin:
+            if k in sin:
                 continue
             sg = 1 if eq == 100 else -1
             if clase == "kill":

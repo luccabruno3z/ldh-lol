@@ -249,3 +249,58 @@ def rachas(d: dict, estados: dict, titulo: str) -> io.BytesIO:
     ax.grid(axis="x", color=GRILLA, lw=0.6)
     ax.set_title(titulo, color=TEXTO, fontsize=12, loc="left")
     return _png(fig)
+
+
+def curva_partida(d: dict, pid: str, titulo: str) -> io.BytesIO:
+    """La probabilidad de ganar del equipo de la persona, minuto a minuto, con sus muertes (más grandes, más
+    costaron), sus kills y los objetivos grandes (abajo los de su equipo, arriba los del rival)."""
+    lado = d["lados"].get(pid, "azul")
+    eq = 100 if lado == "azul" else 200
+    ys = [(v if lado == "azul" else 1 - v) * 100 for v in d["curva"]]
+    xs = list(range(len(ys)))
+    fig, ax = _figura(8, 3.6)
+    ax.axhline(50, color=TENUE, lw=1, ls=(0, (4, 4)))
+    ax.fill_between(xs, 50, ys, color=ACENTO, alpha=0.15, lw=0)
+    ax.plot(xs, ys, color=ACENTO, lw=2.4)
+    letras = {"baron": "B", "ancestral": "A", "dragon": "D", "heraldo": "H", "inhib": "I"}
+    for e in d["eventos"]:
+        i = min(e["min"], len(ys) - 1)
+        v = ys[int(round(i))]
+        if e["tipo"] == "muerte" and e.get("persona") == pid:
+            ax.scatter([i], [v], s=40 + e["costo"] * 2500, color=MAL, alpha=0.75, edgecolor=FONDO, zorder=4)
+        elif e["tipo"] == "kill" and e.get("persona") == pid:
+            ax.scatter([i], [v], s=22, color=BIEN, zorder=4)
+        elif e["tipo"] in letras:
+            nuestro = e.get("equipo") == eq
+            ax.annotate(letras[e["tipo"]], (i, 4 if nuestro else 96), ha="center", va="center", fontsize=9,
+                        fontweight="bold", color=BIEN if nuestro else MAL)
+    ax.set_ylim(0, 100)
+    ax.set_xlim(0, max(len(ys) - 1, 1))
+    ax.set_yticks([0, 25, 50, 75, 100])
+    ax.set_ylabel("probabilidad de ganar (%)", color=TENUE)
+    ax.set_xlabel("minuto", color=TENUE)
+    ax.grid(color=GRILLA, lw=0.6)
+    ax.set_title(titulo, color=TEXTO, fontsize=12, loc="left")
+    return _png(fig)
+
+
+def mapa_muertes(puntos: list, mapa: bytes | None, titulo: str) -> io.BytesIO:
+    """Las muertes sobre el minimapa: el tamaño es lo que costó cada una y el color, el momento."""
+    import matplotlib.image as mpimg
+    fig, ax = _figura(6, 6.3)
+    x0, y0, x1, y1 = -120, -120, 14870, 14980
+    if mapa:
+        ax.imshow(mpimg.imread(io.BytesIO(mapa), format="png"), extent=(x0, x1, y0, y1), alpha=0.55)
+    color = lambda m: COLOR_FRANJA[1] if m < 14 else COLOR_FRANJA[0] if m < 25 else MAL  # noqa: E731
+    ax.scatter([p[1] for p in puntos], [p[2] for p in puntos], s=[12 + max(p[3], 0) * 2600 for p in puntos],
+               c=[color(p[0]) for p in puntos], alpha=0.55, edgecolors="none")
+    ax.set_xlim(x0, x1)
+    ax.set_ylim(y0, y1)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    marcas = [plt.Line2D([], [], color=c, marker="o", ls="", ms=8, label=l)
+              for c, l in ((COLOR_FRANJA[1], "antes del 14"), (COLOR_FRANJA[0], "del 14 al 25"), (MAL, "después del 25"))]
+    ax.legend(handles=marcas, loc="upper center", bbox_to_anchor=(0.5, -0.01), ncol=3, frameon=False,
+              labelcolor=TEXTO, fontsize=9)
+    ax.set_title(titulo, color=TEXTO, fontsize=12, loc="left")
+    return _png(fig)

@@ -49,3 +49,126 @@ export async function bloqueRachas(p, cont, modo) {
       <p class="nota">Una sesión son partidas con menos de ${d.sesion_min} min entre una y otra; "cortar" es esperar ${d.corte_min} min o más. Cuentan todas tus colas para saber cómo venías (una ARAM también corta una racha). Lo del grupo compara a cada persona consigo misma (Mantel–Haenszel), porque si no, el que juega peor aparece más en las rachas. En Corea, Deng y otros (2024) encontraron algo parecido: rachas de derrotas con peor rendimiento, y mejor con pausas.</p>
     </section>`;
 }
+
+// ---- Lo que te cuestan las muertes (costo = probabilidad de ganar que pierde tu equipo) ----
+
+const MAPA = { x0: -120, y0: -120, x1: 14870, y1: 14980 };  // el mismo minimapa de fase4.js
+const FASES = { temprana: 'Antes del 14', media: 'Del 14 al 25', tardia: 'Después del 25' };
+const P = (v, d = 1) => (v == null ? '—' : num(v * 100, d));
+const OBJ = { baron: 'el Barón', ancestral: 'el Ancestral', dragon: 'un dragón', heraldo: 'el Heraldo', larva: 'larvas', torre: 'una torre', inhib: 'un inhibidor' };
+
+function perdidos(xs) {
+    const u = [...new Set(xs || [])];
+    return u.length ? `el rival tomó ${u.map(x => OBJ[x] || x).join(', ')}` : 'sin objetivo perdido';
+}
+
+function mapaMuertes(puntos, version) {
+    const S = 320;
+    const fase = (m) => (m < 14 ? 'temprana' : m < 25 ? 'media' : 'tardia');
+    const circ = puntos.map(([m, x, y, c]) => {
+        const px = ((x - MAPA.x0) / (MAPA.x1 - MAPA.x0)) * S, py = S - ((y - MAPA.y0) / (MAPA.y1 - MAPA.y0)) * S;
+        return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(2 + Math.sqrt(Math.max(c, 0)) * 30).toFixed(1)}" class="mu-p mu-${fase(m)}"><title>Minuto ${num(m, 0)}: ${P(c)} pts</title></circle>`;
+    }).join('');
+    return `<svg class="g-mapa mu-mapa" viewBox="0 0 ${S} ${S}" role="img" aria-label="${puntos.length} muertes sobre el minimapa; el tamaño es lo que costó cada una">
+      <image href="https://ddragon.leagueoflegends.com/cdn/${version}/img/map/map11.png" width="${S}" height="${S}" opacity="0.5"/>${circ}</svg>
+      <p class="fr-leyenda"><span class="fr-item"><span class="fr-sw mu-temprana"></span>antes del 14</span> <span class="fr-item"><span class="fr-sw mu-media"></span>del 14 al 25</span> <span class="fr-item"><span class="fr-sw mu-tardia"></span>después del 25</span> <span class="dim">· más grande = costó más · todo visto desde tu base abajo a la izquierda (las del lado rojo, espejadas)</span></p>`;
+}
+
+export async function bloqueMuertes(p, cont, modo, version) {
+    if (p._cuenta) return;
+    const d = await cachedFetch(`muertes/${encodeURIComponent(p.id)}.json`, { silent: true });
+    const m = d?.modos?.[modo];
+    if (!m || !Object.keys(m.roles).length) { cont.innerHTML = ''; return; }
+    const roles = Object.keys(m.roles);
+    let rol = 'Todos';
+    const pintar = () => {
+        const r = m.roles[rol], med = d.mediana_grupo[`${modo}|${rol}`];
+        const max = Math.max(...Object.values(r.fases).map(x => x.costo || 0), 0.001);
+        const fases = Object.entries(FASES).map(([k, n]) => {
+            const f = r.fases[k];
+            return `<div class="rb-fila"><span class="rb-nombre">${n}</span>
+              <span class="rb-pista"><span class="mu-barra mu-${k}" style="width:${((f.costo || 0) / max) * 100}%"></span></span>
+              <span class="rb-num"><strong>${P(f.costo)} pts</strong> <span class="dim">por muerte · ${f.n}</span></span></div>`;
+        }).join('');
+        const comp = med == null ? '' : r.por_partida > med * 1.1 ? `, más que la mediana del grupo (${P(med, 0)})`
+            : r.por_partida < med * 0.9 ? `, menos que la mediana del grupo (${P(med, 0)})` : `, como la mediana del grupo (${P(med, 0)})`;
+        cont.querySelector('#mu-cuerpo').innerHTML = !r.n ? '<p class="dim">Sin muertes con timeline en este rol.</p> ' : `
+          <p class="lead">Cada muerte le cuesta a tu equipo <strong>${P(r.por_muerte.v)} puntos</strong> de probabilidad de ganar <span class="dim">(${P(r.por_muerte.lo)} a ${P(r.por_muerte.hi)}, ${r.n} muertes)</span>. Por partida suman <strong>${P(r.por_partida, 0)} puntos</strong>${comp}. El <strong>${P(r.con_objetivo, 0)} %</strong> de tus muertes le regalan un objetivo al rival en el minuto siguiente.</p>
+          <div class="mu-grid"><div>${rol === 'Todos' ? mapaMuertes(m.puntos, version) : '<p class="dim">El mapa muestra todos tus roles juntos.</p>'}</div>
+            <div><h4>Cuándo</h4><div class="rb-lista">${fases}</div>
+              <h4>Dónde te cuestan más</h4>
+              <div class="table-wrap"><table class="data-table"><thead><tr><th>Zona</th><th class="num">Muertes</th><th class="num">Por muerte</th><th class="num">Por partida</th></tr></thead>
+                <tbody>${r.zonas.slice(0, 6).map(z => `<tr><td>${escapeHtml(z.nombre)}</td><td class="num mono">${z.n}</td><td class="num mono">${P(z.costo)}</td><td class="num mono">${P(z.total / r.partidas)}</td></tr>`).join('')}</tbody></table></div></div></div>`;
+    };
+    cont.innerHTML = `<section class="section">
+      <div class="section-head"><h3>Lo que te cuestan las muertes <span class="dim">· ${escapeHtml(EN_MODO[modo])}</span></h3>
+        ${roles.length > 1 ? `<label class="selector">Rol <select id="mu-rol">${roles.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r === 'Todos' ? 'Todos los roles' : r)}</option>`).join('')}</select></label>` : ''}</div>
+      <div id="mu-cuerpo"></div>
+      ${m.caras.length ? `<h4>Tus 3 muertes más caras de las últimas 20 partidas</h4><div class="mu-caras">${m.caras.map(c => `<div class="card mu-cara">
+          <span class="mu-cara-v">−${P(c.costo, 0)} pts</span><span>Minuto ${num(c.min, 0)} · ${escapeHtml(c.zona_nombre || '')} · ${escapeHtml(c.rol || '')}</span>
+          <span class="dim">${escapeHtml(perdidos(c.perdidos))}${c.arriba ? ', ibas ganando' : ''}</span></div>`).join('')}</div>` : ''}
+      <p class="nota">${escapeHtml(d.nota)} Sale del modelo de probabilidad de ganar (Guías → Cómo calculamos la probabilidad de ganar). Morir no siempre es un error: lo que más pesa es morir y que el rival se lleve algo, y morir tarde, cuando un Barón decide la partida (regla 9 del coaching).</p></section>`;
+    pintar();
+    cont.querySelector('#mu-rol')?.addEventListener('change', (e) => { rol = e.target.value; pintar(); });
+}
+
+// ---- Gráfico de una partida: la probabilidad de ganar de tu equipo, minuto a minuto ----
+
+const ICONO = { baron: 'B', ancestral: 'A', dragon: 'D', heraldo: 'H', inhib: 'I' };
+
+export function curvaPartida(d, pid) {
+    const lado = d.lados?.[pid] === 'rojo' ? 'rojo' : 'azul';
+    const eq = lado === 'azul' ? 100 : 200;
+    const ys = d.curva.map(v => (lado === 'azul' ? v : 1 - v));
+    const W = 620, H = 200, m = { l: 30, r: 10, t: 12, b: 22 };
+    const n = Math.max(1, ys.length - 1);
+    const x = (i) => m.l + (i / n) * (W - m.l - m.r), y = (v) => m.t + (1 - v) * (H - m.t - m.b);
+    const linea = ys.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    const area = `${x(0)},${y(0.5)} ${linea} ${x(n)},${y(0.5)}`;
+    const marcas = d.eventos.filter(e => (e.persona === pid && (e.tipo === 'muerte' || e.tipo === 'kill')) || ICONO[e.tipo]).map(e => {
+        const i = Math.min(n, e.min), v = ys[Math.round(i)] ?? 0.5;
+        if (e.tipo === 'muerte') return `<circle cx="${x(i)}" cy="${y(v)}" r="${3 + Math.sqrt(e.costo) * 18}" class="cp-muerte"><title>Moriste en el ${num(e.min, 1)}: −${P(e.costo)} pts, ${perdidos(e.perdidos)}</title></circle>`;
+        if (e.tipo === 'kill') return `<circle cx="${x(i)}" cy="${y(v)}" r="3" class="cp-kill"><title>Kill en el ${num(e.min, 1)}</title></circle>`;
+        const nuestro = e.equipo === eq;
+        return `<text x="${x(i)}" y="${nuestro ? H - m.b - 4 : m.t + 9}" class="cp-obj ${nuestro ? 'cp-obj--nuestro' : 'cp-obj--rival'}" text-anchor="middle">${ICONO[e.tipo]}<title>${nuestro ? 'Tu equipo' : 'El rival'} tomó ${OBJ[e.tipo] || e.tipo} en el ${num(e.min, 1)}</title></text>`;
+    }).join('');
+    const k = d.clave;
+    let lect = '';
+    if (k) {
+        const dv = lado === 'azul' ? k.delta : -k.delta;
+        const ev = d.eventos.filter(e => e.min > k.min - 1 && e.min <= k.min && (ICONO[e.tipo] || e.tipo === 'muerte'));
+        const que = ev.length ? ev.map(e => (e.tipo === 'muerte' ? (e.persona === pid ? 'tu muerte' : 'una muerte de alguien del grupo')
+            : `${e.equipo === eq ? 'tu equipo tomó' : 'el rival tomó'} ${OBJ[e.tipo]}`)).join(', ') : 'peleas y oro';
+        lect = `El minuto que más pesó fue el ${k.min}: <strong>${dv > 0 ? '+' : '−'}${P(Math.abs(dv), 0)} pts</strong> (${escapeHtml(que)}).`;
+    }
+    const marcasY = [0, 0.5, 1].map(v => `<text x="${m.l - 5}" y="${y(v) + 4}" class="g-eje" text-anchor="end">${v * 100}</text>`).join('');
+    const marcasX = [...Array(Math.floor(n / 5) + 1).keys()].map(i => i * 5).map(t => `<text x="${x(t)}" y="${H - 6}" class="g-eje" text-anchor="middle">${t}</text>`).join('');
+    return `<div class="cp">
+      <p class="cp-lectura">${lect}</p>
+      <svg class="cp-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Probabilidad de ganar de tu equipo minuto a minuto; terminó en ${d.ganador === eq ? 'victoria' : 'derrota'}">
+        <polygon points="${area}" class="cp-area"/>
+        <line x1="${m.l}" x2="${W - m.r}" y1="${y(0.5)}" y2="${y(0.5)}" class="g-medio"/>
+        <polyline points="${linea}" class="g-linea"/>${marcas}${marcasY}${marcasX}</svg>
+      <p class="fr-leyenda"><span class="fr-item"><span class="fr-sw cp-sw-muerte"></span>tus muertes (más grande, más costó)</span> <span class="fr-item"><span class="fr-sw cp-sw-kill"></span>tus kills</span> <span class="dim">· B Barón, A Ancestral, D dragón, H Heraldo, I inhibidor (abajo tu equipo, arriba el rival)</span></p></div>`;
+}
+
+/** Al tocar el botón de una fila del historial se abre debajo el gráfico de esa partida. */
+export function activarCurvas(tbody, pid) {
+    tbody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.cp-toggle');
+        if (!btn) return;
+        const tr = btn.closest('tr');
+        if (tr.nextElementSibling?.classList.contains('cp-fila')) {
+            tr.nextElementSibling.remove();
+            btn.setAttribute('aria-expanded', 'false');
+            btn.textContent = '▸';
+            return;
+        }
+        btn.setAttribute('aria-expanded', 'true');
+        btn.textContent = '▾';
+        tr.insertAdjacentHTML('afterend', '<tr class="cp-fila"><td colspan="15"><div class="cp-cont"><div class="skeleton"></div></div></td></tr>');
+        const cont = tr.nextElementSibling.querySelector('.cp-cont');
+        const d = await cachedFetch(`partida/${encodeURIComponent(btn.dataset.id)}.json`, { silent: true });
+        cont.innerHTML = d ? curvaPartida(d, pid) : '<p class="dim">Esta partida no tiene timeline: no hay gráfico.</p>';
+    });
+}

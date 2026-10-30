@@ -394,3 +394,32 @@ section.section { scroll-margin-top: calc(var(--header-h) + 56px); }
 .calib-grid { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 20px; align-items: start; }
 .g-calib { width: 100%; max-width: 260px; height: auto; }
 @media (max-width: 640px) { .calib-grid { grid-template-columns: 1fr; } .g-calib { margin: 0 auto; display: block; } }
+
+/* Costo de las muertes */
+.mu-grid { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 720px) { .mu-grid { grid-template-columns: 1fr; } }
+.mu-mapa { width: 100%; max-width: 320px; height: auto; display: block; margin: 0 auto; }
+.mu-p { fill-opacity: .55; stroke-width: 1; }
+.mu-temprana { fill: var(--fr-1); stroke: var(--fr-1); background: var(--fr-1); }
+.mu-media { fill: var(--fr-0); stroke: var(--fr-0); background: var(--fr-0); }
+.mu-tardia { fill: var(--danger); stroke: var(--danger); background: var(--danger); }
+.mu-barra { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; opacity: .8; }
+.mu-caras { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 8px 0; }
+.mu-cara { display: grid; gap: 4px; padding: 12px; font-size: .88rem; }
+.mu-cara-v { font-size: 1.3rem; font-weight: 700; color: var(--danger); }
+
+/* Gráfico de la partida */
+.cp-toggle { border: 1px solid var(--border); background: var(--surface); color: var(--accent); border-radius: var(--r-sm);
+    width: 28px; height: 28px; cursor: pointer; font: inherit; }
+.cp-toggle:hover, .cp-toggle:focus-visible { border-color: var(--accent); }
+.cp-fila > td { padding: 0; }
+.cp-cont { position: sticky; left: 0; width: min(660px, calc(100vw - 56px)); padding: 10px 8px 4px; }
+.cp-svg { width: 100%; height: auto; display: block; }
+.cp-area { fill: var(--accent-dim); }
+.cp-muerte { fill: var(--danger); fill-opacity: .7; stroke: var(--surface); stroke-width: 1; }
+.cp-kill { fill: var(--success); }
+.cp-obj { font-size: 11px; font-weight: 700; }
+.cp-obj--nuestro { fill: var(--success); } .cp-obj--rival { fill: var(--danger); }
+.cp-sw-muerte { background: var(--danger); border-radius: 50%; } .cp-sw-kill { background: var(--success); border-radius: 50%; }
+.cp-lectura { margin: 0 0 6px; font-size: .92rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

@@ -183,6 +183,7 @@ class Feed(commands.Cog):
                     lp = f" · **{F.num(j['lp'], 0, True)} LP**" if j.get("lp") is not None else ""
                     lineas.append(f"{'✅' if j['win'] else '❌'} **{nombres.get(j['persona'], j['persona'])}** · {champ} "
                                   f"{j['rol'] or ''} · {j['k']}/{j['d']}/{j['a']}{lp}")
+                lineas += await self._momento_clave(m)
                 vista = tarjeta_simple(lineas, f"{WEB}#/jugadores/{m['jugadores'][0]['persona']}")
                 for ch in canales:
                     try:
@@ -200,6 +201,23 @@ class Feed(commands.Cog):
         vistos.update(m["id"] for m in recientes)
         self.estado.set("vistos", sorted(vistos)[-500:])
         self.estado.set("rangos", rangos)
+
+    async def _momento_clave(self, m: dict) -> list[str]:
+        """La jugada que más movió la probabilidad de ganar (fase 5), desde el equipo del primer jugador."""
+        try:
+            d = await self.datos.partida(m["id"])
+        except Exception:
+            return []
+        k = (d or {}).get("clave")
+        if not k:
+            return []
+        lado = d["lados"].get(m["jugadores"][0]["persona"], "azul")
+        dv = k["delta"] if lado == "azul" else -k["delta"]
+        nombres = {"baron": "Barón", "ancestral": "Ancestral", "dragon": "dragón", "heraldo": "Heraldo", "inhib": "inhibidor"}
+        eq = 100 if lado == "azul" else 200
+        ev = [e for e in d["eventos"] if k["min"] - 1 < e["min"] <= k["min"] and e["tipo"] in nombres]
+        que = ", ".join(f"{nombres[e['tipo']]} {'propio' if e.get('equipo') == eq else 'rival'}" for e in ev) or "peleas y oro"
+        return [f"-# Momento clave: minuto {k['min']}, {'+' if dv > 0 else '−'}{F.num(abs(dv) * 100, 0)} pts ({que})"]
 
     @vigilar.before_loop
     async def _esperar(self):

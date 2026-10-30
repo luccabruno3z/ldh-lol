@@ -113,6 +113,30 @@ class Datos:
     async def sinergia(self) -> dict:
         return await self._json("sinergia.json") or {"filas": []}
 
+    async def partida(self, match_id: str) -> dict | None:
+        """Curva de probabilidad de ganar y eventos de una partida (fase 5)."""
+        return await self._json(f"partida/{quote(match_id)}.json")
+
+    async def muertes(self, persona_id: str) -> dict | None:
+        return await self._json(f"muertes/{quote(persona_id)}.json")
+
+    async def mapa(self) -> bytes | None:
+        """El minimapa de Data Dragon (para el PNG de las muertes). Se baja una vez y queda en memoria."""
+        if getattr(self, "_mapa", None):
+            return self._mapa
+        version = (await self._json("campeones.json") or {}).get("version")
+        if not version:
+            return None
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession(timeout=self.timeout)
+        try:
+            async with self._session.get(f"https://ddragon.leagueoflegends.com/cdn/{version}/img/map/map11.png") as r:
+                if r.status == 200:
+                    self._mapa = await r.read()
+        except aiohttp.ClientError:
+            logger.warning("No pude bajar el minimapa de Data Dragon")
+        return getattr(self, "_mapa", None)
+
     async def rachas(self, persona_id: str) -> dict | None:
         return await self._json(f"rachas/{quote(persona_id)}.json")
 

@@ -22,9 +22,11 @@ VISTAS = {
     "gten": ("Gráfico: ¿estás mejorando?", "Tu índice por partida y su tendencia"),
     "gevo": ("Gráfico: winrate en el tiempo", "Tus últimas 20 contra tu temporada"),
     "grac": ("Gráfico: ¿te conviene seguir?", "Tu winrate según cómo venías: rachas y pausas"),
+    "gmue": ("Gráfico: lo que te cuestan las muertes", "Dónde morís y cuánta probabilidad de ganar perdés"),
 }
-GRAFICO = {"gfra": "franjas", "grad": "radar", "gten": "tendencia", "gevo": "evolucion", "grac": "rachas"}
-SIN_ROL = ("gevo", "grac")  # no dependen del rol
+GRAFICO = {"gfra": "franjas", "grad": "radar", "gten": "tendencia", "gevo": "evolucion", "grac": "rachas",
+           "gmue": "muertes"}
+SIN_ROL = ("gevo", "grac", "gmue")  # no dependen del rol
 MODOS = {"solo": "Solo/Dúo", "normal": "Normales", "todo": "Todo (solo, flex y normales)"}
 ROLES = ("Top", "Jungla", "Mid", "ADC", "Support")
 

@@ -7,7 +7,7 @@ import { onRoute, go } from './router.js';
 import { bloquesFase2 } from './fase2.js';
 import { bloquesFase3 } from './fase3.js';
 import { bloquesFase4 } from './fase4.js';
-import { bloqueRachas } from './fase5.js';
+import { bloqueRachas, bloqueMuertes, activarCurvas } from './fase5.js';
 import { escapeHtml, rangoTexto, tierClase, nombreCola, conIntervalo, iconoCampeon, campeon, fecha, num } from './utils.js';
 
 const COLS = [
@@ -155,6 +155,7 @@ function forma(f) {
 function filaHistorial(m) {
     const lp = m.lp ? (m.lp.exacto ? `${m.lp.delta > 0 ? '+' : ''}${m.lp.delta}` : `tramo de ${m.lp.tramo}: ${m.lp.delta > 0 ? '+' : ''}${m.lp.delta}`) : '';
     return `<tr class="${m.win ? 'r-win' : 'r-loss'}">
+      <td><button type="button" class="cp-toggle" data-id="${escapeHtml(m.id)}" aria-expanded="false" aria-label="Ver el gráfico de la partida">▸</button></td>
       <td class="mono">${fecha(m.inicio)}</td>
       <td>${escapeHtml(nombreCola(m.cola))}</td>
       <td class="champ">${iconoCampeon(m.champ, 28)}<span>${escapeHtml(campeon(m.champ))}</span></td>
@@ -176,14 +177,15 @@ async function historial(p, cont) {
     let pagina = 0;
     cont.innerHTML = `<section class="section"><h3>Historial</h3>
       <div class="table-wrap"><table class="data-table hist">
-        <thead><tr><th>Fecha</th><th>Cola</th><th>Campeón</th><th>Rol</th><th>Lado</th><th>K/D/A</th><th class="num">CS/min</th>
+        <thead><tr><th><span class="sr-only">Gráfico</span></th><th>Fecha</th><th>Cola</th><th>Campeón</th><th>Rol</th><th>Lado</th><th>K/D/A</th><th class="num">CS/min</th>
           <th class="num">Oro</th><th class="num">Daño</th><th class="num">Visión</th><th>Resultado</th><th>Parche</th><th>LP</th><th>Cuenta</th></tr></thead>
         <tbody></tbody></table></div>
       <button class="btn" type="button" hidden>Ver más</button></section>`;
-    const tbody = cont.querySelector('tbody'), btn = cont.querySelector('button');
+    const tbody = cont.querySelector('tbody'), btn = cont.querySelector('button.btn');
+    activarCurvas(tbody, p.id);
     if (p._cuenta) {  // vista de una cuenta: sus últimas partidas vienen en el mismo archivo
         tbody.innerHTML = p._cuenta.historial.map(filaHistorial).join('')
-            || '<tr><td colspan="14" class="empty-state">Sin partidas todavía.</td></tr>';
+            || '<tr><td colspan="15" class="empty-state">Sin partidas todavía.</td></tr>';
         return;
     }
     const mas = async () => {
@@ -194,7 +196,7 @@ async function historial(p, cont) {
     };
     btn.addEventListener('click', () => mas().catch(err => console.error('[historial]', err)));
     if (p.n) await mas();
-    else tbody.innerHTML = '<tr><td colspan="14" class="empty-state">Sin partidas todavía.</td></tr>';
+    else tbody.innerHTML = '<tr><td colspan="15" class="empty-state">Sin partidas todavía.</td></tr>';
 }
 
 // Pestañas del perfil: el perfil entero era muy largo para el celular. La pestaña y la cuenta van en
@@ -263,7 +265,7 @@ async function pintarPerfil(cont, base, vista, tabInicial = 'resumen', modoElegi
       <nav class="perfil-tabs" role="tablist" aria-label="Secciones del perfil">${Object.entries(PESTANAS).map(([k, l]) =>
         `<a class="perfil-tab" role="tab" data-tab="${k}" href="${ruta(k)}">${l}</a>`).join('')}</nav>
       <div data-pestana="resumen">${forma(p.forma)}${seccionEvolucion(p.evolucion, modo)}<div id="f5-rachas"></div></div>
-      <div data-pestana="coaching"><div id="fase3"></div></div>
+      <div data-pestana="coaching"><div id="fase3"></div><div id="f5-muertes"></div></div>
       <div data-pestana="campeones"><div id="fase2"></div><div id="f4-matchups"></div></div>
       <div data-pestana="mapa"><div id="f4-heatmap"></div><div id="f4-jungla"></div>
         ${p._cuenta ? '<p class="empty-state">El mapa y la jungla se calculan con todas tus cuentas juntas.</p>' : ''}</div>
@@ -290,6 +292,7 @@ async function pintarPerfil(cont, base, vista, tabInicial = 'resumen', modoElegi
     bloquesFase3(p, document.getElementById('fase3'), modo).catch(err => console.error('[coaching]', err));
     bloquesFase2(p, document.getElementById('fase2'), modo);
     bloqueRachas(p, document.getElementById('f5-rachas'), modo).catch(err => console.error('[rachas]', err));
+    bloqueMuertes(p, document.getElementById('f5-muertes'), modo, state.campeones?.version).catch(err => console.error('[muertes]', err));
     bloquesFase4(p, { matchups: document.getElementById('f4-matchups'), heatmap: document.getElementById('f4-heatmap'),
                       jungla: document.getElementById('f4-jungla') }, modo);
     await historial(p, document.getElementById('historial'));

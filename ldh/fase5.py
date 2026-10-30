@@ -3,10 +3,13 @@
 A. Rachas y pausas: ¿te conviene seguir después de 2 derrotas? Cada persona se compara consigo misma
    (si no, el que juega peor aparece más en las rachas y parece que la racha hace perder).
 B. Probabilidad de ganar minuto a minuto (ldh.victoria): se entrena, se valida y se publica con su calibración.
+C. Cuánto te costó cada muerte (la regla 9 del doc de lecciones, medida) y el gráfico de cada partida.
 """
 
 from __future__ import annotations
 
+import gzip
+import json
 import math
 import sqlite3
 from collections import defaultdict
@@ -15,6 +18,7 @@ from typing import Callable
 from . import estadistica as est
 from . import victoria as V
 from .ajustes import AJUSTES
+from .almacen import _ruta
 from .fase2 import GRIETA
 
 CFG = AJUSTES["fase5"]
@@ -137,11 +141,208 @@ def _equivalencias(m: dict) -> list[dict]:
     return [{"clave": k, "nombre": n, "oro": round(c[k] / oro)} for k, n in nombres.items() if k in c]
 
 
+# ---------------------------------------------------------------- C. muertes y partidas
+
+VENTANA_MS = 60_000  # lo que el rival se llevó después de la muerte, y cuándo se mide
+# Oro aproximado que da cada objetivo al equipo (la parte que el frame ya cuenta y hay que devolver).
+ORO_OBJETIVO = {"baron": 1500, "torre": 250}
+FASES = (("temprana", 0, 14), ("media", 14, 25), ("tardia", 25, 999))
+ESPEJO = (14750, 14860)  # dos veces el centro del minimapa de Data Dragon (de −120 a 14.870 y 14.980)
+
+
+def zona(x: int, y: int, lado: str) -> str:
+    """Región del mapa, vista desde el lado de la persona (tu jungla / la del rival)."""
+    if x < 4200 and y < 4200:
+        z = "base_azul"
+    elif x > 10600 and y > 10600:
+        z = "base_roja"
+    elif (x < 2300 and y > 4200) or (y > 12500 and x < 10600):
+        return "top"
+    elif (y < 2300 and x > 4200) or (x > 12500 and y < 10600):
+        return "bot"
+    elif abs(x - y) < 1600:
+        return "mid"
+    elif abs(x + y - 14800) < 1800:
+        return "rio_arriba" if y > x else "rio_abajo"
+    else:
+        z = "jungla_azul" if x + y < 14800 else "jungla_roja"
+    propio = "azul" if lado == "azul" else "roja"
+    if z.startswith("base"):
+        return "tu_base" if z.endswith(propio) else "base_rival"
+    return "tu_jungla" if z.endswith(propio) else "jungla_rival"
+
+
+ZONAS = {"top": "Top", "mid": "Mid", "bot": "Bot", "rio_arriba": "Río de arriba", "rio_abajo": "Río de abajo",
+         "tu_jungla": "Tu jungla", "jungla_rival": "Jungla rival", "tu_base": "Tu base", "base_rival": "Base rival"}
+OBJETIVOS = {"baron": "el Barón", "ancestral": "el Ancestral", "dragon": "un dragón", "heraldo": "el Heraldo",
+             "larva": "larvas", "torre": "una torre", "inhib": "un inhibidor"}
+
+
+def _fase(minuto: float) -> str:
+    return next(n for n, a, b in FASES if a <= minuto < b)
+
+
+def _costo(p: V.Partida, m: dict, k: int, equipo: int) -> tuple[float, list[str]]:
+    """Probabilidad de ganar que el equipo de la víctima pierde por la muerte k (índice en p.eventos):
+    el modelo un minuto después, con la muerte y sin ella. Sin ella = sin la kill, sin su oro (bounty,
+    shutdown y asistencias, ~50 % más si hubo) y sin lo que el rival tomó en ese minuto."""
+    t, _, eq_kill, e = p.eventos[k]
+    t_eval = min(t + VENTANA_MS, p.fin)
+    oro = (e.get("bounty", 0) + e.get("shutdownBounty", 0)) * (1.5 if e.get("assistingParticipantIds") else 1)
+    sacar, perdidos = {k}, []
+    for j in range(k + 1, len(p.eventos)):
+        tj, clase, eqj, _ = p.eventos[j]
+        if tj > t + VENTANA_MS:
+            break
+        if eqj == eq_kill and clase in OBJETIVOS:
+            sacar.add(j)
+            perdidos.append(clase)
+            oro += ORO_OBJETIVO.get(clase, 0)
+    signo = 1 if eq_kill == 100 else -1  # el oro extra se le saca al que mató
+    real = V.prob(m, p.estado(t_eval), equipo)
+    sin = V.prob(m, p.estado(t_eval, frozenset(sacar), -signo * oro), equipo)
+    return sin - real, perdidos
+
+
+def muertes_y_partidas(db: sqlite3.Connection, m: dict) -> tuple[dict, dict]:
+    """(muertes por persona, curva de cada partida). Cada muerte: minuto, costo, zona, fase, lo que se perdió
+    y si el equipo iba arriba. Cada partida: la probabilidad del azul por minuto y los momentos clave."""
+    amigos = defaultdict(dict)  # match -> participant_id -> (persona, lado, rol)
+    for mid, part, pid, lado, rol in db.execute("""SELECT match_id, participant_id, persona_id, lado, rol
+                                                    FROM participantes WHERE persona_id IS NOT NULL"""):
+        amigos[mid][part] = (pid, lado, rol)
+    muertes = defaultdict(list)
+    partidas = {}
+    for mid, inicio, cola, ganador in db.execute("""SELECT match_id, inicio_ms, cola, ganador FROM partidas
+                                                    WHERE cola IN ('solo','flex','normal') AND tiene_timeline=1"""):
+        if mid not in amigos:
+            continue
+        p = V.Partida(json.loads(gzip.decompress(_ruta("timelines", mid, inicio).read_bytes())))
+        curva = [round(V.prob(m, p.estado(t)), 3) for t in range(0, p.fin + 1, MIN_MS)]
+        eventos = []
+        for k, (t, clase, eq, e) in enumerate(p.eventos):
+            if clase == "kill":
+                vic, mat = e.get("victimId"), e.get("killerId")
+                if vic in amigos[mid]:
+                    pid, lado, rol = amigos[mid][vic]
+                    equipo = 100 if lado == "azul" else 200
+                    costo, perdidos = _costo(p, m, k, equipo)
+                    antes = V.prob(m, p.estado(t), equipo)
+                    pos = e.get("position") or {}
+                    # El mapa es simétrico respecto del centro: las del lado rojo se espejan para que todo quede
+                    # visto desde tu base abajo a la izquierda (juntar los dos lados sin esto inventa patrones).
+                    vx, vy = pos.get("x"), pos.get("y")
+                    if vx is not None and lado == "rojo":
+                        vx, vy = ESPEJO[0] - vx, ESPEJO[1] - vy
+                    d = {"match": mid, "t": t, "min": round(t / MIN_MS, 1), "costo": round(costo, 4),
+                         "zona": zona(pos.get("x", 0), pos.get("y", 0), lado), "fase": _fase(t / MIN_MS),
+                         "perdidos": perdidos, "arriba": antes > 0.5, "x": vx, "y": vy,
+                         "rol": rol, "cola": cola, "inicio": inicio}
+                    muertes[pid].append(d)
+                    eventos.append({"min": d["min"], "tipo": "muerte", "persona": pid, "costo": d["costo"],
+                                    "perdidos": perdidos})
+                if mat in amigos[mid]:
+                    eventos.append({"min": round(t / MIN_MS, 1), "tipo": "kill", "persona": amigos[mid][mat][0]})
+            elif clase in ("baron", "ancestral", "dragon", "heraldo", "inhib"):
+                eventos.append({"min": round(t / MIN_MS, 1), "tipo": clase, "equipo": eq})
+        saltos = [abs(b - a) for a, b in zip(curva, curva[1:])]
+        clave = max(range(len(saltos)), key=saltos.__getitem__) + 1 if saltos else None
+        partidas[mid] = {"curva": curva, "ganador": ganador, "cola": cola, "inicio": inicio,
+                         "lados": {pid: lado for pid, lado, _ in amigos[mid].values()},
+                         "eventos": eventos, "clave": None if clave is None else
+                         {"min": clave, "delta": round(curva[clave] - curva[clave - 1], 3)}}
+    return muertes, partidas
+
+
+def _resumen_muertes(ms: list[dict], n_partidas: int, reps: int) -> dict:
+    """Costo medio por muerte y por partida (en puntos de probabilidad), con IC bootstrap por partida."""
+    import numpy as np
+    if not ms:
+        return {"n": 0, "partidas": n_partidas}
+    por_partida = defaultdict(list)
+    for d in ms:
+        por_partida[d["match"]].append(d["costo"])
+    grupos = list(por_partida.values())
+    rng = np.random.default_rng(AJUSTES["bootstrap_semilla"])
+    medias = []
+    for _ in range(reps):
+        g = [grupos[i] for i in rng.integers(0, len(grupos), len(grupos))]
+        medias.append(np.mean([c for x in g for c in x]))
+    costo = float(np.mean([d["costo"] for d in ms]))
+    lo, hi = np.percentile(medias, (2.5, 97.5))
+    fases = {f: [d["costo"] for d in ms if d["fase"] == f] for f, _, _ in FASES}
+    zonas = defaultdict(list)
+    for d in ms:
+        zonas[d["zona"]].append(d["costo"])
+    return {"n": len(ms), "partidas": n_partidas,
+            "por_muerte": {"v": round(costo, 4), "lo": round(float(lo), 4), "hi": round(float(hi), 4)},
+            "por_partida": round(sum(d["costo"] for d in ms) / max(n_partidas, 1), 4),
+            "muertes_partida": round(len(ms) / max(n_partidas, 1), 2),
+            "con_objetivo": round(sum(1 for d in ms if d["perdidos"]) / len(ms), 3),
+            "fases": {f: {"n": len(v), "costo": round(float(np.mean(v)), 4) if v else None,
+                          "total": round(sum(v), 3)} for f, v in fases.items()},
+            "zonas": sorted(({"zona": z, "nombre": ZONAS.get(z, z), "n": len(v), "costo": round(float(np.mean(v)), 4),
+                              "total": round(sum(v), 3)} for z, v in zonas.items()), key=lambda x: -x["total"])}
+
+
+def muertes(muertes_por: dict, filas_por: dict) -> tuple[dict, dict]:
+    """(por persona, mediana del grupo) por modo y rol ("Todos" = todos los roles)."""
+    reps = AJUSTES["bootstrap_reps"] // 4
+    por, refs = {}, defaultdict(list)
+    for pid, filas in filas_por.items():
+        ms = muertes_por.get(pid, [])
+        por[pid] = {}
+        for modo, colas in MODOS.items():
+            con_tl = {f["match_id"]: f for f in filas if f["cola"] in colas}
+            mm = [d for d in ms if d["cola"] in colas]
+            jugadas = defaultdict(set)
+            for d in mm:
+                jugadas[d["rol"]].add(d["match"])
+            roles = {}
+            n_rol = defaultdict(int)
+            for f in con_tl.values():
+                n_rol[f["rol_ldh"] or "Sin rol"] += 1
+            for rol in ["Todos", *[r for r in n_rol if r != "Sin rol"]]:
+                sub = mm if rol == "Todos" else [d for d in mm if d["rol"] == rol]
+                n = len(con_tl) if rol == "Todos" else n_rol[rol]
+                if n < AJUSTES["min_partidas"]:
+                    continue
+                roles[rol] = _resumen_muertes(sub, n, reps)
+                if roles[rol]["n"]:
+                    refs[(modo, rol)].append(roles[rol]["por_partida"])
+            ultimas = sorted(mm, key=lambda d: -d["inicio"])
+            vistas, recientes = set(), []
+            for d in ultimas:
+                if len(vistas) >= 20 and d["match"] not in vistas:
+                    break
+                vistas.add(d["match"])
+                recientes.append(d)
+            caras = sorted(recientes, key=lambda d: -d["costo"])[:3]
+            por[pid][modo] = {"roles": roles, "caras": [{k: d[k] for k in ("match", "min", "costo", "zona", "fase",
+                                                                         "perdidos", "arriba", "rol")} | {"zona_nombre": ZONAS.get(d["zona"])}
+                                                        for d in caras],
+                              # Las 400 más recientes: con todas, el mapa de quien juega mucho se tapaba.
+                              "puntos": [[d["min"], d["x"], d["y"], round(d["costo"], 3)]
+                                         for d in sorted(mm, key=lambda d: (d["inicio"], d["t"])) if d["x"] is not None][-400:]}
+    import statistics
+    mediana = {f"{m}|{r}": round(statistics.median(v), 4) for (m, r), v in refs.items() if len(v) >= 3}
+    return por, mediana
+
+
 # ---------------------------------------------------------------- generar
 
 def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: Callable) -> None:
     m = modelo(db)
     escribir("modelo_victoria.json", {**m, "equivalencias": _equivalencias(m)})
+    if m["validacion"]["aprobado"]:  # sin un modelo validado no se publica nada que dependa de él
+        ms, partidas = muertes_y_partidas(db, m)
+        por, mediana = muertes(ms, filas_por)
+        nota = ("Costo de una muerte: cuánta probabilidad de ganar pierde tu equipo por ella, medida un minuto "
+                "después: la kill, su oro y lo que el rival tomó en ese minuto. En puntos de 0 a 100.")
+        for pid, d in por.items():
+            escribir(f"muertes/{pid}.json", {"modos": d, "mediana_grupo": mediana, "zonas": ZONAS, "nota": nota})
+        for mid, d in partidas.items():
+            escribir(f"partida/{mid}.json", d)
     por, grupo = rachas(db, list(filas_por))
     textos = {"estados": ESTADOS, "sesion_min": CFG["sesion_min"], "corte_min": CFG["corte_min"],
               "largas_desde": CFG["largas_desde"]}
