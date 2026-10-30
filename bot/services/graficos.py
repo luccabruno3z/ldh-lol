@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 FONDO, PANEL, TEXTO, TENUE, GRILLA = "#0d1420", "#121a2a", "#e8ecf4", "#7a8296", "#263248"
 ACENTO, SEGUNDO = "#00e5e5", "#ffa500"
+COLOR_FRANJA = ["#c08457", "#c9ced8", "#3fbf9b"]  # bronce, plata, esmeralda
 
 
 def _figura(ancho=8, alto=4.2, polar=False):
@@ -119,8 +120,10 @@ def tendencia(t: dict, titulo: str, franja: str) -> io.BytesIO:
     return _png(fig)
 
 
-def radar(comps: list[dict], titulo: str, segundo: list[dict] | None = None, etiquetas=("", "")) -> io.BytesIO:
-    """Los 7 componentes (0–100) contra la franja; el anillo punteado es 50, la mitad de la franja."""
+def radar(comps: list[dict], titulo: str, segundo: list[dict] | None = None, etiquetas=("", ""),
+          franjas: dict | None = None) -> io.BytesIO:
+    """Los 7 componentes (0–100) contra la franja. franjas: {franja: {componente: nivel}}, dónde cae el
+    jugador mediano de cada franja en tu escala; va una línea punteada por franja."""
     n = len(comps)
     ang = [2 * math.pi * i / n for i in range(n)] + [0]
     val = lambda cs: [50 if c.get("sin_dato") or c.get("nivel") is None else c["nivel"] * 100 for c in cs]
@@ -133,7 +136,12 @@ def radar(comps: list[dict], titulo: str, segundo: list[dict] | None = None, eti
     ax.set_xticks(ang[:-1])
     ax.set_xticklabels([c["nombre"] for c in comps], color=TEXTO, fontsize=10)
     ax.grid(color=GRILLA, lw=0.7)
-    ax.plot(ang, [50] * (n + 1), color=TENUE, lw=1, ls=(0, (4, 4)))
+    if franjas:
+        for j, (fr, niv) in enumerate(franjas.items()):
+            vf = [(niv.get(c["clave"]) if niv.get(c["clave"]) is not None else 0.5) * 100 for c in comps]
+            ax.plot(ang, vf + vf[:1], color=COLOR_FRANJA[j % 3], lw=1.6, ls=(0, (4, 3)), label=f"mediana {fr}")
+    else:
+        ax.plot(ang, [50] * (n + 1), color=TENUE, lw=1, ls=(0, (4, 4)))
     if segundo:
         v2 = val(segundo)
         ax.fill(ang, v2 + v2[:1], color=SEGUNDO, alpha=0.18)
@@ -141,14 +149,14 @@ def radar(comps: list[dict], titulo: str, segundo: list[dict] | None = None, eti
     v1 = val(comps)
     ax.fill(ang, v1 + v1[:1], color=ACENTO, alpha=0.22)
     ax.plot(ang, v1 + v1[:1], color=ACENTO, lw=2.2, label=etiquetas[0])
-    if segundo:
-        ax.legend(loc="upper right", bbox_to_anchor=(1.25, 1.12), facecolor=PANEL, edgecolor=GRILLA, labelcolor=TEXTO)
+    if segundo or franjas:
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.06), ncol=2, facecolor=PANEL, edgecolor=GRILLA,
+                  labelcolor=TEXTO, fontsize=9)
     ax.set_title(titulo, color=TEXTO, fontsize=12, pad=24)
     return _png(fig)
 
 
 ABREV = {"Hierro–Bronce": "H–B", "Plata–Oro": "P–O", "Platino–Esmeralda": "P–E"}
-COLOR_FRANJA = ["#c08457", "#c9ced8", "#3fbf9b"]  # bronce, plata, esmeralda
 
 
 def _fmt(x: float | None, dec: int, signo: bool = False) -> str:

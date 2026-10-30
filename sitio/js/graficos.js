@@ -146,7 +146,9 @@ export function seccionTendencia(t, rol, franja) {
 // ---- Radar de los componentes del Performance contra tu franja ----
 
 /** comps: [{nombre, nivel (0–1), sin_dato}]. El anillo punteado es 50: la mitad de tu franja. */
-export function radar(comps, { titulo = '', segundo = null } = {}) {
+const COLOR_FR = ['fr-0', 'fr-1', 'fr-2'];
+
+export function radar(comps, { titulo = '', segundo = null, franjas = null } = {}) {
     const S = 300, c = S / 2, R = 104, n = comps.length;
     const ang = (i) => -Math.PI / 2 + (2 * Math.PI * i) / n;
     const pt = (i, v) => `${c + Math.cos(ang(i)) * R * v},${c + Math.sin(ang(i)) * R * v}`;
@@ -161,7 +163,9 @@ export function radar(comps, { titulo = '', segundo = null } = {}) {
     const vals = (cs) => cs.map(k => (k.sin_dato || k.nivel == null ? 0.5 : k.nivel));
     return `<svg class="g-radar" viewBox="-60 -10 ${S + 120} ${S + 20}" role="img" aria-label="${escapeHtml(titulo || 'Componentes contra tu franja')}">
       ${anillos}${ejes}
-      <polygon points="${poli(comps.map(() => 0.5))}" class="g-medio"/>
+      ${franjas ? Object.entries(franjas).map(([fr, niv], j) =>
+        `<polygon points="${poli(comps.map(k => niv[k.clave] ?? 0.5))}" class="g-franja ${COLOR_FR[j % 3]}"><title>Mediana de ${escapeHtml(fr)}</title></polygon>`).join('')
+        : `<polygon points="${poli(comps.map(() => 0.5))}" class="g-medio"/>`}
       ${segundo ? `<polygon points="${poli(vals(segundo))}" class="g-area g-area--b"/>` : ''}
       <polygon points="${poli(vals(comps))}" class="g-area"/>
       ${comps.map((k, i) => `<circle cx="${pt(i, vals(comps)[i]).split(',')[0]}" cy="${pt(i, vals(comps)[i]).split(',')[1]}" r="3.5" class="g-punto">
@@ -183,8 +187,8 @@ export function graficoFranjas(filas) {
     const franjas = Object.keys(filas[0].medianas);
     const W = 300, H = 22;
     const fmt = (f, x) => `${f.clave.startsWith('dif') && x > 0 ? '+' : ''}${num(x, f.dec)}`;
-    const leyenda = `<p class="fr-leyenda"><span class="fr-sw fr-vos"></span>vos ${franjas.map((fr, j) =>
-        `<span class="fr-sw fr-${j}"></span>mediana ${escapeHtml(fr)}`).join(' ')}</p>`;
+    const leyenda = `<p class="fr-leyenda"><span class="fr-item"><span class="fr-sw fr-vos"></span>vos</span> ${franjas.map((fr, j) =>
+        `<span class="fr-item"><span class="fr-sw fr-${j}"></span>mediana ${escapeHtml(fr)}</span>`).join(' ')}</p>`;
     const fila = (f) => {
         const vals = [f.v, ...Object.values(f.medianas)];
         const centro = (Math.min(...vals) + Math.max(...vals)) / 2;

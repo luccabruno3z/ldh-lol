@@ -395,6 +395,22 @@ def _rol(filas: list[dict], rol: str, franja: str, celdas: dict) -> dict | None:
             por_franja.append({"clave": k, "mejor": METRICAS[k][2], "medianas": meds,
                                **{c: x[c] for c in ("nombre", "v", "lo", "hi", "dec", "unidad")}})
 
+    # Las otras franjas en el radar: dónde caería el jugador mediano de cada franja dentro de la tuya
+    # (su mediana de cada métrica, en percentil de tu referencia). Winrate y consistencia no se comparan
+    # entre franjas (el winrate es 50 % por construcción; la consistencia se mide contra el reparto de
+    # cada franja): van en 50.
+    radar_franjas = {}
+    for fr in FRANJAS:
+        c = celdas.get((fr, rol))
+        if c is None or c.n_jugadores < REF["min_jugadores"]:
+            continue
+        niveles = {}
+        for clave, _, ms in _componentes(rol):
+            ps = [float(_pct(c.mediana(k), celda.por_jugador[k])) for k in ms
+                  if clave not in ("winrate", "consistencia") and celda.disponible(k) and c.disponible(k)]
+            niveles[clave] = _r(float(np.mean(ps))) if ps else 0.5
+        radar_franjas[fr] = niveles
+
     comps = []
     for clave, nombre, ms in _componentes(rol):
         nivel = ev["comps"][clave]
@@ -454,7 +470,7 @@ def _rol(filas: list[dict], rol: str, franja: str, celdas: dict) -> dict | None:
             "componentes": comps, "metricas": metricas,
             "fortalezas": [item(k, x, False) for k, x in fort],
             "mejorar": [item(k, x, True) for k, x in debil],
-            "sumar": sumar, "por_franja": por_franja,
+            "sumar": sumar, "por_franja": por_franja, "radar_franjas": radar_franjas,
             "tendencia": tendencia(filas, celda, rol)}
 
 

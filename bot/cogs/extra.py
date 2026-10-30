@@ -193,9 +193,11 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
         if not r or r.get("sin_referencia"):
             return (f"Todavía no hay referencia para el radar de {nombre} en {rol_n or 'ningún rol'}: hacen falta "
                     f"10+ partidas de {en} en el rol y 20 jugadores de referencia en su franja."), None
-        png = graficos.radar(r["componentes"], f"{nombre} · {rol_n} en {en} contra {d['franja']}")
-        texto = (f"## {discord.utils.escape_markdown(nombre)} · radar\n-# Performance {round(r['performance']['v'] * 100)}/100. "
-                 f"El anillo punteado es 50, la mitad de su franja ({d['franja']}). Detalle en `-performance`.")
+        png = graficos.radar(r["componentes"], f"{nombre} · {rol_n} en {en} contra {d['franja']}",
+                             etiquetas=(nombre, ""), franjas=r.get("radar_franjas"))
+        texto = (f"## {discord.utils.escape_markdown(nombre)} · radar\n-# Performance {round(r['performance']['v'] * 100)}/100 "
+                 f"contra {d['franja']}. Cada línea punteada es dónde cae el jugador mediano de esa franja en la escala "
+                 "de la tuya. Winrate y consistencia no se comparan entre franjas: van en 50. Detalle en `-performance`.")
     else:
         evo = p.get("evolucion") or {}
         colas = evo.get("colas") or {}

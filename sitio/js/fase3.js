@@ -52,8 +52,11 @@ function performance(r, franja) {
           <span class="ic">${num(pf.lo * 100, 0)} a ${num(pf.hi * 100, 0)}</span></div>
         <div><p class="lead">${lectura}</p><div class="perf-franjas">${franjas}</div></div>
       </div>
-      <div>${radar(r.componentes, { titulo: `Tus 7 componentes contra ${franja}; el anillo punteado es la mitad de tu franja` })}
-        <p class="nota" style="text-align:center">El anillo punteado es la mitad de tu franja (50).</p></div>
+      <div>${radar(r.componentes, { titulo: `Tus 7 componentes contra ${franja}, con la mediana de cada franja punteada`, franjas: r.radar_franjas })}
+        ${r.radar_franjas ? `<p class="fr-leyenda" style="justify-content:center"><span class="fr-item"><span class="fr-sw fr-vos"></span>vos</span> ${Object.keys(r.radar_franjas).map((fr, j) =>
+            `<span class="fr-item"><span class="fr-sw fr-${j}"></span>${escapeHtml(fr)}</span>`).join(' ')}</p>
+        <p class="nota" style="text-align:center">Cada línea punteada es dónde cae el jugador mediano de esa franja en la escala de la tuya. Winrate y consistencia no se comparan entre franjas: van en 50.</p>`
+        : '<p class="nota" style="text-align:center">El anillo punteado es la mitad de tu franja (50).</p>'}</div>
       </div>
       <div class="table-wrap"><table class="data-table">
         <thead><tr><th>Componente</th><th>Nivel en tu franja</th><th class="num">Peso</th><th class="num">Aporta</th><th class="num">Puede sumar</th></tr></thead>
