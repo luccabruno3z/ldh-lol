@@ -118,9 +118,12 @@ class _SelectorTexto(discord.ui.Select):
         super().__init__(placeholder="Elegí un tema", options=[discord.SelectOption(label=k) for k in textos])
 
     async def callback(self, interaction: discord.Interaction):
-        k = self.values[0]
-        self.view.mostrar(k)
-        await interaction.response.edit_message(view=self.view)
+        # La vista se guarda antes de rearmarla: mostrar() saca este selector y self.view pasa a None,
+        # y editar con view=None en un mensaje de Components V2 da "Cannot send an empty message".
+        vista = self.view
+        vista.mostrar(self.values[0])
+        await interaction.response.defer()
+        await interaction.edit_original_response(view=vista)
 
 
 class _VistaTexto(discord.ui.LayoutView):
