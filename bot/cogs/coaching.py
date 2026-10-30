@@ -149,35 +149,31 @@ class Coaching(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    async def _cargar(self, ctx: commands.Context, texto: str | None, comando: str):
+    async def _abrir(self, ctx: commands.Context, texto: str | None, comando: str, vista: str):
+        """La tarjeta con sus menús (qué ver, rol y modo): rol y modo escritos son solo el arranque."""
+        from bot.ui.coaching_vista import responder
         jugador, rol, modo = _jugador_rol_modo(texto)
         p = await self.bot.get_cog("Perfil")._persona(ctx, jugador, comando)
         if not p:
-            return None, None, None
+            return
         await ctx.defer()
-        d = await self.bot.datos.coaching_auto(p["id"], modo)
-        if not d:
-            await ctx.reply("Todavía no hay coaching publicado para este jugador.", ephemeral=True)
-            return None, None, None
-        return p, d, rol
+        await responder(ctx, self.bot, vista, p["id"], rol, modo)
 
-    @commands.hybrid_command(name="performance", description="Performance y sus 7 componentes contra tu franja de rango")
+    @commands.hybrid_command(name="performance", description="Performance y sus 7 componentes contra tu franja (con menús de rol y modo)")
     async def performance(self, ctx: commands.Context, *, jugador_rol_y_modo: str | None = None):
-        p, d, rol = await self._cargar(ctx, jugador_rol_y_modo, "performance")
-        if p:
-            await ctx.reply(view=tarjeta_performance(p, d, rol))
+        await self._abrir(ctx, jugador_rol_y_modo, "performance", "perf")
 
-    @commands.hybrid_command(name="mejora", description="Las 3 brechas más grandes contra tu franja, como metas en números")
+    @commands.hybrid_command(name="mejora", description="Las brechas más grandes contra tu franja, como metas en números")
     async def mejora(self, ctx: commands.Context, *, jugador_rol_y_modo: str | None = None):
-        p, d, rol = await self._cargar(ctx, jugador_rol_y_modo, "mejora")
-        if p:
-            await ctx.reply(view=tarjeta_mejora(p, d, rol))
+        await self._abrir(ctx, jugador_rol_y_modo, "mejora", "mejora")
 
     @commands.hybrid_command(name="temprano", description="CS, oro y XP a los 10 y 15 contra tu rival directo")
     async def temprano(self, ctx: commands.Context, *, jugador_rol_y_modo: str | None = None):
-        p, d, rol = await self._cargar(ctx, jugador_rol_y_modo, "temprano")
-        if p:
-            await ctx.reply(view=tarjeta_temprano(p, d, rol))
+        await self._abrir(ctx, jugador_rol_y_modo, "temprano", "temp")
+
+    @commands.hybrid_command(name="coaching", description="Todo tu coaching en una tarjeta: elegí qué ver, el rol y el modo con los menús")
+    async def coaching(self, ctx: commands.Context, *, jugador_rol_y_modo: str | None = None):
+        await self._abrir(ctx, jugador_rol_y_modo, "coaching", "perf")
 
 
 async def setup(bot: commands.Bot):

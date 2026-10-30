@@ -48,7 +48,8 @@ AYUDA = {
     "Perfil": "`-perfil [jugador]` perfil con pestañas: resumen, roles, campeones, coaching y partidas. "
               "Si tenés varias cuentas, hay botones para ver cada una\n`-roles` · `-campeones` · `-sinergia` `[jugador]` "
               "abren esa pestaña directo",
-    "Coaching": "`-performance [jugador] [rol] [solo|normal|todo]` tu índice y sus 7 componentes contra tu franja\n"
+    "Coaching": "`-coaching [jugador]` todo en una tarjeta: elegís qué ver, el rol y el modo con menús\n"
+                "`-performance [jugador] [rol] [solo|normal|todo]` tu índice y sus 7 componentes contra tu franja\n"
                 "`-mejora [jugador] [rol] [solo|normal|todo]` las 3 brechas más grandes como metas en números\n"
                 "`-temprano [jugador] [rol] [solo|normal|todo]` CS, oro y XP a los 10 y 15 contra tu rival directo\n"
                 "-# Sin modo: solo/dúo si te alcanza, si no `todo` (solo/dúo, flex y normales juntas).\n"
@@ -57,6 +58,7 @@ AYUDA = {
                 "`-grafico [jugador] evolucion [modo]` ¿venís mejor o peor? Tu winrate de las últimas 20 contra tu temporada\n"
                 "`-grafico [jugador] radar [rol] [modo]` la rosa de tus 7 componentes contra tu franja\n"
                 "`-grafico [jugador] franjas [rol] [modo]` tus números al lado de la mediana de cada franja de elo\n"
+                "-# Todos traen menús para cambiar de gráfico, rol y modo sin volver a escribir el comando.\n"
                 "-# En `-menu`, **Mis gráficos** manda los tres.",
     "Equipos y mapa": "`-ideal` el 5 ideal del grupo: una persona por rol con 10+ partidas ahí\n"
                       "`-inhouse <10 jugadores separados por coma>` dos equipos parejos, cada uno en un rol que conoce\n"
@@ -327,13 +329,12 @@ class Extra(commands.Cog):
             return
         await ctx.defer()  # dibujar el PNG puede pasar los 3 s
         from bot.cogs.coaching import MODOS
+        from bot.ui.coaching_vista import responder
         if rol and rol.lower() in MODOS and not modo:  # -grafico lucca radar todo
             rol, modo = None, rol
-        view, png = await armar_grafico(self.bot, p, tipo, rol, MODOS.get((modo or "").lower()))
-        if png is None:
-            await ctx.reply(view)
-            return
-        await ctx.reply(view=view, file=discord.File(png, "grafico.png"))
+        vista = {"ten": "gten", "rad": "grad", "fra": "gfra"}.get(tipo.lower()[:3], "gevo")
+        # Con menús para cambiar de gráfico, rol y modo sin volver a escribir el comando.
+        await responder(ctx, self.bot, vista, p["id"], ROLES.get((rol or "").lower()), MODOS.get((modo or "").lower()))
 
     @commands.hybrid_command(name="sugerencia", description="Dejá una idea o un error para mejorar el bot o la web")
     async def sugerencia(self, ctx: commands.Context, *, texto: str):

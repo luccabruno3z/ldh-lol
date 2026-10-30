@@ -8,7 +8,7 @@ import discord
 
 from bot.cogs.perfil import AVISO_RIOT
 
-ACCIONES = {"perfil": "Mi perfil", "grafico": "Mis gráficos", "buscar": "Buscar jugador", "top": "Rankings",
+ACCIONES = {"perfil": "Mi perfil", "coaching": "Mi coaching", "grafico": "Mis gráficos", "buscar": "Buscar jugador", "top": "Rankings",
             "toprol": "Top por rol", "competencia": "Competencia del mes", "comparar": "Comparar",
             "tips": "Tips de mi rol", "glosario": "Glosario", "ayuda": "Ayuda", "inhouse": "Armar inhouse"}
 
@@ -114,24 +114,21 @@ class MenuBoton(discord.ui.DynamicItem[discord.ui.Button], template=r"lm:(?P<acc
             from bot.cogs.extra import tarjeta_tips
             await interaction.followup.send(view=await tarjeta_tips(bot, rol))
             return
-        if self.accion == "grafico":
+        if self.accion in ("grafico", "coaching"):
             # La evolución siempre que haya 20+ partidas; el radar (la "rosa") cuando haya referencia.
             pid = bot.get_cog("Perfil").vinculos.get(str(self.owner))
             if not pid:
                 await interaction.response.send_message(
                     "Primero vinculate con `-vincular <tu nombre o Riot ID>`, o usá `-grafico <jugador>`.", ephemeral=True)
                 return
-            from bot.cogs.extra import armar_grafico
+            # Una sola tarjeta con menús (gráfico, rol y modo) en vez de cuatro mensajes seguidos.
+            from bot.ui.coaching_vista import vista_coaching
             await interaction.response.defer(thinking=True)
-            p = await bot.datos.perfil(pid)
-            enviados = 0
-            for tipo in ("tendencia", "evolucion", "franjas", "radar"):
-                view, png = await armar_grafico(bot, p, tipo, None)
-                if png is not None:
-                    await interaction.followup.send(view=view, file=discord.File(png, "grafico.png"))
-                    enviados += 1
-                elif tipo == "radar" or not enviados:
-                    await interaction.followup.send(view, ephemeral=True)
+            view, png = await vista_coaching(bot, "gfra" if self.accion == "grafico" else "perf", pid, None, None, self.owner)
+            if png:
+                await interaction.followup.send(view=view, file=discord.File(png, "grafico.png"))
+            else:
+                await interaction.followup.send(view=view)
             return
         if self.accion == "perfil":
             pid = bot.get_cog("Perfil").vinculos.get(str(self.owner))
@@ -155,7 +152,7 @@ def menu(owner: int) -> discord.ui.LayoutView:
     view.add_item(discord.ui.Container(
         discord.ui.TextDisplay("## LDH Stats LoL\nElegí qué querés ver. Los números llevan su intervalo y su n; "
                                "si algo dice **ruido**, con esas partidas no se puede sacar conclusiones.\n-# " + AVISO_RIOT),
-        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("perfil", "grafico", "buscar")]),
+        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("perfil", "coaching", "grafico", "buscar")]),
         discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("top", "toprol", "competencia", "comparar")]),
         discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("inhouse", "tips", "glosario", "ayuda")]),
         discord.ui.ActionRow(discord.ui.Button(label="Abrir la web", url="https://luccabruno3z.github.io/ldh-lol/")),
