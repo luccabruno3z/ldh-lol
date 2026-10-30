@@ -8,13 +8,11 @@ from discord.ext import commands
 
 from bot.cogs.perfil import WEB, tarjeta_simple
 from bot.cogs.rankings import ROLES
+from bot.services import formato as F
 
 
 def _num(x: float | None, dec: int = 0, signo: bool = False) -> str:
-    if x is None:
-        return "—"
-    s = f"{x:+.{dec}f}" if signo else f"{x:.{dec}f}"
-    return s.replace(".", ",")
+    return F.num(x, dec, signo)
 
 
 def _val(m: dict, x: float | None) -> str:
@@ -55,15 +53,20 @@ def tarjeta_performance(p: dict, d: dict, pedido: str | None) -> discord.ui.Layo
     if (aviso := _sin_dato(p, d, rol, r)):
         return tarjeta_simple(aviso, url)
     pf = r["performance"]
-    lineas = [f"## {discord.utils.escape_markdown(p['nombre'])} · {rol} en solo/dúo",
-              f"Performance **{_num(pf['v'] * 100)}**/100 ({_num(pf['lo'] * 100)}–{_num(pf['hi'] * 100)}) "
-              f"contra {d['franja']} · n={r['n']}, confianza {r['confianza']}"]
+    lineas = [f"## {discord.utils.escape_markdown(p['nombre'])} · Performance",
+              f"-# {rol} en solo/dúo · {r['n']} partidas · contra {d['franja']}",
+              f"# {_num(pf['v'] * 100)}/100",
+              f"-# {F.rango(pf, 0, k=100)} · confianza {r['confianza']}"]
     if pf.get("como"):
         lineas.append(f"Rendís como un **{pf['como']}** típico" +
                       (f" (también podría ser {' o '.join(pf['pisan'])})" if pf["pisan"] else "") + ".")
+    lineas.append("### Componentes")
     for c in r["componentes"]:
-        nivel = "sin dato" if c["sin_dato"] else f"{_num(c['nivel'] * 100)} ({_num(c['lo'] * 100)}–{_num(c['hi'] * 100)})"
-        lineas.append(f"**{c['nombre']}** {nivel} · peso {_num(c['peso'] * 100)} · puede sumar {_num(c['margen'] * 100, 1)}")
+        if c["sin_dato"]:
+            lineas.append(f"**{c['nombre']}**: sin dato, cuenta como 50")
+            continue
+        lineas += [f"**{c['nombre']}**: {_num(c['nivel'] * 100)} · puede sumar {_num(c['margen'] * 100, 1)}",
+                   f"-# {F.rango(c, 0, k=100)} · peso {_num(c['peso'] * 100)}"]
     lineas.append(f"-# Percentiles contra {r['n_ref']} jugadores de {d['franja']} en {rol}. 50 = la mitad de tu franja.")
     return tarjeta_simple(lineas, url)
 
@@ -73,11 +76,11 @@ def tarjeta_mejora(p: dict, d: dict, pedido: str | None) -> discord.ui.LayoutVie
     url = f"{WEB}#/jugadores/{p['id']}"
     if (aviso := _sin_dato(p, d, rol, r)):
         return tarjeta_simple(aviso, url)
-    lineas = [f"## Plan de mejora · {discord.utils.escape_markdown(p['nombre'])} · {rol}"]
+    lineas = [f"## {discord.utils.escape_markdown(p['nombre'])} · plan de mejora", f"-# {rol} en solo/dúo · contra {d['franja']}"]
     # Las 3 brechas más grandes contra la franja: las métricas con el percentil más bajo y su intervalo entero abajo.
     for i, m in enumerate(r["mejorar"][:3], 1):
-        lineas.append(f"**{i}. {m['nombre']}**: subir de {_val(m, m['v'])} a {_val(m, m['mediana'])} "
-                      f"(mediana de {d['franja']}; hoy mejor que el {round(m['pct'] * 100)} %)")
+        lineas += [f"\n**{i}. {m['nombre']}**: de {_val(m, m['v'])} a {_val(m, m['mediana'])}",
+                   f"-# la meta es la mediana de {d['franja']} · hoy mejor que el {round(m['pct'] * 100)} %"]
         if m.get("consejo"):
             lineas.append(f"> {m['consejo']}")
         if m.get("nota"):
@@ -103,18 +106,21 @@ def tarjeta_temprano(p: dict, d: dict, pedido: str | None) -> discord.ui.LayoutV
     if not t:
         return tarjeta_simple([f"## {nombre}", f"Menos de 10 partidas de solo/dúo en {rol or 'ningún rol'}."], url)
     ref = ((d.get("roles") or {}).get(rol) or {}).get("metricas") or {}
-    lineas = [f"## {nombre} · primeros 15 minutos · {rol} en solo/dúo (n={t['n']})"]
+    lineas = [f"## {nombre} · primeros 15 minutos", f"-# {rol} en solo/dúo · {t['n']} partidas · contra el rival directo"]
+    lin = t["linea"]
+    if lin["gana"]["n"] and lin["pierde"]["n"]:
+        # Lo más útil primero: si la partida se pierde en la línea o después.
+        veredicto = "se separa del ruido" if lin["senal"] else "no se separa del ruido"
+        lineas += [f"Vas arriba a los 15 en **{F.pct(lin['pct_gana']['v'])}** de las partidas.",
+                   f"Arriba ganás **{F.pct(lin['gana']['v'])}** · abajo, **{F.pct(lin['pierde']['v'])}** ({veredicto})",
+                   f"-# arriba {F.rango_pct(lin['gana'])} en {lin['gana']['n']} · abajo {F.rango_pct(lin['pierde'])} "
+                   f"en {lin['pierde']['n']} · Fisher p = {_num(lin['p'], 3)}"]
+    lineas.append("### Tus números")
     for k, m in t["metricas"].items():
         mm = {**m, "clave": k}
         extra = f" · mejor que el {round(ref[k]['pct'] * 100)} % de {d['franja']}" if k in ref else ""
-        ic = f" ({_val(mm, m['lo'])} a {_val(mm, m['hi'])})" if m.get("lo") is not None else ""
-        lineas.append(f"**{m['nombre']}** {_val(mm, m['v'])}{ic}{extra}")
-    lin = t["linea"]
-    if lin["gana"]["n"] and lin["pierde"]["n"]:
-        lineas.append(f"Vas arriba a los 15 en {round(lin['pct_gana']['v'] * 100)} % de las partidas. "
-                      f"Arriba ganás {round(lin['gana']['v'] * 100)} % (n={lin['gana']['n']}); "
-                      f"abajo, {round(lin['pierde']['v'] * 100)} % (n={lin['pierde']['n']}). Fisher p = {_num(lin['p'], 3)}")
-    lineas.append("-# Diferencias contra el rival directo de la misma partida.")
+        lineas += [f"**{m['nombre']}**: {_val(mm, m['v'])}{extra}",
+                   f"-# {F.rango(m, m.get('dec', 0), k.startswith('dif'))}" if m.get("lo") is not None else None]
     return tarjeta_simple(lineas, url)
 
 

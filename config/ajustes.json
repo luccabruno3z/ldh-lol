@@ -74,7 +74,9 @@
       "temporada": 20
     },
     "min_rol": 10,
-    "dias_rol_reciente": 30
+    "dias_rol_reciente": 30,
+    "piso_podio": 0.5,
+    "_": "El podio exige confianza media o alta y winrate ajustado de 50 % o más (piso_podio)."
   },
   "referencia": {
     "_": "Muestra de referencia de la fase 3: jugadores al azar de cada división de solo/dúo (LAS) con 10+ partidas en su rol principal. Usa casi todo el límite de la clave (95 de 100 cada 2 min); si Coach AI la usa a la vez, el cliente espera lo que pida Riot.",

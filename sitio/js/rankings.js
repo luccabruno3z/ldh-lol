@@ -33,7 +33,7 @@ async function porPeriodo(cont) {
     }).join('');
     cont.innerHTML = `
       <div class="section-head">${opciones('rk-periodo', PERIODOS, sel.periodo, 'Período')}${opciones('rk-cola', colas(), sel.cola, 'Cola')}</div>
-      ${c.podio.length ? `<div class="podio">${podio}</div>` : '<p class="empty-state">Nadie llega a confianza media en este período.</p>'}
+      ${c.podio.length ? `<div class="podio">${podio}</div>` : '<p class="empty-state">Nadie llega a confianza media con 50 % ajustado o más en este período: no hay podio.</p>'}
       ${c.tabla.length ? `<div class="table-wrap"><table class="data-table">
         <thead><tr><th class="num">#</th><th>Jugador</th><th class="num">n</th><th class="num">Winrate ajustado</th><th class="num">KDA ajustado</th><th>Confianza</th></tr></thead>
         <tbody>${c.tabla.map(r => `<tr><td class="num mono">${r.puesto}</td><td>${persona(r.persona)}</td><td class="num mono">${r.n}</td>
@@ -41,7 +41,7 @@ async function porPeriodo(cont) {
           <td class="num"><span class="v">${num(r.kda_aj, 2)}</span><span class="ic">real ${num(r.kda.v, 2)}</span></td>
           <td>${chipConf(r.confianza)}</td></tr>`).join('')}</tbody></table></div>` : ''}
       ${c.sin_muestra.length ? `<p class="nota">Sin muestra suficiente (menos de ${d.min} partidas): ${c.sin_muestra.map(([id, n]) => `${escapeHtml(nombrePersona(id))} (${n})`).join(', ')}.</p>` : ''}
-      <p class="nota">Ordenado por winrate ajustado (${state.ajustes?.ajuste_muestra?.k_tasa ?? 10} partidas sumadas al 50 %). El podio exige confianza media o alta.</p>`;
+      <p class="nota">Ordenado por winrate ajustado (${state.ajustes?.ajuste_muestra?.k_tasa ?? 10} partidas sumadas al 50 %). El podio exige confianza media o alta y ${Math.round((state.ajustes?.rankings?.piso_podio ?? 0.5) * 100)} % ajustado o más.</p>`;
     cont.querySelector('#rk-periodo').addEventListener('change', (e) => { sel.periodo = e.target.value; render(); });
     cont.querySelector('#rk-cola').addEventListener('change', (e) => { sel.cola = e.target.value; render(); });
 }

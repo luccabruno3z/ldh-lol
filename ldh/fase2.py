@@ -262,7 +262,10 @@ def rankings(filas_por: dict[str, list[dict]], ahora_ms: int, med_kda_cola: dict
             ok = sorted((r for r in filas if r["n"] >= cfg["min"][periodo]), key=_orden)
             for i, r in enumerate(ok):
                 r["puesto"] = i + 1
-            podio = [r["persona"] for r in ok if r["confianza"] != "baja"][:3]
+            # Medalla solo con confianza media o alta y arriba del piso: con 3 habilitados, el
+            # tercero podía ser un 22 % real y llevarse el bronce igual.
+            podio = [r["persona"] for r in ok
+                     if r["confianza"] != "baja" and (r["winrate_aj"] or 0) >= cfg["piso_podio"]][:3]
             por_cola[cola] = {"tabla": ok, "podio": podio,
                               "sin_muestra": sorted((r["persona"], r["n"]) for r in filas if r["n"] < cfg["min"][periodo])}
         out[periodo] = {"periodo": periodo, "dias": dias, "min": cfg["min"][periodo], "colas": por_cola}

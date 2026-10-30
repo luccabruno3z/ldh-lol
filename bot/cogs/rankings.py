@@ -5,38 +5,48 @@ from __future__ import annotations
 import discord
 from discord.ext import commands
 
-from bot.cogs.perfil import WEB, ic, pct, tarjeta_simple
+from bot.cogs.perfil import WEB, tarjeta_simple
+from bot.services import formato as F
 
 PERIODOS = {"semana": "últimos 7 días", "mes": "últimos 30 días", "temporada": "temporada"}
 COLAS = {"solo": "solo", "soloq": "solo", "flex": "flex", "normal": "normal", "normales": "normal"}
 ROLES = {"top": "Top", "jungla": "Jungla", "jg": "Jungla", "mid": "Mid", "adc": "ADC", "bot": "ADC",
          "support": "Support", "supp": "Support", "sup": "Support"}
 MEDALLAS = ["🥇", "🥈", "🥉"]
+MAX_FILAS = 8
 
 
 def tarjeta_top(d: dict, cola: str, nombres: dict, nombre_cola: dict) -> discord.ui.LayoutView:
     c = d["colas"][cola]
-    lineas = [f"## Top · {nombre_cola.get(cola, cola)} · {PERIODOS[d['periodo']]}"]
-    if c["podio"]:
-        lineas.append(" ".join(f"{MEDALLAS[i]} **{nombres.get(pid, pid)}**" for i, pid in enumerate(c["podio"])))
-    for r in c["tabla"][:10]:
-        lineas.append(f"`{r['puesto']:>2}` **{nombres.get(r['persona'], r['persona'])}** · {pct(r['winrate_aj'])} ajustado "
-                      f"(real {ic(r['winrate'], 'pct')}, n={r['n']}) · confianza {r['confianza']}")
+    lineas = [f"## Top · {nombre_cola.get(cola, cola)}",
+              f"-# {PERIODOS[d['periodo']]} · winrate ajustado · mínimo {d['min']} partidas"]
+    # La medalla va en la fila (antes había una línea aparte que repetía la tabla).
+    for r in c["tabla"][:MAX_FILAS]:
+        pid = r["persona"]
+        marca = MEDALLAS[c["podio"].index(pid)] if pid in c["podio"] else f"`{r['puesto']}.`"
+        lineas += [f"{marca} **{nombres.get(pid, pid)}** · {F.pct(r['winrate_aj'])} · {r['n']} partidas",
+                   f"-# real {F.pct(r['winrate']['v'])} ({F.rango_pct(r['winrate'])}) · confianza {r['confianza']}"]
     if not c["tabla"]:
         lineas.append(f"Nadie tiene {d['min']}+ partidas en este período.")
-    lineas.append(f"-# Mínimo {d['min']} partidas. El podio exige confianza media o alta.")
+    elif not c["podio"]:
+        lineas.append("Sin podio: nadie llega a 50 % ajustado con confianza media o alta.")
+    if c.get("sin_muestra"):
+        lineas.append(f"-# Sin muestra suficiente: {len(c['sin_muestra'])} personas más.")
+    lineas.append("-# Medalla solo con confianza media o alta y 50 % ajustado o más.")
     return tarjeta_simple(lineas, f"{WEB}#/rankings/periodo")
 
 
 def tarjeta_top_rol(v: dict, cola: str, rol: str, nombres: dict, nombre_cola: dict) -> discord.ui.LayoutView:
     g = v["grupos"][f"{cola}|{rol}"]
-    dec = 0 if "oro" in g["metrica"] else 2
-    lineas = [f"## {rol} · {nombre_cola.get(cola, cola)} · {g['nombre']}"]
-    for i, r in enumerate(g["tabla"][:10]):
-        lineas.append(f"`{i + 1:>2}` **{nombres.get(r['persona'], r['persona'])}** · {ic(r['valor'], dec=dec)} (n={r['n']})")
+    dec = 0 if "oro" in g["metrica"] else 1 if "cs" in g["metrica"] else 2
+    signo = g["metrica"].startswith("dif")
+    lineas = [f"## {rol} · {nombre_cola.get(cola, cola)}", f"-# {g['nombre']}, contra el rival directo de la misma partida"]
+    for i, r in enumerate(g["tabla"][:MAX_FILAS]):
+        lineas += [f"`{i + 1}.` **{nombres.get(r['persona'], r['persona'])}**: {F.num(r['valor']['v'], dec, signo)} · {r['n']} partidas",
+                   f"-# {F.rango(r['valor'], dec, signo)} · WR {F.pct(r['winrate']['v'])}"]
     if not g["tabla"]:
         lineas.append(f"Nadie tiene {v['min']}+ partidas de {rol} en esta cola.")
-    lineas.append(f"-# Contra el rival directo de la misma partida. Mínimo {v['min']} partidas y confianza media o alta.")
+    lineas.append(f"-# Mínimo {v['min']} partidas en el rol y confianza media o alta.")
     return tarjeta_simple(lineas, f"{WEB}#/rankings/roles")
 
 

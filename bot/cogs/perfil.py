@@ -7,6 +7,7 @@ import logging
 import discord
 from discord.ext import commands
 
+from bot.services import formato as F
 from bot.services.storage import JSONStorage
 
 logger = logging.getLogger(__name__)
@@ -28,21 +29,21 @@ def rango(r: dict | None) -> str:
 
 
 def ic(m: dict | None, tipo="dec", dec=1) -> str:
-    """'52 % (45–59)' o '2,31 (2,05–2,60)'. Sin intervalo, solo el valor."""
+    """'52 % (45 a 59 %)' o '2,31 (2,05 a 2,60)'. Sin intervalo, solo el valor."""
     if not m or m.get("v") is None:
         return "—"
-    k, suf = (100, " %") if tipo == "pct" else (1, " %") if tipo == "pct100" else (1, "")
-    d = 0 if tipo in ("pct", "pct100") else dec
-    f = lambda x: f"{x * k:.{d}f}".replace(".", ",")
-    return f"{f(m['v'])}{suf}" + (f" ({f(m['lo'])}–{f(m['hi'])})" if m.get("lo") is not None else "")
+    if tipo == "pct":
+        return f"{F.pct(m['v'])}" + (f" ({F.rango_pct(m)})" if m.get("lo") is not None else "")
+    k, suf = (1, " %") if tipo == "pct100" else (1, "")
+    d = 0 if tipo == "pct100" else dec
+    return f"{F.num(m['v'], d)}{suf}" + (f" ({F.rango(m, d, suf=suf)})" if m.get("lo") is not None else "")
 
 
-def pct(v: float | None) -> str:
-    return "—" if v is None else f"{round(v * 100)} %"
+pct = F.pct
 
 
 def dec2(v: float | None) -> str:
-    return "—" if v is None else f"{v:.2f}".replace(".", ",")
+    return F.num(v, 2)
 
 
 def _cola_principal(tabla: list[dict]) -> str | None:
@@ -54,7 +55,7 @@ def _cola_principal(tabla: list[dict]) -> str | None:
 
 def tarjeta_simple(lineas: list[str], url: str) -> discord.ui.LayoutView:
     """Un Container con el texto (cortado al límite de Discord) y el botón a la web."""
-    texto = "\n".join(lineas)
+    texto = "\n".join(l for l in lineas if l)
     if len(texto) > 3900:
         texto = texto[:3890] + "\n…"
     view = discord.ui.LayoutView(timeout=None)
@@ -64,57 +65,81 @@ def tarjeta_simple(lineas: list[str], url: str) -> discord.ui.LayoutView:
     return view
 
 
+def _dec_metrica(clave: str) -> int:
+    return 0 if "oro" in clave else 1 if "cs" in clave else 2
+
+
 def tarjeta_roles(p: dict, d: dict, nombre_cola: dict) -> discord.ui.LayoutView:
     cola = _cola_principal(d["tabla"])
     nombre = discord.utils.escape_markdown(p["nombre"])
+    url = f"{WEB}#/jugadores/{p['id']}"
     if not cola:
-        return tarjeta_simple([f"## {nombre}", "Todavía no hay partidas de Grieta."], f"{WEB}#/jugadores/{p['id']}")
-    lineas = [f"## {nombre} · roles en {nombre_cola.get(cola, cola)}"]
+        return tarjeta_simple([f"## {nombre}", "Todavía no hay partidas de Grieta."], url)
+    lineas = [f"## {nombre} · roles", f"-# {nombre_cola.get(cola, cola)} · valores ajustados por muestra"]
     mejor = d["mejor"].get(cola)
-    lineas.append(f"Mejor rol: **{mejor['rol']}** ({pct(mejor['winrate_aj'])} ajustado, n={mejor['n']})" if mejor
-                  else 'Ningún rol llega a confianza media: no hay "mejor rol" todavía.')
-    for t in (t for t in d["tabla"] if t["cola"] == cola):
+    lineas.append(f"Mejor rol: **{mejor['rol']}**, {F.pct(mejor['winrate_aj'])} ajustado en {mejor['n']} partidas" if mejor
+                  else 'Ningún rol llega a confianza media: todavía no hay "mejor rol".')
+    filas = [t for t in d["tabla"] if t["cola"] == cola]
+    for t in (t for t in filas if not t["muestra_chica"]):
         m = (d["metricas"].get(t["rol"]) or [None])[0]
-        extra = f" · {m['nombre']} {ic(t.get(m['clave']), dec=0 if 'oro' in m['clave'] else 2)}" if m else ""
-        chica = " · *muestra chica*" if t["muestra_chica"] else ""
-        lineas.append(f"**{t['rol']}** (n={t['n']}, confianza {t['confianza']}{chica})\n"
-                      f"WR {pct(t['winrate_aj'])} ajustado (real {ic(t['winrate'], 'pct')}) · KDA {dec2(t['kda_aj'])}{extra}")
-    return tarjeta_simple(lineas, f"{WEB}#/jugadores/{p['id']}")
+        val = t.get(m["clave"]) if m else None
+        dec = _dec_metrica(m["clave"]) if m else 0
+        extra = f" · {m['nombre']}: {F.num(val['v'], dec, True)}" if m and val and val.get("v") is not None else ""
+        det = f" · {m['nombre'].split(' ')[0].lower()} {F.rango(val, dec, True)}" if extra and val.get("lo") is not None else ""
+        lineas += [f"\n**{t['rol']}** · {t['n']} partidas · confianza {t['confianza']}",
+                   f"WR {F.pct(t['winrate_aj'])} · KDA {F.num(t['kda_aj'], 2)}{extra}",
+                   f"-# WR real {F.pct(t['winrate']['v'])} ({F.rango_pct(t['winrate'])}) · "
+                   f"KDA real {F.num(t['kda']['v'], 2)} ({F.rango(t['kda'], 2)}){det}"]
+    lineas.append(F.chica([f"{t['rol']} ({t['n']})" for t in filas if t["muestra_chica"]]))
+    return tarjeta_simple(lineas, url)
 
 
 def tarjeta_campeones(p: dict, d: dict, champs: dict, nombre_cola: dict) -> discord.ui.LayoutView:
     cola = _cola_principal(d["tabla"])
     nombre = discord.utils.escape_markdown(p["nombre"])
+    url = f"{WEB}#/jugadores/{p['id']}"
     if not cola:
-        return tarjeta_simple([f"## {nombre}", "Todavía no hay partidas de Grieta."], f"{WEB}#/jugadores/{p['id']}")
-    lineas = [f"## {nombre} · campeones en {nombre_cola.get(cola, cola)}"]
-    for t in [t for t in d["tabla"] if t["cola"] == cola][:8]:
-        champ = (champs.get(str(t["champ"])) or {}).get("nombre", t["champ"])
-        chica = " · *muestra chica*" if t["muestra_chica"] else ""
-        lineas.append(f"**{champ}** {t['rol'] or ''} (n={t['n']}{chica}) · WR {pct(t['winrate_aj'])} ajustado "
-                      f"(real {ic(t['winrate'], 'pct')}) · KDA {dec2(t['kda_aj'])}")
+        return tarjeta_simple([f"## {nombre}", "Todavía no hay partidas de Grieta."], url)
+    lineas = [f"## {nombre} · campeones", f"-# {nombre_cola.get(cola, cola)} · ordenados por winrate ajustado"]
+    filas = [t for t in d["tabla"] if t["cola"] == cola]
+    nombre_c = lambda t: (champs.get(str(t["champ"])) or {}).get("nombre", t["champ"])
+    for t in [t for t in filas if not t["muestra_chica"]][:6]:
+        lineas += [f"\n**{nombre_c(t)}** {t['rol'] or ''} · {t['n']} partidas",
+                   f"WR {F.pct(t['winrate_aj'])} · KDA {F.num(t['kda_aj'], 2)}",
+                   f"-# real {F.pct(t['winrate']['v'])} ({F.rango_pct(t['winrate'])}) · confianza {t['confianza']}"]
+    resto = [t for t in filas if t["muestra_chica"]]
+    if resto:
+        lineas.append(f"-# Muestra chica, sin conclusiones: {len(resto)} campeones más")
     pool = d["pool"]["colas"].get(cola)
-    if pool:
-        lectura = "no discrimina" if pool["p"] is None or pool["p"] >= 0.05 else "hay señal"
-        lineas.append(f"### Dentro y fuera del pool\nDentro {ic(pool['dentro'], 'pct')} (n={pool['dentro']['n']}) · "
-                      f"fuera {ic(pool['fuera'], 'pct')} (n={pool['fuera']['n']}) → {lectura} (Fisher p = {pool['p']})")
-    return tarjeta_simple(lineas, f"{WEB}#/jugadores/{p['id']}")
+    if pool and pool["p"] is not None:
+        senal = pool["p"] < 0.05
+        lineas += ["### Dentro y fuera de tu pool",
+                   f"Dentro: **{F.pct(pool['dentro']['v'])}** ({pool['dentro']['n']}) · "
+                   f"fuera: **{F.pct(pool['fuera']['v'])}** ({pool['fuera']['n']}) → {'hay señal' if senal else 'no discrimina'}",
+                   f"-# {F.rango_pct(pool['dentro'])} · {F.rango_pct(pool['fuera'])} · Fisher p = {F.num(pool['p'], 3)}"]
+    return tarjeta_simple(lineas, url)
 
 
 def tarjeta_sinergia(p: dict, d: dict, nombres: dict, nombre_cola: dict) -> discord.ui.LayoutView:
-    filas = [r for r in d["filas"] if r["persona"] == p["id"] and not r["muestra_chica"]][:8]
+    todas = [r for r in d["filas"] if r["persona"] == p["id"] and not r["muestra_chica"]]
+    # Lo que tiene señal arriba; después, los compañeros con más partidas juntos.
+    filas = sorted(todas, key=lambda r: (not r["senal"], -r["juntos"]))[:7]
     lineas = [f"## {discord.utils.escape_markdown(p['nombre'])} · sinergia"]
     mc = p.get("mejor_companero")
     lineas.append(f"Mejor compañero: **{nombres.get(mc['companero'], mc['companero'])}** en {nombre_cola.get(mc['cola'], mc['cola'])}"
                   if mc else "Con ningún compañero rendís mejor más allá del ruido.")
     for r in filas:
-        dif = r["dif"]["v"] or 0
-        lineas.append(f"**{nombres.get(r['companero'], r['companero'])}** · {nombre_cola.get(r['cola'], r['cola'])} · "
-                      f"{r['juntos']} juntos: {ic(r['con'], 'pct')} contra {ic(r['sin'], 'pct')} sin esa persona "
-                      f"({'+' if dif > 0 else ''}{round(dif * 100)} pts, {'señal' if r['senal'] else 'ruido'})")
+        # Un intervalo que no cruza el cero puede no pasar la corrección por tantos pares: se dice así.
+        tag = ("**señal**" if r["senal"] else "ruido" if r["dif"].get("ruido")
+               else "no pasa la corrección por comparaciones múltiples")
+        lineas += [f"\n**{nombres.get(r['companero'], r['companero'])}** · {nombre_cola.get(r['cola'], r['cola'])} · {r['juntos']} juntos",
+                   f"Juntos {F.pct(r['con']['v'])} · sin esa persona {F.pct(r['sin']['v'])} → {F.pts(r['dif']['v'])}, {tag}",
+                   f"-# diferencia {F.rango_pts(r['dif'])} · p ajustado {F.num(r['p_bh'], 2)}"]
     if not filas:
         lineas.append(f"No hay compañeros con {d.get('min_juntos', 3)}+ partidas juntos fuera de la muestra chica.")
-    lineas.append(f"-# {d.get('nota', '')}")
+    elif len(todas) > len(filas):
+        lineas.append(f"-# {len(todas) - len(filas)} compañeros más en la web.")
+    lineas.append("-# Misma cola, con contra sin. La señal usa el p ajustado por Benjamini-Hochberg: con tantos pares, alguno sale por azar.")
     return tarjeta_simple(lineas, f"{WEB}#/jugadores/{p['id']}")
 
 
@@ -199,27 +224,34 @@ class Perfil(commands.Cog):
             discord.ui.Separator(),
         ]
 
-        # KPIs: la cola más jugada, fila "Todos" y los roles con muestra suficiente.
+        # KPIs: la cola más jugada, "Todos" y hasta 3 roles con muestra; lo chico va a una línea final.
         tabla = [f for f in p["kpis"]["todas"]]
         if tabla:
             cola = max({f["cola"] for f in tabla}, key=lambda c: next(f["n"] for f in tabla if f["cola"] == c and f["rol"] == "Todos"))
-            filas = [f for f in tabla if f["cola"] == cola][:6]
+            filas = [f for f in tabla if f["cola"] == cola]
+            grandes = [f for f in filas if not f["muestra_chica"]][:4]
             lineas = [f"### KPIs · {nombre_cola.get(cola, cola)}"]
-            for f in filas:
-                chica = " · *muestra chica*" if f["muestra_chica"] else ""
-                lineas.append(f"**{f['rol']}** (n={f['n']}{chica})\nWR {ic(f['winrate'], 'pct')} · KDA {ic(f['kda'], dec=2)} · "
-                              f"CS/min {ic(f['cs_min'])} · Part. kills {ic(f['kp'], 'pct100')}")
+            for f in grandes:
+                lineas += [f"**{f['rol']}** · {f['n']} partidas",
+                           f"WR {F.pct(f['winrate']['v'])} · KDA {F.num(f['kda']['v'], 2)} · "
+                           f"CS/min {F.num(f['cs_min']['v'], 1)} · KP {F.num(f['kp']['v'], 0)} %",
+                           f"-# WR {F.rango_pct(f['winrate'])} · KDA {F.rango(f['kda'], 2)} · "
+                           f"CS {F.rango(f['cs_min'], 1)} · KP {F.rango(f['kp'], 0)} %"]
+            resto = [f"{f['rol']} ({f['n']})" for f in filas if f not in grandes]
+            if resto:
+                lineas.append(f"-# En la web: {', '.join(resto)}")
             items += [discord.ui.TextDisplay("\n".join(lineas)), discord.ui.Separator()]
 
         forma = p.get("forma")
         if forma:
-            dif = forma["comparacion"]["winrate"]["dif"]
-            lectura = "ruido: no se puede decir que cambió" if dif.get("ruido") else ("mejor que su resto" if dif["v"] > 0 else "peor que su resto")
+            c = forma["comparacion"]["winrate"]
+            dif = c["dif"]
+            lectura = "ruido, no se puede decir que cambió" if dif.get("ruido") else ("mejor que tu resto" if dif["v"] > 0 else "peor que tu resto")
             racha = "".join("🟩" if x["win"] else "🟥" for x in forma["partidas"])
             items += [discord.ui.TextDisplay(
                 f"### Forma reciente · {nombre_cola.get(forma['cola'], forma['cola'])}\n{racha}\n"
-                f"Últimas {forma['n_ultimas']}: WR {ic(forma['comparacion']['winrate']['ultimas'], 'pct')} · "
-                f"resto ({forma['n_resto']}): {ic(forma['comparacion']['winrate']['resto'], 'pct')} → {lectura}"),
+                f"Últimas {forma['n_ultimas']}: **{F.pct(c['ultimas']['v'])}** · resto: {F.pct(c['resto']['v'])} → {lectura}\n"
+                f"-# {F.rango_pct(c['ultimas'])} · resto ({forma['n_resto']} partidas) {F.rango_pct(c['resto'])}"),
                 discord.ui.Separator()]
 
         hist = await self.datos.historial(p["id"], 1)
