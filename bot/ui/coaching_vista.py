@@ -21,8 +21,10 @@ VISTAS = {
     "grad": ("Gráfico: radar", "Tus 7 componentes con la mediana de cada franja"),
     "gten": ("Gráfico: ¿estás mejorando?", "Tu índice por partida y su tendencia"),
     "gevo": ("Gráfico: winrate en el tiempo", "Tus últimas 20 contra tu temporada"),
+    "grac": ("Gráfico: ¿te conviene seguir?", "Tu winrate según cómo venías: rachas y pausas"),
 }
-GRAFICO = {"gfra": "franjas", "grad": "radar", "gten": "tendencia", "gevo": "evolucion"}
+GRAFICO = {"gfra": "franjas", "grad": "radar", "gten": "tendencia", "gevo": "evolucion", "grac": "rachas"}
+SIN_ROL = ("gevo", "grac")  # no dependen del rol
 MODOS = {"solo": "Solo/Dúo", "normal": "Normales", "todo": "Todo (solo, flex y normales)"}
 ROLES = ("Top", "Jungla", "Mid", "ADC", "Support")
 
@@ -75,7 +77,7 @@ async def vista_coaching(bot, vista: str, pid: str, rol: str | None, modo: str |
     d = await datos.coaching_auto(pid, modo) or {}
     modo = d.get("modo") or modo or "solo"
     roles = list(d.get("roles") or {})
-    if rol and rol not in roles and not vista == "gevo":
+    if rol and rol not in roles and vista not in SIN_ROL:
         rol = None  # el rol elegido no tiene muestra en este modo: se vuelve al de siempre
     rol = rol or d.get("rol_con_referencia") or d.get("rol_principal")
 
@@ -106,7 +108,7 @@ async def vista_coaching(bot, vista: str, pid: str, rol: str | None, modo: str |
     items.append(discord.ui.Separator())
     items.append(sel("vista", [discord.SelectOption(label=l, value=v, description=desc, default=v == vista)
                                for v, (l, desc) in VISTAS.items()]))
-    if roles and vista != "gevo":
+    if roles and vista not in SIN_ROL:
         items.append(sel("rol", [discord.SelectOption(
             label=r, value=r, default=r == rol,
             description=f"{d['roles'][r]['n']} partidas" + (" · sin referencia" if d["roles"][r].get("sin_referencia") else ""))

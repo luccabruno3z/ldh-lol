@@ -155,5 +155,12 @@
     "min_jungla": 20,
     "min_jungla_lado": 10,
     "umbral_predecible": 0.65
+  },
+  "fase5": {
+    "_": "Rachas: una sesión son partidas separadas por menos de sesion_min minutos; después de 2+ derrotas, 'cortar' es esperar corte_min o más antes de la siguiente. Cansancio: de la partida largas_desde de la sesión en adelante.",
+    "sesion_min": 30,
+    "corte_min": 15,
+    "largas_desde": 4,
+    "min_celda": 10
   }
 }

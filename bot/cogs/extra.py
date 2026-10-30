@@ -58,6 +58,7 @@ AYUDA = {
                 "`-grafico [jugador] evolucion [modo]` ¿venís mejor o peor? Tu winrate de las últimas 20 contra tu temporada\n"
                 "`-grafico [jugador] radar [rol] [modo]` la rosa de tus 7 componentes contra tu franja\n"
                 "`-grafico [jugador] franjas [rol] [modo]` tus números al lado de la mediana de cada franja de elo\n"
+                "`-rachas [jugador] [modo]` ¿te conviene seguir después de 2 derrotas? Tu winrate según cómo venías\n"
                 "-# Todos traen menús para cambiar de gráfico, rol y modo sin volver a escribir el comando.\n"
                 "-# En `-menu`, **Mis gráficos** manda los tres.",
     "Equipos y mapa": "`-ideal` el 5 ideal del grupo: una persona por rol con 10+ partidas ahí\n"
@@ -174,6 +175,29 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
                  f"({signo(t['pendiente'])} puntos cada 100 partidas, {signo(t['lo'])} a {signo(t['hi'])})\n"
                  f"-# Índice de 0 a 100 por partida: tus percentiles en {', '.join(t['metricas']).lower()} contra "
                  f"{d['franja']} en {rol_n}. Mide cómo jugás, no si ganaste. 50 = la mitad de tu franja.")
+    elif tipo.lower().startswith("rac"):
+        r = await bot.datos.rachas(p["id"]) or {}
+        modo_r = modo or "todo"
+        m = (r.get("modos") or {}).get(modo_r)
+        if not m:
+            return f"{nombre} no tiene partidas en {EN_MODO.get(modo_r, modo_r)}.", None
+        g = ((await bot.datos.rachas_grupo() or {}).get("modos") or {}).get(modo_r) or {}
+        png = graficos.rachas(m, r["estados"], f"{nombre} · ¿te conviene seguir? · {EN_MODO.get(modo_r)}")
+        c, s2, k2 = m["comparaciones"]["corta_vs_sigue"], m["estados"]["tras_2_sigue"], m["estados"]["tras_2_corta"]
+        if s2["n"] and k2["n"]:
+            ver = ("con tan pocas partidas no se puede decir nada" if c["muestra_chica"]
+                   else ("**te conviene cortar**" if c["dif"]["v"] > 0 else "**cortar no te ayuda**") if c["senal"]
+                   else "la diferencia es **ruido**")
+            lectura = (f"Después de 2 derrotas, seguido ganás **{F.pct(s2['v'])}** ({s2['n']}); cortando "
+                       f"{r['corte_min']}+ min, **{F.pct(k2['v'])}** ({k2['n']}) → {ver}.")
+        else:
+            lectura = "Todavía no hay suficientes rachas de 2 derrotas para comparar."
+        gv = g.get("racha_vs_victoria") or {}
+        grupo = (f"\n-# En el grupo (cada uno contra sí mismo): después de 2+ derrotas seguidas se gana "
+                 f"{F.num((gv.get('v') or 0) * 100, 1, True)} pts contra después de ganar "
+                 f"({F.num((gv.get('lo') or 0) * 100, 1, True)} a {F.num((gv.get('hi') or 0) * 100, 1, True)}"
+                 f"{', ruido' if gv.get('ruido') else ', señal'}).") if gv.get("v") is not None else ""
+        texto = f"## {discord.utils.escape_markdown(nombre)} · ¿te conviene seguir?\n{lectura}{grupo}"
     elif tipo.lower().startswith("fra"):
         d = await bot.datos.coaching_auto(p["id"], modo)
         en = EN_MODO.get((d or {}).get("modo") or "solo")
@@ -318,12 +342,12 @@ class Extra(commands.Cog):
                                                     COLAS.get((cola or "").lower()), ROLES.get((rol or "").lower())))
 
     @commands.hybrid_command(name="grafico", description="Evolución del winrate, tendencia de mejora o radar de tus componentes")
-    @app_commands.autocomplete(jugador=autocompletar_jugador, tipo=autocompletar_opciones("tendencia", "evolucion", "radar", "franjas"),
+    @app_commands.autocomplete(jugador=autocompletar_jugador, tipo=autocompletar_opciones("tendencia", "evolucion", "radar", "franjas", "rachas"),
                                rol=autocompletar_opciones("top", "jungla", "mid", "adc", "support"),
                                modo=autocompletar_opciones("solo", "normal", "todo"))
     async def grafico(self, ctx: commands.Context, jugador: str | None = None, tipo: str = "evolucion", rol: str | None = None,
                       modo: str | None = None):
-        if jugador and jugador.lower() in ("evolucion", "evolución", "radar", "tendencia", "franjas"):  # -grafico radar
+        if jugador and jugador.lower() in ("evolucion", "evolución", "radar", "tendencia", "franjas", "rachas"):  # -grafico radar
             jugador, tipo = None, jugador
         if not (p := await self._persona(ctx, jugador, "grafico")):
             return
@@ -332,7 +356,7 @@ class Extra(commands.Cog):
         from bot.ui.coaching_vista import responder
         if rol and rol.lower() in MODOS and not modo:  # -grafico lucca radar todo
             rol, modo = None, rol
-        vista = {"ten": "gten", "rad": "grad", "fra": "gfra"}.get(tipo.lower()[:3], "gevo")
+        vista = {"ten": "gten", "rad": "grad", "fra": "gfra", "rac": "grac"}.get(tipo.lower()[:3], "gevo")
         # Con menús para cambiar de gráfico, rol y modo sin volver a escribir el comando.
         await responder(ctx, self.bot, vista, p["id"], ROLES.get((rol or "").lower()), MODOS.get((modo or "").lower()))
 

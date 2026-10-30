@@ -113,6 +113,12 @@ class Datos:
     async def sinergia(self) -> dict:
         return await self._json("sinergia.json") or {"filas": []}
 
+    async def rachas(self, persona_id: str) -> dict | None:
+        return await self._json(f"rachas/{quote(persona_id)}.json")
+
+    async def rachas_grupo(self) -> dict | None:
+        return await self._json("rachas/grupo.json")
+
     async def ranking(self, nombre: str) -> dict | None:
         """semana, mes, temporada o roles."""
         return await self._json(f"rankings/{nombre}.json")

@@ -171,6 +171,10 @@ class Coaching(commands.Cog):
     async def temprano(self, ctx: commands.Context, *, jugador_rol_y_modo: str | None = None):
         await self._abrir(ctx, jugador_rol_y_modo, "temprano", "temp")
 
+    @commands.hybrid_command(name="rachas", description="¿Te conviene seguir después de 2 derrotas? Tu winrate según cómo venías")
+    async def rachas(self, ctx: commands.Context, *, jugador_y_modo: str | None = None):
+        await self._abrir(ctx, jugador_y_modo, "rachas", "grac")
+
     @commands.hybrid_command(name="coaching", description="Todo tu coaching en una tarjeta: elegí qué ver, el rol y el modo con los menús")
     async def coaching(self, ctx: commands.Context, *, jugador_rol_y_modo: str | None = None):
         await self._abrir(ctx, jugador_rol_y_modo, "coaching", "perf")

@@ -218,3 +218,34 @@ def franjas(filas: list[dict], titulo: str, propia: str | None = None) -> io.Byt
               fontsize=8.5, handletextpad=0.6, columnspacing=1.6)
     ax.set_title(titulo, color=TEXTO, fontsize=12, loc="left", pad=48 if propia else 30)
     return _png(fig)
+
+
+def rachas(d: dict, estados: dict, titulo: str) -> io.BytesIO:
+    """¿Te conviene seguir? Winrate de la partida según cómo venías, con su intervalo y n. Las dos filas
+    de "después de 2+ derrotas" van resaltadas: son la comparación que importa."""
+    claves = list(estados)
+    n = len(claves)
+    fig, ax = _figura(8, 0.62 * n + 1.2)
+    ax.set_xlim(0, 100)
+    ax.set_ylim(n - 0.5, -0.6)
+    ax.axvline(50, color=TENUE, lw=1, ls=(0, (4, 4)))
+    for i, k in enumerate(claves):
+        m = d["estados"][k]
+        clave = k.startswith("tras_2")
+        if m.get("n"):
+            ax.plot([m["lo"] * 100, m["hi"] * 100], [i, i], color=ACENTO, lw=9 if clave else 7,
+                    alpha=0.55 if clave else 0.3, solid_capstyle="round")
+            ax.scatter([m["v"] * 100], [i], s=60, color=TEXTO, zorder=3)
+            ax.annotate(f"{m['v'] * 100:.0f} %  (n = {m['n']})", (101, i), va="center", color=TEXTO, fontsize=9,
+                        annotation_clip=False)
+        else:
+            ax.annotate("sin partidas", (101, i), va="center", color=TENUE, fontsize=9, annotation_clip=False)
+    ax.set_yticks(range(n))
+    ax.set_yticklabels([estados[k] for k in claves], color=TEXTO, fontsize=10)
+    for t, k in zip(ax.get_yticklabels(), claves):
+        t.set_fontweight("bold" if k.startswith("tras_2") else "normal")
+    ax.set_xticks([0, 25, 50, 75, 100])
+    ax.set_xticklabels(["0", "25", "50 %", "75", "100"])
+    ax.grid(axis="x", color=GRILLA, lw=0.6)
+    ax.set_title(titulo, color=TEXTO, fontsize=12, loc="left")
+    return _png(fig)
