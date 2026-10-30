@@ -66,3 +66,12 @@ Si cambia `extract_match_stats`, subir `EXTRACTOR_VERSION` en `ldh/base.py`.
 - El workflow las baja antes de correr (`gh release download`), las abre con `python -m ldh timelines desempaquetar tl-tar` y al final sube solo los meses que cambiaron (`empaquetar --desde`, `gh release upload --clobber`).
 - Si faltan las timelines de más del 5 % de las partidas, `reconstruir` se frena en vez de publicar una base incompleta.
 - En otra PC: `gh release download timelines -p 'timelines-*.tar' -D tl-tar` y `python -m ldh timelines desempaquetar tl-tar`.
+
+## Bot: comandos y configuración
+
+- `-menu` abre un panel con botones; `-perfil` tiene pestañas (Resumen, Roles, Campeones, Coaching, Partidas) y, si la persona tiene varias cuentas, botones para ver cada una. Los botones son DynamicItems: siguen andando después de un redeploy.
+- `-top` y `-top_rol` traen menús para cambiar período, cola, rol y ventana.
+- `-grafico [jugador] [evolucion|radar] [rol]` manda un PNG (matplotlib, en `requirements-bot.txt`).
+- `-comparar a b [cola] [rol]`, `-glosario`, `-ayuda`, `-tips <rol>`, `-sugerencia <texto>`.
+- **Ranking semanal:** alguien con *Gestionar servidor* corre `-canal_ranking #canal`; los lunes desde las 12 (hora argentina) se publica el top de la semana en solo/dúo, una vez por semana. `-canal_ranking` sin canal lo apaga.
+- **Sugerencias:** se guardan en el volumen (`sugerencias.json`) y, si hay `-canal_sugerencias #canal`, también se publican ahí.

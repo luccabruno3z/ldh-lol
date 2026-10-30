@@ -254,6 +254,7 @@ def publicar() -> dict:
     _escribir("campeones.json", {"version": static.version,
                                  "campeones": {cid: {"key": k, "nombre": n} for cid, (k, n) in static.campeones().items()}})
     _escribir("ajustes.json", AJUSTES)
+    _escribir("consejos.json", fase3.CONSEJOS)  # el bot los usa en -tips
     n_partidas = db.execute("SELECT count(*) FROM partidas").fetchone()[0]
     meta = {
         "generado": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),

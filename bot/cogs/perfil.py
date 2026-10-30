@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 from bot.services import formato as F
@@ -19,6 +20,14 @@ COLORES = {"IRON": 0x6b5a4e, "BRONZE": 0xa0703c, "SILVER": 0x8a96a8, "GOLD": 0xc
            "EMERALD": 0x1fa65a, "DIAMOND": 0x4b7bec, "MASTER": 0xb05ce0, "GRANDMASTER": 0xd64545,
            "CHALLENGER": 0xf1c40f}
 WEB = "https://luccabruno3z.github.io/ldh-lol/"
+
+
+async def autocompletar_jugador(interaction: discord.Interaction, actual: str) -> list[app_commands.Choice[str]]:
+    """Sugerencias de jugador en los slash commands: evita los "no encontré ese jugador"."""
+    t = actual.strip().lower()
+    personas = await interaction.client.datos.personas()
+    hallados = [p for p in personas if not t or t in p["nombre"].lower() or any(t in c.lower() for c in p["cuentas"])]
+    return [app_commands.Choice(name=p["nombre"], value=p["id"]) for p in hallados[:25]]
 
 
 def rango(r: dict | None) -> str:
@@ -183,26 +192,29 @@ class Perfil(commands.Cog):
             await ctx.reply("No encontré ese jugador. Solo aparecen las cuentas que se vincularon.")
         return perfil
 
-    @commands.hybrid_command(name="perfil", description="Rango, KPIs, forma reciente y últimas partidas")
+    async def _abrir(self, ctx: commands.Context, jugador: str | None, comando: str, tab: str):
+        """El perfil con pestañas, abierto en la pestaña pedida."""
+        from bot.ui.perfil_vista import render
+        if p := await self._persona(ctx, jugador, comando):
+            await ctx.reply(view=await render(self.bot, p["id"], tab, "t", ctx.author.id))
+
+    @commands.hybrid_command(name="perfil", description="Tu perfil con pestañas: resumen, roles, campeones, coaching y partidas")
+    @app_commands.autocomplete(jugador=autocompletar_jugador)
     async def perfil(self, ctx: commands.Context, *, jugador: str | None = None):
-        if perfil := await self._persona(ctx, jugador, "perfil"):
-            await ctx.reply(view=await self._tarjeta(perfil))
+        await self._abrir(ctx, jugador, "perfil", "resumen")
 
     @commands.hybrid_command(name="roles", description="Rendimiento por posición, ajustado por muestra")
+    @app_commands.autocomplete(jugador=autocompletar_jugador)
     async def roles(self, ctx: commands.Context, *, jugador: str | None = None):
-        if not (p := await self._persona(ctx, jugador, "roles")):
-            return
-        await ctx.reply(view=tarjeta_roles(p, await self.datos.roles(p["id"]),
-                                           (await self.datos.ajustes()).get("nombres_cola", {})))
+        await self._abrir(ctx, jugador, "roles", "roles")
 
     @commands.hybrid_command(name="campeones", description="Campeón por posición, con el bloque dentro y fuera del pool")
+    @app_commands.autocomplete(jugador=autocompletar_jugador)
     async def campeones(self, ctx: commands.Context, *, jugador: str | None = None):
-        if not (p := await self._persona(ctx, jugador, "campeones")):
-            return
-        await ctx.reply(view=tarjeta_campeones(p, await self.datos.campeones_de(p["id"]), await self.datos.campeones(),
-                                               (await self.datos.ajustes()).get("nombres_cola", {})))
+        await self._abrir(ctx, jugador, "campeones", "campeones")
 
     @commands.hybrid_command(name="sinergia", description="Con qué amigos rendís distinto")
+    @app_commands.autocomplete(jugador=autocompletar_jugador)
     async def sinergia(self, ctx: commands.Context, *, jugador: str | None = None):
         if not (p := await self._persona(ctx, jugador, "sinergia")):
             return
@@ -210,7 +222,7 @@ class Perfil(commands.Cog):
         await ctx.reply(view=tarjeta_sinergia(p, await self.datos.sinergia(), nombres,
                                               (await self.datos.ajustes()).get("nombres_cola", {})))
 
-    async def _tarjeta(self, p: dict) -> discord.ui.LayoutView:
+    async def _tarjeta(self, p: dict, hist: dict | None = None) -> discord.ui.LayoutView:
         campeones = await self.datos.campeones()
         nombre_cola = (await self.datos.ajustes()).get("nombres_cola", {})
         mejor = max((c.get("solo") for c in p["rango"].values() if c.get("solo")),
@@ -254,7 +266,7 @@ class Perfil(commands.Cog):
                 f"-# {F.rango_pct(c['ultimas'])} · resto ({forma['n_resto']} partidas) {F.rango_pct(c['resto'])}"),
                 discord.ui.Separator()]
 
-        hist = await self.datos.historial(p["id"], 1)
+        hist = hist or await self.datos.historial(p["id"], 1)
         if hist and hist["partidas"]:
             lineas = ["### Últimas partidas"]
             for m in hist["partidas"][:5]:
@@ -267,18 +279,6 @@ class Perfil(commands.Cog):
         view = discord.ui.LayoutView(timeout=None)
         view.add_item(discord.ui.Container(*items, accent_colour=COLORES.get((mejor or {}).get("tier"), 0x00cccc)))
         return view
-
-    @commands.hybrid_command(name="ayuda", description="Qué hace el bot")
-    async def ayuda(self, ctx: commands.Context):
-        await ctx.reply(
-            "**LDH Stats LoL**\n"
-            "`-vincular <nombre o Riot ID>` une tu Discord con tu jugador\n"
-            "`-desvincular` borra el vínculo\n"
-            "`-perfil [jugador]` rango, KPIs con su intervalo, forma reciente y últimas partidas\n"
-            "`-roles` · `-campeones` · `-sinergia` `[jugador]` rendimiento ajustado por muestra\n"
-            "`-top [semana|mes|temporada] [solo|flex|normal]` · `-top_rol <rol> [cola]` rankings del grupo\n"
-            "`-performance` · `-mejora` · `-temprano` `[jugador] [rol]` coaching contra tu franja de rango\n"
-            f"Todo sale de la web: {WEB}")
 
 
 async def setup(bot: commands.Bot):

@@ -68,17 +68,21 @@ class Rankings(commands.Cog):
         if periodo not in PERIODOS or not cola:
             await ctx.reply("Uso: `-top [semana|mes|temporada] [solo|flex|normal]`")
             return
-        await ctx.reply(view=tarjeta_top(await self.datos.ranking(periodo), cola, *await self._contexto()))
+        from bot.ui.rankings_vista import TopVista
+        vista = TopVista(self.bot, ctx.author.id, periodo, cola)  # con menús para cambiar período y cola
+        await vista.pintar()
+        await ctx.reply(view=vista)
 
     @commands.hybrid_command(name="top_rol", description="Ranking por rol con la métrica de cada rol contra el rival directo")
-    async def top_rol(self, ctx: commands.Context, rol: str, cola: str = "solo", ventana: str = "temporada"):
+    async def top_rol(self, ctx: commands.Context, rol: str = "top", cola: str = "solo", ventana: str = "temporada"):
         rol, cola = ROLES.get(rol.lower()), COLAS.get(cola.lower())
         if not rol or not cola:
             await ctx.reply("Uso: `-top_rol <top|jungla|mid|adc|support> [solo|flex|normal] [temporada|reciente]`")
             return
-        d = await self.datos.ranking("roles")
-        v = d["reciente" if ventana.lower().startswith("rec") else "historico"]
-        await ctx.reply(view=tarjeta_top_rol(v, cola, rol, *await self._contexto()))
+        from bot.ui.rankings_vista import TopRolVista
+        vista = TopRolVista(self.bot, ctx.author.id, rol, cola, "reciente" if ventana.lower().startswith("rec") else "historico")
+        await vista.pintar()
+        await ctx.reply(view=vista)
 
 
 async def setup(bot: commands.Bot):

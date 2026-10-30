@@ -70,6 +70,13 @@ class Datos:
     async def campeones_de(self, persona_id: str) -> dict | None:
         return await self._json(f"campeones/{quote(persona_id)}.json")
 
+    async def cuenta(self, persona_id: str, indice: int) -> dict | None:
+        """Vista de una sola cuenta de alguien con varias (cuenta/<persona>/<i>.json)."""
+        return await self._json(f"cuenta/{quote(persona_id)}/{indice}.json")
+
+    async def consejos(self) -> dict:
+        return await self._json("consejos.json") or {}
+
     async def coaching(self, persona_id: str) -> dict | None:
         return await self._json(f"coaching/{quote(persona_id)}.json")
 

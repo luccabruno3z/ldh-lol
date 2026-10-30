@@ -14,7 +14,7 @@ from bot.services.datos import DATA_URL, Datos
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("ldh-lol")
 
-COGS = ["bot.cogs.perfil", "bot.cogs.rankings", "bot.cogs.coaching"]
+COGS = ["bot.cogs.perfil", "bot.cogs.rankings", "bot.cogs.coaching", "bot.cogs.extra"]
 
 
 class Bot(commands.Bot):
@@ -34,6 +34,10 @@ class Bot(commands.Bot):
                 caidos.append(cog)
         if caidos:
             logger.warning("Cogs sin cargar: %s", ", ".join(caidos))
+        # Botones persistentes (DynamicItems): siguen andando después de un reinicio o un redeploy.
+        from bot.ui.menu import MenuBoton
+        from bot.ui.perfil_vista import PerfilBoton
+        self.add_dynamic_items(PerfilBoton, MenuBoton)
         try:
             await self.tree.sync()
         except discord.HTTPException:
