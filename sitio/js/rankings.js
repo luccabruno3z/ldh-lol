@@ -10,7 +10,7 @@ import { nombrePersona, pct, chipConf, winrateAj, difWinrate, senal } from './fa
 const GRIETA = ['solo', 'flex', 'normal'];
 const ROLES = ['Top', 'Jungla', 'Mid', 'ADC', 'Support'];
 const PERIODOS = { semana: 'Últimos 7 días', mes: 'Últimos 30 días', temporada: 'Temporada' };
-const TABS = { periodo: 'Por período', roles: 'Por rol', duos: 'Dúos' };
+const TABS = { periodo: 'Por período', roles: 'Por rol', duos: 'Dúos', mejora: 'Quién más mejoró' };
 
 const sel = { tab: 'periodo', periodo: 'mes', cola: 'solo', ventana: 'historico' };
 
@@ -91,11 +91,24 @@ async function duos(cont) {
     cont.querySelector('#rk-cola').addEventListener('change', (e) => { sel.cola = e.target.value; render(); });
 }
 
+async function mejora(cont) {
+    const d = await cachedFetch('rankings/mejora.json');
+    const signo = (v) => `${v > 0 ? '+' : ''}${num(v, 1)}`;
+    cont.innerHTML = d.tabla.length ? `<div class="table-wrap"><table class="data-table">
+      <thead><tr><th>Jugador</th><th>Rol</th><th class="num">Partidas</th><th class="num">De → a</th><th class="num">Cada 100 partidas</th><th></th></tr></thead>
+      <tbody>${d.tabla.map(x => `<tr class="${x.veredicto === 'mejorando' ? '' : 'chica'}"><td>${persona(x.persona)}</td><td>${escapeHtml(x.rol)}</td>
+        <td class="num mono">${x.n}</td><td class="num mono">${num(x.inicio, 0)} → ${num(x.ahora, 0)}</td>
+        <td class="num"><span class="v">${signo(x.pendiente)}</span><span class="ic">${signo(x.lo)} a ${signo(x.hi)}</span></td>
+        <td><span class="tag ${x.veredicto === 'mejorando' ? 'win' : x.veredicto === 'empeorando' ? 'loss' : ''}">${escapeHtml(x.veredicto)}</span></td></tr>`).join('')}</tbody></table></div>
+      <p class="nota">${escapeHtml(d.nota)} Cada uno se mide contra su propia franja, así que se puede comparar a un Hierro con un Esmeralda.</p>`
+      : '<p class="empty-state">Nadie tiene 30+ partidas de solo/dúo en un rol con referencia.</p>';
+}
+
 function render() {
     const cont = document.getElementById('rankings-cuerpo');
     document.querySelectorAll('#rankings-tabs a').forEach(a => a.classList.toggle('is-active', a.dataset.tab === sel.tab));
     cont.innerHTML = '<div class="skeleton"></div>';
-    const fn = { periodo: porPeriodo, roles: porRol, duos }[sel.tab];
+    const fn = { periodo: porPeriodo, roles: porRol, duos, mejora }[sel.tab];
     fn(cont).catch(err => {
         console.error('[rankings]', err);
         cont.innerHTML = '<div class="error-state">No se pudo cargar este ranking.</div>';

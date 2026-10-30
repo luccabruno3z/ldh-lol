@@ -499,6 +499,7 @@ def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], rangos: di
                    for (fr, rol), c in sorted(celdas.items())],
         "bajada": max((f.get("bajada", "") for f in cargar_filas()), default=None)})
 
+    mejora = []
     for pid, filas in filas_por.items():
         franja, rango = franja_persona.get(pid, (None, None))
         mias = sorted(por_persona.get(pid, []), key=lambda f: f["inicio_ms"])
@@ -522,3 +523,14 @@ def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], rangos: di
             "temprano": temprano(filas),
             "campeones": contra_campeon(mias, otros) if franja else [],
         })
+        for rol, r in roles.items():
+            if (t := r.get("tendencia")):
+                mejora.append({"persona": pid, "rol": rol, "franja": franja, "n": t["n"], "pendiente": t["pendiente"],
+                               "lo": t["lo"], "hi": t["hi"], "veredicto": t["veredicto"], "inicio": t["inicio"],
+                               "ahora": t["ahora"]})
+    # Quién más mejoró: por la pendiente de la tendencia (puntos cada 100 partidas contra su propia
+    # franja), así no se comparan winrates de franjas distintas. Primero los que se separan del ruido.
+    escribir("rankings/mejora.json", {
+        "nota": "Pendiente del índice por partida (0–100, contra la propia franja y rol) en solo/dúo, en puntos "
+                "cada 100 partidas. 'Mejorando' solo si todo el intervalo está arriba de cero.",
+        "tabla": sorted(mejora, key=lambda x: (x["veredicto"] != "mejorando", -x["lo"]))})

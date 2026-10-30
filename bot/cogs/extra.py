@@ -64,7 +64,8 @@ AYUDA = {
     "Rankings": "`-top [semana|mes|temporada] [cola]` con menús para cambiar período y cola\n"
                 "`-top_rol [rol] [cola]` la métrica de cada rol contra el rival directo\n"
                 "`-comparar <jugador> <otro> [cola] [rol]` métrica por métrica\n"
-                "`-competencia <desde dd/mm> [hasta dd/mm] [cola]` quién rindió mejor entre dos fechas",
+                "`-competencia <desde dd/mm> [hasta dd/mm] [cola]` quién rindió mejor entre dos fechas\n"
+                "`-mejoraron` quién más mejoró, cada uno contra su propia franja",
     "Servidor": "`-canal_feed #canal` publica cada partida del grupo (resultado, KDA y LP) y los ascensos y descensos\n"
                 "`-canal_ranking #canal` publica el top de la semana y lo destacado cada lunes\n"
                 "`-canal_sugerencias #canal` adónde llegan las `-sugerencia <texto>`\n"

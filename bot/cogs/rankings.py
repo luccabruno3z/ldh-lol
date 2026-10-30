@@ -50,6 +50,18 @@ def tarjeta_top_rol(v: dict, cola: str, rol: str, nombres: dict, nombre_cola: di
     return tarjeta_simple(lineas, f"{WEB}#/rankings/roles")
 
 
+def tarjeta_mejora(d: dict, nombres: dict) -> discord.ui.LayoutView:
+    lineas = ["## Quién más mejoró", "-# Índice por partida contra su propia franja, en solo/dúo · puntos cada 100 partidas"]
+    for i, x in enumerate(d["tabla"][:10], 1):
+        tag = {"mejorando": "**mejorando**", "empeorando": "empeorando"}.get(x["veredicto"], "sin tendencia clara")
+        lineas += [f"`{i}.` **{nombres.get(x['persona'], x['persona'])}** · {x['rol']} · {F.num(x['inicio'], 0)} → {F.num(x['ahora'], 0)} · {tag}",
+                   f"-# {F.num(x['pendiente'], 1, True)} cada 100 partidas ({F.num(x['lo'], 1, True)} a {F.num(x['hi'], 1, True)}) · {x['n']} partidas"]
+    if not d["tabla"]:
+        lineas.append("Nadie tiene 30+ partidas de solo/dúo en un rol con referencia.")
+    lineas.append("-# Mejorando solo si todo el intervalo está arriba de cero. Cada uno contra su franja: se puede comparar entre rangos.")
+    return tarjeta_simple(lineas, f"{WEB}#/rankings/mejora")
+
+
 class Rankings(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -85,6 +97,13 @@ class Rankings(commands.Cog):
         vista = TopRolVista(self.bot, ctx.author.id, rol, cola, "reciente" if ventana.lower().startswith("rec") else "historico")
         await vista.pintar()
         await ctx.reply(view=vista)
+
+
+    @commands.hybrid_command(name="mejoraron", description="Quién más mejoró: la tendencia de cada uno contra su franja")
+    async def mejoraron(self, ctx: commands.Context):
+        await ctx.defer()
+        nombres, _ = await self._contexto()
+        await ctx.reply(view=tarjeta_mejora(await self.datos.ranking("mejora") or {"tabla": []}, nombres))
 
 
 async def setup(bot: commands.Bot):
