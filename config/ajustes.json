@@ -145,5 +145,14 @@
     "_": "Winrate móvil de las últimas 'ventana' partidas de cada cola, un punto cada 'paso' partidas, con su intervalo de Wilson.",
     "ventana": 20,
     "paso": 5
+  },
+  "fase4": {
+    "_": "Equipos: nadie va a un rol con menos de min_rol partidas; campeones sugeridos con min_campeon+. Matchups con menos de min_matchup partidas van al final. Jungla: predecible si el lado más usado, con todo su intervalo, pasa el umbral.",
+    "min_rol": 10,
+    "min_campeon": 5,
+    "min_matchup": 5,
+    "min_jungla": 20,
+    "min_jungla_lado": 10,
+    "umbral_predecible": 0.65
   }
 }
