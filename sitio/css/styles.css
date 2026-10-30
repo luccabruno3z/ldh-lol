@@ -182,3 +182,9 @@ html.js .view:not(.is-active) { display: none; }
 .consejo { margin: 6px 0 0; padding-left: 10px; border-left: 3px solid var(--accent); }
 .campeon-ref { margin: 12px 0; }
 .campeon-ref .fd-cab { align-items: center; margin-bottom: 6px; }
+
+/* Bloques plegables: muestra chica y listas largas */
+.plegable { margin-top: 8px; }
+.plegable > summary { cursor: pointer; color: var(--text-dim); font-size: .85rem; padding: 6px 0; }
+.plegable > summary:hover, .plegable > summary:focus-visible { color: var(--accent); }
+.plegable[open] > summary { margin-bottom: 6px; }

@@ -50,14 +50,16 @@ export function hace(ms) {
     return `hace ${Math.round(h / 24)} días`;
 }
 
-const num = (v, dec) => (v == null ? '—' : Number(v).toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec }));
+// Signo menos de verdad (−) y no el guión: "−116" no se confunde con un rango ni con "15-116".
+const num = (v, dec) => (v == null ? '—' : Number(v).toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec })
+    .replace(/^-(?=.*[1-9])/, '−').replace(/^-/, ''));
 
-/** Valor con su intervalo y n. tipo: 'pct' (0–1), 'pct100' (0–100) o decimales. */
+/** Valor con su intervalo y n. tipo: 'pct' (0–1), 'pct100' (0–100) o decimales. Rangos como "x a y", el % una sola vez. */
 export function conIntervalo(m, tipo = 1) {
     if (!m || m.v == null) return '<span class="dim">—</span>';
     const f = (x) => (tipo === 'pct' ? num(x * 100, 0) : tipo === 'pct100' ? num(x, 0) : num(x, tipo));
     const suf = tipo === 'pct' || tipo === 'pct100' ? ' %' : '';
-    const ic = m.lo == null ? '' : `<span class="ic">${f(m.lo)}–${f(m.hi)}</span>`;
+    const ic = m.lo == null ? '' : `<span class="ic">${f(m.lo)} a ${f(m.hi)}${suf}</span>`;
     return `<span class="v">${f(m.v)}${suf}</span>${ic}`;
 }
 

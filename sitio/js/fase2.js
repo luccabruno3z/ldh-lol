@@ -13,7 +13,7 @@ export const chipConf = (c) => `<span class="tag conf-${c}" title="${CONF[c]}">$
 
 /** Winrate ajustado como valor principal y el real con su IC al lado. */
 export function winrateAj(t) {
-    return `<span class="v">${pct(t.winrate_aj)}</span><span class="ic">real ${pct(t.winrate.v)} · ${pct(t.winrate.lo)}–${pct(t.winrate.hi)}</span>`;
+    return `<span class="v">${pct(t.winrate_aj)}</span><span class="ic">real ${pct(t.winrate.v)} · ${t.winrate.lo == null ? '' : `${num(t.winrate.lo * 100, 0)} a ${pct(t.winrate.hi)}`}</span>`;
 }
 
 const kdaAj = (t) => `<span class="v">${num(t.kda_aj, 2)}</span><span class="ic">real ${num(t.kda.v, 2)}</span>`;

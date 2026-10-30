@@ -15,7 +15,8 @@ function fmt(m, x) {
     return `${signo}${num(x, m.dec ?? 2)}${m.unidad ? ' ' + m.unidad : ''}`;
 }
 
-const valorIc = (m) => `<span class="v">${fmt(m, m.v)}</span>${m.lo == null ? '' : `<span class="ic">${fmt(m, m.lo)} a ${fmt(m, m.hi)}</span>`}`;
+// En el rango la unidad va una sola vez, al final: "−20 a +13 pts".
+const valorIc = (m) => `<span class="v">${fmt(m, m.v)}</span>${m.lo == null ? '' : `<span class="ic">${fmt({ ...m, unidad: '' }, m.lo)} a ${fmt(m, m.hi)}</span>`}`;
 
 /** Barra de percentil con su intervalo sombreado. */
 function barra(p, lo, hi, titulo) {
@@ -117,7 +118,7 @@ function temprano(d, cola, rol) {
 
 function contraCampeon(lista) {
     if (!lista.length) return '';
-    return lista.map(c => `<div class="campeon-ref">
+    const bloques = lista.map(c => `<div class="campeon-ref">
       <div class="fd-cab">${iconoCampeon(c.campeon_id, 28)}<strong>${escapeHtml(campeon(c.campeon_id))}</strong> <span class="dim">${escapeHtml(c.rol)} · tus ${c.n} partidas contra ${c.n_ref} de ${c.jugadores_ref} jugadores distintos</span></div>
       <div class="table-wrap"><table class="data-table">
         <thead><tr><th>Métrica</th><th class="num">Vos</th><th class="num">Ellos</th><th class="num">Diferencia</th><th></th></tr></thead>
@@ -129,7 +130,10 @@ function contraCampeon(lista) {
             return `<tr><td>${escapeHtml(f.nombre)}</td>
               <td class="num mono">${f.pctw ? `${num(c.winrate_tuyo * 100, 0)} %` : fmt(f, f.tuyo)}</td><td class="num mono">${f.pctw ? `${num(c.winrate_ellos * 100, 0)} %` : fmt(f, f.ellos)}</td>
               <td class="num">${valorIc(ff)}</td><td>${bien}</td></tr>`;
-        }).join('')}</tbody></table></div></div>`).join('') +
+        }).join('')}</tbody></table></div></div>`);
+    // Los dos con más partidas a la vista; el resto plegado (con 9 campeones el bloque era media página).
+    return bloques.slice(0, 2).join('') +
+        (bloques.length > 2 ? `<details class="plegable"><summary>${bloques.length - 2} campeones más</summary>${bloques.slice(2).join('')}</details>` : '') +
         '<p class="nota">"Ellos" son los desconocidos que jugaron el mismo campeón en el mismo rol en las partidas de solo/dúo del grupo, en tu franja; se sacan las partidas donde su rival directo era alguien del grupo. Es por partida (casi todos aparecen una vez), por eso va la columna de jugadores distintos.</p>';
 }
 

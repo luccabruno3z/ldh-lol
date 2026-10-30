@@ -49,20 +49,32 @@ function cabecera(p) {
     </section>`;
 }
 
-function tablaKpis(filas) {
-    if (!filas.length) return '<p class="empty-state">Sin partidas en este filtro.</p>';
-    return `<div class="table-wrap"><table class="data-table kpis">
-      <thead><tr><th>Cola</th><th>Rol</th><th class="num">n</th>${COLS.map(([, l]) => `<th class="num">${l}</th>`).join('')}</tr></thead>
-      <tbody>${filas.map(f => `
+/** Colas presentes, la más jugada primero (por la fila "Todos"). */
+function colasKpis(filas) {
+    return [...new Set(filas.map(f => f.cola))].sort((a, b) =>
+        (filas.find(f => f.cola === b && f.rol === 'Todos')?.n || 0) - (filas.find(f => f.cola === a && f.rol === 'Todos')?.n || 0));
+}
+
+function filasKpis(filas) {
+    return filas.map(f => `
         <tr class="${f.muestra_chica ? 'chica' : ''}${f.rol === 'Todos' ? ' total' : ''}">
-          <td>${escapeHtml(nombreCola(f.cola))}</td>
-          <td>${escapeHtml(f.rol)}${f.muestra_chica ? ' <span class="tag">muestra chica</span>' : ''}</td>
+          <td>${escapeHtml(f.rol)}</td>
           <td class="num mono">${f.n}</td>
           ${COLS.map(([k, , t]) => `<td class="num">${conIntervalo(f[k], t)}</td>`).join('')}
-        </tr>`).join('')}</tbody>
-    </table></div>
+        </tr>`).join('');
+}
+
+/** Una cola por vez; las filas con muestra chica quedan plegadas al final (antes eran la mitad de la tabla). */
+function tablaKpis(filas, cola) {
+    const deCola = filas.filter(f => f.cola === cola);
+    if (!deCola.length) return '<p class="empty-state">Sin partidas en este filtro.</p>';
+    const grandes = deCola.filter(f => !f.muestra_chica), chicas = deCola.filter(f => f.muestra_chica);
+    const cab = `<thead><tr><th>Rol</th><th class="num">n</th>${COLS.map(([, l]) => `<th class="num">${l}</th>`).join('')}</tr></thead>`;
+    return `<div class="table-wrap"><table class="data-table kpis">${cab}<tbody>${filasKpis(grandes)}</tbody></table></div>
+    ${chicas.length ? `<details class="plegable"><summary>${chicas.length} ${chicas.length === 1 ? 'rol' : 'roles'} con muestra chica (${chicas.map(f => `${escapeHtml(f.rol)} ${f.n}`).join(', ')})</summary>
+      <div class="table-wrap"><table class="data-table kpis">${cab}<tbody>${filasKpis(chicas)}</tbody></table></div></details>` : ''}
     <p class="nota">Cada valor lleva su intervalo del ${Math.round((state.ajustes?.confianza || 0.95) * 100)} % (Wilson para el winrate, bootstrap para el resto).
-      Las filas con menos de ${state.ajustes?.min_partidas ?? 10} partidas van al final.</p>`;
+      Los roles con menos de ${state.ajustes?.min_partidas ?? 10} partidas no permiten sacar conclusiones.</p>`;
 }
 
 function grafForma(partidas) {
@@ -164,23 +176,27 @@ async function mostrar(id) {
         return;
     }
     const vistas = Object.keys(p.kpis);
+    let cuenta = 'todas', colaK = colasKpis(p.kpis.todas)[0];
+    // Orden: lo que se lee de un vistazo (forma) y lo que ayuda a mejorar (coaching, roles, pool)
+    // antes que la tabla de KPIs, que es el detalle.
     cont.innerHTML = `${cabecera(p)}
-      <section class="section">
-        <div class="section-head"><h3>KPIs por cola y rol</h3>
-          ${vistas.length > 1 ? `<label class="selector">Cuenta
-            <select id="kpi-cuenta">${vistas.map(v => `<option value="${escapeHtml(v)}">${v === 'todas' ? 'Todas las cuentas' : escapeHtml(v)}</option>`).join('')}</select></label>` : ''}
-        </div>
-        <div id="kpi-tabla">${tablaKpis(p.kpis.todas)}</div>
-      </section>
       ${forma(p.forma)}
       <div id="fase3"></div>
       <div id="fase2"></div>
+      <section class="section">
+        <div class="section-head"><h3>KPIs por rol</h3><span>
+          <label class="selector">Cola <select id="kpi-cola">${colasKpis(p.kpis.todas).map(c => `<option value="${escapeHtml(c)}">${escapeHtml(nombreCola(c))}</option>`).join('')}</select></label>
+          ${vistas.length > 1 ? `<label class="selector">Cuenta
+            <select id="kpi-cuenta">${vistas.map(v => `<option value="${escapeHtml(v)}">${v === 'todas' ? 'Todas las cuentas' : escapeHtml(v)}</option>`).join('')}</select></label>` : ''}
+        </span></div>
+        <div id="kpi-tabla">${tablaKpis(p.kpis.todas, colaK)}</div>
+      </section>
       <div id="historial"></div>`;
     bloquesFase3(p, document.getElementById('fase3')).catch(err => console.error('[coaching]', err));
     bloquesFase2(p, document.getElementById('fase2'));
-    document.getElementById('kpi-cuenta')?.addEventListener('change', (e) => {
-        document.getElementById('kpi-tabla').innerHTML = tablaKpis(p.kpis[e.target.value] || []);
-    });
+    const pintarKpis = () => { document.getElementById('kpi-tabla').innerHTML = tablaKpis(p.kpis[cuenta] || [], colaK); };
+    document.getElementById('kpi-cola').addEventListener('change', (e) => { colaK = e.target.value; pintarKpis(); });
+    document.getElementById('kpi-cuenta')?.addEventListener('change', (e) => { cuenta = e.target.value; pintarKpis(); });
     await historial(p, document.getElementById('historial'));
 }
 
