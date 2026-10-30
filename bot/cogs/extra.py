@@ -56,6 +56,7 @@ AYUDA = {
     "Gráficos": "`-grafico [jugador] tendencia [rol] [modo]` ¿estás mejorando? Tu índice por partida contra tu franja y su tendencia\n"
                 "`-grafico [jugador] evolucion [modo]` ¿venís mejor o peor? Tu winrate de las últimas 20 contra tu temporada\n"
                 "`-grafico [jugador] radar [rol] [modo]` la rosa de tus 7 componentes contra tu franja\n"
+                "`-grafico [jugador] franjas [rol] [modo]` tus números al lado de la mediana de cada franja de elo\n"
                 "-# En `-menu`, **Mis gráficos** manda los tres.",
     "Equipos y mapa": "`-ideal` el 5 ideal del grupo: una persona por rol con 10+ partidas ahí\n"
                       "`-inhouse <10 jugadores separados por coma>` dos equipos parejos, cada uno en un rol que conoce\n"
@@ -171,6 +172,19 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
                  f"({signo(t['pendiente'])} puntos cada 100 partidas, {signo(t['lo'])} a {signo(t['hi'])})\n"
                  f"-# Índice de 0 a 100 por partida: tus percentiles en {', '.join(t['metricas']).lower()} contra "
                  f"{d['franja']} en {rol_n}. Mide cómo jugás, no si ganaste. 50 = la mitad de tu franja.")
+    elif tipo.lower().startswith("fra"):
+        d = await bot.datos.coaching_auto(p["id"], modo)
+        en = EN_MODO.get((d or {}).get("modo") or "solo")
+        rol_n = ROLES.get((rol or "").lower()) or (d or {}).get("rol_con_referencia") or (d or {}).get("rol_principal")
+        r = ((d or {}).get("roles") or {}).get(rol_n) or {}
+        filas = r.get("por_franja")
+        if not filas:
+            return (f"Todavía no hay comparación por franja para {nombre} en {rol_n or 'ningún rol'}: hacen falta "
+                    f"10+ partidas de {en} en el rol."), None
+        png = graficos.franjas(filas, f"{nombre} · {rol_n} en {en} · tus números y la mediana de cada franja")
+        texto = (f"## {discord.utils.escape_markdown(nombre)} · contra cada franja\n"
+                 f"-# Tu promedio al lado de la mediana de los jugadores de referencia de cada franja en {rol_n} "
+                 "(ranked solo/dúo de LAS). No dice a qué franja te parecés: Riot no permite estimar rangos.")
     elif tipo.lower().startswith("rad"):
         d = await bot.datos.coaching_auto(p["id"], modo)
         en = EN_MODO.get((d or {}).get("modo") or "solo")
@@ -298,12 +312,12 @@ class Extra(commands.Cog):
                                                     COLAS.get((cola or "").lower()), ROLES.get((rol or "").lower())))
 
     @commands.hybrid_command(name="grafico", description="Evolución del winrate, tendencia de mejora o radar de tus componentes")
-    @app_commands.autocomplete(jugador=autocompletar_jugador, tipo=autocompletar_opciones("tendencia", "evolucion", "radar"),
+    @app_commands.autocomplete(jugador=autocompletar_jugador, tipo=autocompletar_opciones("tendencia", "evolucion", "radar", "franjas"),
                                rol=autocompletar_opciones("top", "jungla", "mid", "adc", "support"),
                                modo=autocompletar_opciones("solo", "normal", "todo"))
     async def grafico(self, ctx: commands.Context, jugador: str | None = None, tipo: str = "evolucion", rol: str | None = None,
                       modo: str | None = None):
-        if jugador and jugador.lower() in ("evolucion", "evolución", "radar", "tendencia"):  # -grafico radar
+        if jugador and jugador.lower() in ("evolucion", "evolución", "radar", "tendencia", "franjas"):  # -grafico radar
             jugador, tipo = None, jugador
         if not (p := await self._persona(ctx, jugador, "grafico")):
             return

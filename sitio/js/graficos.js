@@ -110,7 +110,9 @@ export function seccionTendencia(t, rol, franja) {
     const W = 640, H = 210, m = { l: 34, r: 12, t: 14, b: 24 };
     // Eje = número de partida (la recta se ajusta por partida); los meses quedan como rótulos.
     const n1 = Math.max(1, t.n - 1);
-    const vs = t.puntos.map(p => p.v), lo = Math.max(0, Math.min(...vs, 40) - 8), hi = Math.min(100, Math.max(...vs, 60) + 8);
+    const ref = t.ref;  // dónde juegan los jugadores de la franja en este mismo índice
+    const vs = [...t.puntos.map(p => p.v), ...(ref ? [ref.lo, ref.hi] : [])];
+    const lo = Math.max(0, Math.min(...vs, 40) - 8), hi = Math.min(100, Math.max(...vs, 60) + 8);
     const x = (i) => m.l + (i / n1) * (W - m.l - m.r);
     const y = (v) => m.t + (1 - (v - lo) / (hi - lo)) * (H - m.t - m.b);
     const linea = t.puntos.map(p => `${x(p.i)},${y(p.v)}`).join(' ');
@@ -125,16 +127,20 @@ export function seccionTendencia(t, rol, franja) {
         <span class="tag ${clase}">${escapeHtml(t.veredicto)}</span>
         <span class="dim">${signo(t.pendiente)} puntos cada 100 partidas (${signo(t.lo)} a ${signo(t.hi)})</span></p>
       <svg class="g-evo" viewBox="0 0 ${W} ${H}" role="img" aria-label="Tu índice por partida en ${escapeHtml(rol)} a lo largo de la temporada: de ${num(t.inicio, 0)} a ${num(t.ahora, 0)}, ${escapeHtml(t.veredicto)}">
-        <line x1="${m.l}" x2="${W - m.r}" y1="${y(50)}" y2="${y(50)}" class="g-medio"/>
+        ${ref ? `<rect x="${m.l}" width="${W - m.l - m.r}" y="${y(ref.hi)}" height="${y(ref.lo) - y(ref.hi)}" class="g-banda"/>
+        <line x1="${m.l}" x2="${W - m.r}" y1="${y(ref.mediana)}" y2="${y(ref.mediana)}" class="g-medio"/>
+        <text x="${m.l - 6}" y="${y(ref.mediana) + 4}" class="g-eje" text-anchor="end">${num(ref.mediana, 0)}</text>
+        <text x="${m.l + 4}" y="${y(ref.hi) - 5}" class="g-eje">${escapeHtml(franja)}: la mitad del medio, ${num(ref.lo, 0)} a ${num(ref.hi, 0)}</text>`
+        : `<line x1="${m.l}" x2="${W - m.r}" y1="${y(50)}" y2="${y(50)}" class="g-medio"/>
         <text x="${m.l - 6}" y="${y(50) + 4}" class="g-eje" text-anchor="end">50</text>
-        <text x="${m.l + 4}" y="${y(50) - 5}" class="g-eje">mitad de ${escapeHtml(franja)}</text>
+        <text x="${m.l + 4}" y="${y(50) - 5}" class="g-eje">mitad de ${escapeHtml(franja)}</text>`}
         <polyline points="${linea}" class="g-linea"/>
         <line x1="${x(t.recta.desde.i)}" y1="${y(t.recta.desde.v)}" x2="${x(t.recta.hasta.i)}" y2="${y(t.recta.hasta.v)}" class="g-recta g-recta--${clase || 'neutra'}"/>
         <circle cx="${x(t.n - 1)}" cy="${y(t.puntos[t.puntos.length - 1].v)}" r="5" class="g-punto"/>
         <text x="${W - m.r}" y="${H - 6}" class="g-eje" text-anchor="end">partida ${t.n}</text>
         ${meses.join('')}
       </svg>
-      <p class="nota">Cada partida recibe un índice de 0 a 100: el promedio de tus percentiles en ${t.metricas.map(escapeHtml).join(', ').toLowerCase()}, contra jugadores de ${escapeHtml(franja)} en ${escapeHtml(rol)} (las muertes cuentan al revés). La línea celeste es el promedio de tus últimas ${t.ventana} partidas en cada momento y la recta, la tendencia de toda la temporada (${t.n} partidas). Mide cómo jugás, no si ganaste: el winrate depende demasiado de los compañeros. "Sin tendencia clara" quiere decir que el intervalo de la pendiente cruza el cero.</p>`;
+      <p class="nota">Cada partida recibe un índice de 0 a 100: el promedio de tus percentiles en ${t.metricas.map(escapeHtml).join(', ').toLowerCase()}, contra jugadores de ${escapeHtml(franja)} en ${escapeHtml(rol)} (las muertes cuentan al revés). La línea celeste es el promedio de tus últimas ${t.ventana} partidas en cada momento y la recta, la tendencia de toda la temporada (${t.n} partidas). Mide cómo jugás, no si ganaste: el winrate depende demasiado de los compañeros. "Sin tendencia clara" quiere decir que el intervalo de la pendiente cruza el cero.${ref ? ` La franja gris es dónde juegan los ${ref.jugadores} jugadores de referencia de ${escapeHtml(franja)} con este mismo índice: la mitad del medio, y la línea punteada, su mediana.` : ''}</p>`;
 }
 
 // ---- Radar de los componentes del Performance contra tu franja ----
@@ -164,3 +170,35 @@ export function radar(comps, { titulo = '', segundo = null } = {}) {
 }
 
 export { num };
+
+// ---- Contra cada franja: tu valor al lado de la mediana de las tres franjas ----
+
+const ABREV = { 'Hierro–Bronce': 'H–B', 'Plata–Oro': 'P–O', 'Platino–Esmeralda': 'P–E' };
+
+/** Una fila por métrica. Cada una con su escala (unidades distintas), nunca menos de ±25 % de la mediana
+    del medio: si no, diferencias chicas ocupaban todo el ancho. Solo pone las medianas al lado; no dice a
+    qué franja te parecés (Riot no permite estimar rangos). */
+export function graficoFranjas(filas) {
+    if (!filas?.length) return '';
+    const franjas = Object.keys(filas[0].medianas);
+    const W = 300, H = 22;
+    const fmt = (f, x) => `${f.clave.startsWith('dif') && x > 0 ? '+' : ''}${num(x, f.dec)}`;
+    const leyenda = `<p class="fr-leyenda"><span class="fr-sw fr-vos"></span>vos ${franjas.map((fr, j) =>
+        `<span class="fr-sw fr-${j}"></span>mediana ${escapeHtml(fr)}`).join(' ')}</p>`;
+    const fila = (f) => {
+        const vals = [f.v, ...Object.values(f.medianas)];
+        const centro = (Math.min(...vals) + Math.max(...vals)) / 2;
+        const medio = Object.values(f.medianas)[Math.floor(franjas.length / 2)];
+        const mitad = Math.max((Math.max(...vals) - Math.min(...vals)) / 2 * 1.15, f.clave.startsWith('dif') ? 0 : Math.abs(medio) * 0.25, 1e-9);
+        const x = (v) => 8 + ((v - (centro - mitad)) / (2 * mitad)) * (W - 16);
+        const marcas = Object.values(f.medianas).map((m, j) => `<line x1="${x(m)}" x2="${x(m)}" y1="3" y2="${H - 3}" class="fr-marca fr-${j}"><title>${escapeHtml(franjas[j])}: ${fmt(f, m)}</title></line>`).join('');
+        return `<div class="fr-fila">
+          <div class="fr-cab"><span>${escapeHtml(f.nombre)}${f.mejor ? '' : ' <span class="dim small">(menos es mejor)</span>'}</span>
+            <span class="fr-nums"><strong>vos ${fmt(f, f.v)}${f.unidad ? ` ${escapeHtml(f.unidad)}` : ''}</strong>
+              ${franjas.map(fr => `<span>${ABREV[fr] || escapeHtml(fr)} ${fmt(f, f.medianas[fr])}</span>`).join('')}</span></div>
+          <svg viewBox="0 0 ${W} ${H}" class="fr-svg" role="img" aria-label="${escapeHtml(f.nombre)}: vos ${fmt(f, f.v)}; ${franjas.map(fr => `${escapeHtml(fr)} ${fmt(f, f.medianas[fr])}`).join('; ')}">
+            <line x1="8" x2="${W - 8}" y1="${H / 2}" y2="${H / 2}" class="fr-eje"/>${marcas}
+            <circle cx="${x(f.v)}" cy="${H / 2}" r="5.5" class="fr-punto"/></svg></div>`;
+    };
+    return `${leyenda}<div class="fr-lista">${filas.map(fila).join('')}</div>`;
+}

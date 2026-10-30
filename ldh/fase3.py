@@ -16,6 +16,7 @@ import gzip
 import json
 import math
 import sqlite3
+import warnings
 from datetime import datetime, timezone
 from collections import defaultdict
 from typing import Callable
@@ -65,6 +66,9 @@ NO_APLICA = {"Support": {"cs_min", "cs10", "cs15", "dif_cs10", "dif_cs15"}, "Jun
 NOTA = ("kp", "dano", "oro_min", "vision_min")
 # Índice por partida para la tendencia: lo que depende de cómo jugaste, no del resultado (el winrate
 # depende de los compañeros y tiene demasiado ruido para ver una tendencia). Muertes cuentan al revés.
+# Las del gráfico "contra cada franja": tu valor al lado de la mediana de las tres franjas. Solo pone
+# las medianas al lado; no dice a qué franja te parecés (eso sería estimar un rango, y Riot no lo permite).
+POR_FRANJA = ("kp", "dano", "oro_min", "cs_min", "vision_min", "control", "muertes_min", "dif_oro15", "dif_vision_min")
 INDICE = {
     "_": ("kp", "dano", "oro_min", "vision_min", "dif_oro15", "muertes_min"),
     "Support": ("kp", "dano", "oro_min", "vision_min", "dif_vision_min", "muertes_min"),
@@ -207,6 +211,24 @@ class Celda:
         crudos = np.array([np.mean([f["win"] for f in g]) for g in jugadores]) if jugadores else np.array([])
         ns = np.array([len(g) for g in jugadores])
         self.tau2 = max(float(crudos.var(ddof=1) - np.mean(crudos * (1 - crudos) / ns)), 1e-4) if len(crudos) > 2 else None
+        # El mismo índice de la tendencia, promediado por jugador de referencia: dónde juega la franja
+        # en ese gráfico (mediana y la mitad del medio), para no comparar solo contra un 50 teórico.
+        rol = filas[0]["role"] if filas else None
+        self.indice_jugadores = np.sort(np.array([x for g in jugadores
+                                                  if not np.isnan(x := float(np.nanmean(self.indice(_matriz(g), rol))))]))
+
+    def indice(self, m: dict, rol: str | None) -> np.ndarray:
+        """Índice por partida (0–100): percentil promedio en las métricas de INDICE, muertes al revés."""
+        ps = []
+        for k in INDICE.get(rol, INDICE["_"]):
+            if k in self.partida and len(self.partida[k]):
+                p = _pct(m[k], self.partida[k])
+                ps.append(1 - p if not METRICAS[k][2] else p)
+        if not ps:
+            return np.full(len(m["_w"]), np.nan)
+        with warnings.catch_warnings():  # partidas sin ninguna métrica: NaN, sin aviso
+            warnings.simplefilter("ignore", RuntimeWarning)
+            return np.nanmean(np.stack(ps), axis=0) * 100
 
     def dispersion(self, m: dict, idx: np.ndarray) -> np.ndarray:
         """Desvío de la nota por partida: el promedio de los percentiles por partida de NOTA."""
@@ -288,15 +310,9 @@ def tendencia(filas: list[dict], celda: "Celda", rol: str) -> dict | None:
     cfg = PERF["tendencia"]
     if len(filas) < cfg["min_partidas"]:
         return None
-    m = _matriz(filas)
-    ps = []
-    for k in INDICE.get(rol, INDICE["_"]):
-        if k in celda.partida and len(celda.partida[k]):
-            p = _pct(m[k], celda.partida[k])
-            ps.append(1 - p if not METRICAS[k][2] else p)
-    if not ps:
+    y = celda.indice(_matriz(filas), rol)
+    if np.isnan(y).all():
         return None
-    y = np.nanmean(np.stack(ps), axis=0) * 100
     ok = ~np.isnan(y)
     y, t = y[ok], np.array([f["inicio_ms"] for f, o in zip(filas, ok) if o])
     n = len(y)
@@ -332,7 +348,12 @@ def tendencia(filas: list[dict], celda: "Celda", rol: str) -> dict | None:
             "pendiente": _r(pendiente * 100, 1), "lo": _r(lo * 100, 1), "hi": _r(hi * 100, 1),
             "veredicto": "mejorando" if lo > 0 else "empeorando" if hi < 0 else "sin tendencia clara",
             "inicio": _r(float(np.mean(y[:v])), 1), "ahora": _r(float(np.mean(y[-v:])), 1),
-            "metricas": [METRICAS[k][0] for k in INDICE.get(rol, INDICE["_"])]}
+            "metricas": [METRICAS[k][0] for k in INDICE.get(rol, INDICE["_"])],
+            "ref": None if len(celda.indice_jugadores) < REF["min_jugadores"] else {
+                "mediana": _r(float(np.median(celda.indice_jugadores)), 1),
+                "lo": _r(float(np.percentile(celda.indice_jugadores, 25)), 1),
+                "hi": _r(float(np.percentile(celda.indice_jugadores, 75)), 1),
+                "jugadores": len(celda.indice_jugadores)}}
 
 
 def _rol(filas: list[dict], rol: str, franja: str, celdas: dict) -> dict | None:
@@ -362,6 +383,17 @@ def _rol(filas: list[dict], rol: str, franja: str, celdas: dict) -> dict | None:
         metricas[k] = {"nombre": nombre, "v": _r(val[0], dec + 1), "lo": lo, "hi": hi, "dec": dec, "unidad": unidad,
                        "pct": pv, "pct_lo": plo, "pct_hi": phi, "mediana": _r(celda.mediana(k), dec + 1),
                        "n_ref": len(celda.por_jugador[k])}
+
+    por_franja = []
+    for k in POR_FRANJA:
+        if k not in metricas or (k == "dif_oro15" and rol == "Support") or (k == "dif_vision_min" and rol != "Support"):
+            continue
+        x = metricas[k]
+        meds = {fr: _r(c.mediana(k), x["dec"] + 1) for fr in FRANJAS
+                if (c := celdas.get((fr, rol))) is not None and c.n_jugadores >= REF["min_jugadores"] and c.disponible(k)}
+        if len(meds) == len(FRANJAS):
+            por_franja.append({"clave": k, "mejor": METRICAS[k][2], "medianas": meds,
+                               **{c: x[c] for c in ("nombre", "v", "lo", "hi", "dec", "unidad")}})
 
     comps = []
     for clave, nombre, ms in _componentes(rol):
@@ -422,7 +454,7 @@ def _rol(filas: list[dict], rol: str, franja: str, celdas: dict) -> dict | None:
             "componentes": comps, "metricas": metricas,
             "fortalezas": [item(k, x, False) for k, x in fort],
             "mejorar": [item(k, x, True) for k, x in debil],
-            "sumar": sumar,
+            "sumar": sumar, "por_franja": por_franja,
             "tendencia": tendencia(filas, celda, rol)}
 
 

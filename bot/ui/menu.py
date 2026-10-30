@@ -125,7 +125,7 @@ class MenuBoton(discord.ui.DynamicItem[discord.ui.Button], template=r"lm:(?P<acc
             await interaction.response.defer(thinking=True)
             p = await bot.datos.perfil(pid)
             enviados = 0
-            for tipo in ("tendencia", "evolucion", "radar"):
+            for tipo in ("tendencia", "evolucion", "franjas", "radar"):
                 view, png = await armar_grafico(bot, p, tipo, None)
                 if png is not None:
                     await interaction.followup.send(view=view, file=discord.File(png, "grafico.png"))

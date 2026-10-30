@@ -85,8 +85,16 @@ def tendencia(t: dict, titulo: str, franja: str) -> io.BytesIO:
     MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
     xs = [p["i"] for p in t["puntos"]]
     fig, ax = _figura()
-    ax.axhline(50, color=TENUE, lw=1, ls=(0, (4, 4)))
-    ax.annotate(f"mitad de {franja}", (0, 50), xytext=(2, 5), textcoords="offset points", color=TENUE, fontsize=9)
+    ref = t.get("ref")
+    if ref:
+        # Dónde juegan de verdad los jugadores de la franja en este mismo índice: la mitad del medio y la mediana.
+        ax.axhspan(ref["lo"], ref["hi"], color=TENUE, alpha=0.16, lw=0)
+        ax.axhline(ref["mediana"], color=TENUE, lw=1.2, ls=(0, (4, 4)))
+        ax.annotate(f"{franja}: mediana {ref['mediana']:.0f}, la mitad del medio entre {ref['lo']:.0f} y {ref['hi']:.0f}",
+                    (0, ref["hi"]), xytext=(4, 4), textcoords="offset points", color=TEXTO, fontsize=8.5)
+    else:
+        ax.axhline(50, color=TENUE, lw=1, ls=(0, (4, 4)))
+        ax.annotate(f"mitad de {franja}", (0, 50), xytext=(2, 5), textcoords="offset points", color=TENUE, fontsize=9)
     ax.plot(xs, [p["v"] for p in t["puntos"]], color=ACENTO, lw=2.4)
     color = {"mejorando": "#00e07a", "empeorando": "#ff4466"}.get(t["veredicto"], TENUE)
     r = t["recta"]
@@ -136,4 +144,55 @@ def radar(comps: list[dict], titulo: str, segundo: list[dict] | None = None, eti
     if segundo:
         ax.legend(loc="upper right", bbox_to_anchor=(1.25, 1.12), facecolor=PANEL, edgecolor=GRILLA, labelcolor=TEXTO)
     ax.set_title(titulo, color=TEXTO, fontsize=12, pad=24)
+    return _png(fig)
+
+
+ABREV = {"Hierro–Bronce": "H–B", "Plata–Oro": "P–O", "Platino–Esmeralda": "P–E"}
+COLOR_FRANJA = ["#c08457", "#c9ced8", "#3fbf9b"]  # bronce, plata, esmeralda
+
+
+def _fmt(x: float | None, dec: int, signo: bool = False) -> str:
+    if x is None:
+        return "—"
+    t = f"{abs(x):,.{dec}f}".replace(",", " ").replace(".", ",").replace(" ", ".")
+    return ("+" if signo and x > 0 else "−" if x < 0 else "") + t
+
+
+def franjas(filas: list[dict], titulo: str) -> io.BytesIO:
+    """Contra cada franja: una fila por métrica con tu valor y la mediana de las tres franjas.
+    Cada fila tiene su propia escala (son unidades distintas); los números van a la derecha."""
+    nombres_fr = list(filas[0]["medianas"])
+    n = len(filas)
+    fig, ax = _figura(9, 0.62 * n + 1.3)
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(n - 0.5, -0.5)
+    ax.set_xticks([])
+    ax.set_yticks(range(n))
+    ax.set_yticklabels([f["nombre"] + ("" if f["mejor"] else "  (menos es mejor)") for f in filas], color=TEXTO, fontsize=9.5)
+    for s in ax.spines.values():
+        s.set_visible(False)
+    for i, f in enumerate(filas):
+        vals = [f["v"], *f["medianas"].values()]
+        # Cada fila tiene su escala, pero nunca menos de ±25 % de la mediana del medio: si no, 0,20 contra
+        # 0,23 muertes por minuto ocupaba todo el ancho y parecía tan grande como 300 de oro.
+        centro = (min(vals) + max(vals)) / 2
+        medio = list(f["medianas"].values())[len(f["medianas"]) // 2]
+        mitad = max((max(vals) - min(vals)) / 2 * 1.15, 0 if f["clave"].startswith("dif") else abs(medio) * 0.25, 1e-9)
+        lo, hi = centro - mitad, centro + mitad
+        x = lambda v: (v - lo) / (hi - lo)
+        ax.plot([0, 1], [i, i], color=GRILLA, lw=1.2, zorder=1)
+        for j, (fr, med) in enumerate(f["medianas"].items()):
+            ax.scatter([x(med)], [i], marker="|", s=320, lw=3, color=COLOR_FRANJA[j], zorder=2)
+        ax.scatter([x(f["v"])], [i], s=90, color=ACENTO, edgecolor=FONDO, lw=1.5, zorder=3)
+        signo = f["clave"].startswith("dif")
+        u = f" {f['unidad']}" if f["unidad"] else ""
+        txt = f"vos {_fmt(f['v'], f['dec'], signo)}{u}   " + "   ".join(
+            f"{ABREV.get(fr, fr)} {_fmt(m, f['dec'], signo)}" for fr, m in f["medianas"].items())
+        ax.annotate(txt, (1.03, i), xycoords=("axes fraction", "data"), va="center", color=TENUE, fontsize=8.5)
+    marcas = [plt.Line2D([], [], color=ACENTO, marker="o", ls="", ms=8, label="vos")] + [
+        plt.Line2D([], [], color=COLOR_FRANJA[j], marker="|", ls="", ms=14, mew=3, label=f"mediana {fr}")
+        for j, fr in enumerate(nombres_fr)]
+    ax.legend(handles=marcas, loc="lower left", bbox_to_anchor=(0, 1.0), ncol=4, frameon=False, labelcolor=TEXTO,
+              fontsize=8.5, handletextpad=0.3, columnspacing=1.2)
+    ax.set_title(titulo, color=TEXTO, fontsize=12, loc="left", pad=30)
     return _png(fig)
