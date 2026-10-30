@@ -35,22 +35,47 @@ def _png(fig) -> io.BytesIO:
 
 def evolucion(evo: dict, cola: str, nombre_cola: str, titulo: str) -> io.BytesIO:
     """Winrate de las últimas N partidas en cada momento, con su banda de Wilson y el 50 % punteado."""
-    pts = evo["colas"][cola]["puntos"]
-    xs = [p["i"] for p in pts]
+    import matplotlib.dates as mdates
+
+    c = evo["colas"][cola]
+    pts = c["puntos"]
+    fecha = lambda t: datetime.fromtimestamp(t / 1000, timezone.utc)
+    xs = [fecha(p["t"]) for p in pts]
     fig, ax = _figura()
     ax.fill_between(xs, [p["lo"] * 100 for p in pts], [p["hi"] * 100 for p in pts], color=ACENTO, alpha=0.18, lw=0)
     ax.plot(xs, [p["v"] * 100 for p in pts], color=ACENTO, lw=2.4)
     ax.axhline(50, color=TENUE, lw=1, ls=(0, (4, 4)))
+    # La referencia es tu propia temporada: la línea naranja es tu promedio.
+    if c.get("temporada"):
+        temp = c["temporada"]["v"] * 100
+        ax.axhline(temp, color=SEGUNDO, lw=1.4, ls=(0, (6, 4)))
+        # El rótulo va a la izquierda: a la derecha se pisaba con el de "hoy".
+        ax.annotate(f"tu temporada {round(temp)} %", (xs[0], temp), xytext=(2, 5), textcoords="offset points",
+                    color=SEGUNDO, fontsize=9, ha="left")
+    for clave, rotulo, dy in (("mejor", "mejor tramo", 8), ("peor", "peor tramo", -14)):
+        if c.get(clave):
+            h = c[clave]
+            ax.scatter([fecha(h["t"])], [h["v"] * 100], color=TENUE, s=14, zorder=3)
+            ax.annotate(f"{rotulo} {round(h['v'] * 100)} %", (fecha(h["t"]), h["v"] * 100), xytext=(0, dy),
+                        textcoords="offset points", color=TENUE, fontsize=8, ha="center")
     ult = pts[-1]
-    ax.scatter([ult["i"]], [ult["v"] * 100], color=ACENTO, zorder=3, s=30)
-    ax.annotate(f"{round(ult['v'] * 100)} %", (ult["i"], ult["v"] * 100), xytext=(6, 6),
-                textcoords="offset points", color=TEXTO, fontsize=10)
+    ax.scatter([xs[-1]], [ult["v"] * 100], color=ACENTO, zorder=4, s=36)
+    ax.annotate(f"hoy {round(ult['v'] * 100)} %", (xs[-1], ult["v"] * 100), xytext=(-8, 8),
+                textcoords="offset points", color=ACENTO, fontsize=10, ha="right", fontweight="bold")
     ax.set_ylim(0, 100)
-    ax.set_ylabel("winrate (%)", color=TENUE)
-    fecha = datetime.fromtimestamp(ult["t"] / 1000, timezone.utc).strftime("%d/%m")
-    ax.set_xlabel(f"partida número (última: {fecha})", color=TENUE)
+    ax.set_ylabel(f"winrate de las {evo['ventana']} anteriores (%)", color=TENUE)
+    ax.xaxis.set_major_locator(mdates.MonthLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b"))
     ax.grid(color=GRILLA, lw=0.6)
-    ax.set_title(f"{titulo} · {nombre_cola} · últimas {evo['ventana']} partidas", color=TEXTO, fontsize=12, loc="left")
+    # El título contesta la pregunta del gráfico: ¿venís mejor o peor que antes?
+    if c.get("ultimas"):
+        veredicto = ("venís mejor" if c["ultimas"]["v"] > c["resto"]["v"] else "venís peor") if c.get("senal") \
+            else "igual que siempre (ruido)"
+        sub = (f"Últimas {evo['ventana']}: {round(c['ultimas']['v'] * 100)} % · antes: {round(c['resto']['v'] * 100)} % "
+               f"→ {veredicto}")
+    else:
+        sub = ""
+    ax.set_title(f"{titulo} · {nombre_cola}\n{sub}", color=TEXTO, fontsize=12, loc="left")
     return _png(fig)
 
 

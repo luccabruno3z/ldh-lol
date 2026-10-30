@@ -41,11 +41,12 @@ function selector(id, etiqueta, valores, actual, nombre = (x) => x) {
 
 function performance(r, franja) {
     const pf = r.performance;
-    const lectura = pf.como
-        ? `Rendís como un <strong>${escapeHtml(pf.como)}</strong> típico en este rol${pf.pisan.length ? ` (aunque con este intervalo también podría ser ${pf.pisan.map(escapeHtml).join(' o ')})` : ''}.`
-        : '';
-    const franjas = Object.entries(pf.por_franja).map(([f, x]) =>
-        `<div class="perf-franja${f === franja ? ' actual' : ''}"><span class="dim">contra ${escapeHtml(f)}</span> <span class="v">${num(x.v * 100, 0)}</span><span class="ic">${num(x.lo * 100, 0)} a ${num(x.hi * 100, 0)}</span></div>`).join('');
+    // Solo contra tu propia franja: decir "rendís como un X" sería estimar un rango, y la política
+    // de Riot prohíbe las alternativas al sistema de rangos (calculadoras de MMR/ELO).
+    const lectura = pf.lo > 0.5 ? `Por encima de la mitad de los jugadores de <strong>${escapeHtml(franja)}</strong> en este rol.`
+        : pf.hi < 0.5 ? `Por debajo de la mitad de los jugadores de <strong>${escapeHtml(franja)}</strong> en este rol.`
+        : `A la par de la mitad de los jugadores de <strong>${escapeHtml(franja)}</strong> en este rol: el intervalo cruza el 50.`;
+    const franjas = '';
     return `<div class="perf-radar">
       <div class="perf">
         <div class="perf-num"><span class="perf-v">${num(pf.v * 100, 0)}</span><span class="dim">/100</span>

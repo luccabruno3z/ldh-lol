@@ -74,6 +74,13 @@ class Datos:
         """Vista de una sola cuenta de alguien con varias (cuenta/<persona>/<i>.json)."""
         return await self._json(f"cuenta/{quote(persona_id)}/{indice}.json")
 
+    async def recientes(self) -> list[dict]:
+        return await self._json("recientes.json") or []
+
+    async def partidas_resumen(self) -> list[dict]:
+        """Una fila mínima por partida de cada persona (p, t, c, w, ch, lp): semanal y competencias."""
+        return await self._json("partidas_resumen.json") or []
+
     async def consejos(self) -> dict:
         return await self._json("consejos.json") or {}
 

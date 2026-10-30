@@ -1,30 +1,57 @@
 /* graficos.js — gráficos en SVG a mano: sin dependencias, con los colores del tema (claro y
    oscuro) y legibles a 375 px. Cada gráfico muestra su intervalo, como las tablas. */
 
-import { escapeHtml, nombreCola, num, fecha } from './utils.js';
+import { escapeHtml, nombreCola, num } from './utils.js';
 
 const COLAS = ['solo', 'flex', 'normal'];
 
 // ---- Evolución: winrate móvil con su banda de Wilson, y el LP ----
 
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const P = (v) => `${Math.round(v * 100)} %`;
+
+/** La frase que el gráfico tiene que contestar: ¿venís mejor o peor que en el resto de la temporada? */
+function lecturaEvo(c, ventana) {
+    if (!c.ultimas) return '';
+    const veredicto = c.senal
+        ? (c.ultimas.v > c.resto.v ? '<span class="tag win">venís mejor</span>' : '<span class="tag loss">venís peor</span>')
+        : '<span class="tag">igual que siempre (ruido)</span>';
+    return `<p class="evo-lectura">En tus últimas <strong>${ventana}</strong> ganás <strong>${P(c.ultimas.v)}</strong>; antes, ${P(c.resto.v)}. ${veredicto}
+      <span class="dim">Fisher p = ${num(c.p, 2)}</span></p>`;
+}
+
 function lineaWinrate(c, ventana) {
-    const W = 640, H = 200, m = { l: 34, r: 8, t: 10, b: 22 };
-    const pts = c.puntos, x0 = pts[0].i, x1 = pts[pts.length - 1].i;
-    const x = (i) => m.l + (x1 === x0 ? 0.5 : (i - x0) / (x1 - x0)) * (W - m.l - m.r);
+    const W = 640, H = 220, m = { l: 34, r: 12, t: 16, b: 24 };
+    const pts = c.puntos, t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+    const x = (t) => m.l + (t1 === t0 ? 0.5 : (t - t0) / (t1 - t0)) * (W - m.l - m.r);
     const y = (v) => m.t + (1 - v) * (H - m.t - m.b);
-    const banda = `${pts.map(p => `${x(p.i)},${y(p.hi)}`).join(' ')} ${[...pts].reverse().map(p => `${x(p.i)},${y(p.lo)}`).join(' ')}`;
-    const linea = pts.map(p => `${x(p.i)},${y(p.v)}`).join(' ');
+    const banda = `${pts.map(p => `${x(p.t)},${y(p.hi)}`).join(' ')} ${[...pts].reverse().map(p => `${x(p.t)},${y(p.lo)}`).join(' ')}`;
+    const linea = pts.map(p => `${x(p.t)},${y(p.v)}`).join(' ');
     const ult = pts[pts.length - 1];
-    const marcas = [0.25, 0.5, 0.75].map(v => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" class="${v === 0.5 ? 'g-medio' : 'g-grilla'}"/>
+    const marcas = [0.25, 0.75].map(v => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" class="g-grilla"/>
         <text x="${m.l - 6}" y="${y(v) + 4}" class="g-eje" text-anchor="end">${v * 100}%</text>`).join('');
+    // Un rótulo por mes en el eje: las fechas dicen más que "partida 245".
+    const meses = [];
+    for (let d = new Date(t0); d.getTime() <= t1; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+        const ini = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+        if (ini >= t0) meses.push(`<text x="${x(ini)}" y="${H - 6}" class="g-eje" text-anchor="middle">${MESES[d.getMonth()]}</text>`);
+    }
+    const temp = c.temporada?.v;
+    const marca = (p, txt, arriba) => `<circle cx="${x(p.t)}" cy="${y(p.v)}" r="3" class="g-punto--hito"/>
+        <text x="${x(p.t)}" y="${y(p.v) + (arriba ? -8 : 16)}" class="g-eje g-hito" text-anchor="middle">${txt} ${P(p.v)}</text>`;
     return `<svg class="g-evo" viewBox="0 0 ${W} ${H}" role="img"
-        aria-label="Winrate de las últimas ${ventana} partidas a lo largo de la temporada en ${escapeHtml(nombreCola(c.cola))}; hoy ${Math.round(ult.v * 100)} %">
+        aria-label="Winrate de tus últimas ${ventana} partidas a lo largo de la temporada en ${escapeHtml(nombreCola(c.cola))}; hoy ${P(ult.v)}, en la temporada ${temp != null ? P(temp) : '—'}">
       ${marcas}
+      <line x1="${m.l}" x2="${W - m.r}" y1="${y(0.5)}" y2="${y(0.5)}" class="g-medio"/>
+      <text x="${m.l - 6}" y="${y(0.5) + 4}" class="g-eje" text-anchor="end">50%</text>
+      ${temp != null ? `<line x1="${m.l}" x2="${W - m.r}" y1="${y(temp)}" y2="${y(temp)}" class="g-temporada"/>
+        <text x="${m.l + 4}" y="${y(temp) - 5}" class="g-eje g-temporada-txt" text-anchor="start">tu temporada ${P(temp)}</text>` : ''}
       <polygon points="${banda}" class="g-banda"/>
       <polyline points="${linea}" class="g-linea"/>
-      <circle cx="${x(ult.i)}" cy="${y(ult.v)}" r="4" class="g-punto"><title>Hoy: ${Math.round(ult.v * 100)} % (${Math.round(ult.lo * 100)} a ${Math.round(ult.hi * 100)} %)</title></circle>
-      <text x="${m.l}" y="${H - 4}" class="g-eje">partida ${x0}</text>
-      <text x="${W - m.r}" y="${H - 4}" class="g-eje" text-anchor="end">partida ${x1} · ${fecha(ult.t, false)}</text>
+      ${c.mejor ? marca(c.mejor, 'mejor tramo', true) : ''}${c.peor ? marca(c.peor, 'peor tramo', false) : ''}
+      <circle cx="${x(ult.t)}" cy="${y(ult.v)}" r="5" class="g-punto"><title>Hoy: ${P(ult.v)} (${P(ult.lo)} a ${P(ult.hi)})</title></circle>
+      <text x="${x(ult.t) - 8}" y="${y(ult.v) - 9}" class="g-eje g-hoy" text-anchor="end">hoy ${P(ult.v)}</text>
+      ${meses.join('')}
     </svg>`;
 }
 
@@ -58,8 +85,9 @@ export function seccionEvolucion(evo) {
         ${colas.length > 1 ? `<div class="chips-cola" role="tablist">${colas.map(c => `<button type="button" role="tab" class="chip-cola${c === principal ? ' is-active' : ''}"
             data-evo="${c}" aria-selected="${c === principal}">${escapeHtml(nombreCola(c))}</button>`).join('')}</div>` : ''}</div>
       ${colas.map(c => `<div class="evo-panel" data-panel="${c}"${c === principal ? '' : ' hidden'}>
+          ${lecturaEvo(evo.colas[c], evo.ventana)}
           ${lineaWinrate({ ...evo.colas[c], cola: c }, evo.ventana)}</div>`).join('')}
-      ${colas.length ? `<p class="nota">Winrate de tus últimas ${evo.ventana} partidas en cada momento de la temporada; la banda es su intervalo del 95 %. La línea punteada es el 50 %. Si la banda la cruza, ese tramo no se distingue de ir parejo.</p>` : ''}
+      ${colas.length ? `<p class="nota">Cada punto es tu winrate en las ${evo.ventana} partidas anteriores a esa fecha: si la línea sube, venías ganando más. La banda es el margen de error; la línea punteada gris es el 50 % y la naranja, tu promedio de toda la temporada. Si la banda cubre tu promedio, ese tramo no se distingue de tu nivel de siempre.</p>` : ''}
       ${evo.lp?.length ? `<h4>LP en solo/dúo</h4>${lineaLp(evo.lp)}` : ''}
     </section>`;
 }

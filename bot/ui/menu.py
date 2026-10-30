@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import discord
 
+from bot.cogs.perfil import AVISO_RIOT
+
 ACCIONES = {"perfil": "Mi perfil", "grafico": "Mis gráficos", "buscar": "Buscar jugador", "top": "Rankings",
             "toprol": "Top por rol", "comparar": "Comparar", "ayuda": "Ayuda"}
 
@@ -107,7 +109,7 @@ def menu(owner: int) -> discord.ui.LayoutView:
     view = discord.ui.LayoutView(timeout=None)
     view.add_item(discord.ui.Container(
         discord.ui.TextDisplay("## LDH Stats LoL\nElegí qué querés ver. Los números llevan su intervalo y su n; "
-                               "si algo dice **ruido**, con esas partidas no se puede sacar conclusiones."),
+                               "si algo dice **ruido**, con esas partidas no se puede sacar conclusiones.\n-# " + AVISO_RIOT),
         discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("perfil", "grafico", "buscar")]),
         discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("top", "toprol", "comparar", "ayuda")]),
         discord.ui.ActionRow(discord.ui.Button(label="Abrir la web", url="https://luccabruno3z.github.io/ldh-lol/")),

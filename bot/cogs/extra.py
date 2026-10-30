@@ -10,7 +10,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from bot.cogs.perfil import WEB, autocompletar_jugador, tarjeta_simple
+from bot.cogs.perfil import AVISO_RIOT, WEB, autocompletar_jugador, tarjeta_simple
 from bot.cogs.rankings import COLAS, ROLES, tarjeta_top
 from bot.services import formato as F
 from bot.services.storage import JSONStorage
@@ -34,6 +34,8 @@ GLOSARIO = {
                           "en tu rol. \"Mejor que el 70 %\" es contra ellos, no contra el grupo.",
     "Performance": "Índice de 0 a 100 con 7 componentes, cada uno es tu percentil contra tu franja. 50 = la mitad de tu franja.",
     "Pool": "Una partida es \"de tu pool\" si ya tenías 5+ partidas con ese campeón en ese rol en los 90 días anteriores.",
+    "Privacidad": "Solo aparecen las cuentas de quienes se sumaron al grupo, y sus estadísticas son públicas en la web "
+                  "y el bot. Los demás jugadores de las partidas quedan anónimos. Para dejar de aparecer, pedíselo a Lucca.",
     "Señal": "En sinergia y en el pool: la diferencia pasa la prueba (Fisher, y con tantos pares, ajustada por "
              "Benjamini-Hochberg). Si no, es ruido.",
 }
@@ -51,9 +53,12 @@ AYUDA = {
     "Gráficos": "`-grafico [jugador] [evolucion|radar] [rol]` tu winrate en el tiempo con su banda, o el radar de tus componentes",
     "Rankings": "`-top [semana|mes|temporada] [cola]` con menús para cambiar período y cola\n"
                 "`-top_rol [rol] [cola]` la métrica de cada rol contra el rival directo\n"
-                "`-comparar <jugador> <otro> [cola] [rol]` métrica por métrica",
-    "Servidor": "`-canal_ranking #canal` publica el top de la semana cada lunes (necesita Gestionar servidor)\n"
-                "`-canal_sugerencias #canal` adónde llegan las `-sugerencia <texto>`",
+                "`-comparar <jugador> <otro> [cola] [rol]` métrica por métrica\n"
+                "`-competencia <desde dd/mm> [hasta dd/mm] [cola]` quién rindió mejor entre dos fechas",
+    "Servidor": "`-canal_feed #canal` publica cada partida del grupo (resultado, KDA y LP) y los ascensos y descensos\n"
+                "`-canal_ranking #canal` publica el top de la semana y lo destacado cada lunes\n"
+                "`-canal_sugerencias #canal` adónde llegan las `-sugerencia <texto>`\n"
+                "-# Los tres necesitan el permiso Gestionar servidor.",
 }
 
 
@@ -134,8 +139,17 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None):
         cola = max(colas, key=lambda c: colas[c]["n"])
         nc = (await bot.datos.ajustes()).get("nombres_cola", {})
         png = graficos.evolucion(evo, cola, nc.get(cola, cola), nombre)
-        texto = (f"## {discord.utils.escape_markdown(nombre)} · evolución\n-# La banda es el intervalo del 95 %. "
-                 "Si cruza la línea del 50 %, ese tramo no se distingue de ir parejo.")
+        c = colas[cola]
+        if c.get("ultimas"):
+            veredicto = (("**venís mejor**" if c["ultimas"]["v"] > c["resto"]["v"] else "**venís peor**")
+                         if c.get("senal") else "igual que siempre (ruido)")
+            resp = (f"En tus últimas {evo['ventana']} ganás **{F.pct(c['ultimas']['v'])}**; antes, "
+                    f"{F.pct(c['resto']['v'])} → {veredicto} · Fisher p = {F.num(c['p'], 2)}")
+        else:
+            resp = ""
+        texto = (f"## {discord.utils.escape_markdown(nombre)} · ¿venís mejor o peor?\n{resp}\n"
+                 f"-# Cada punto es tu winrate en las {evo['ventana']} partidas anteriores a esa fecha. "
+                 "La banda es el margen de error; la línea naranja, tu promedio de la temporada.")
     view = discord.ui.LayoutView(timeout=None)
     view.add_item(discord.ui.Container(
         discord.ui.TextDisplay(texto),
@@ -168,7 +182,7 @@ class _VistaTexto(discord.ui.LayoutView):
     def mostrar(self, k: str):
         self.clear_items()
         self.add_item(discord.ui.Container(
-            discord.ui.TextDisplay(f"## {self.titulo} · {k}\n{self.textos[k]}"),
+            discord.ui.TextDisplay(f"## {self.titulo} · {k}\n{self.textos[k]}\n\n-# {AVISO_RIOT}"),
             discord.ui.ActionRow(_SelectorTexto(self.textos, self.titulo)),
             discord.ui.ActionRow(discord.ui.Button(label="Abrir la web", url=WEB)),
             accent_colour=0x00CCCC))
@@ -214,7 +228,7 @@ class Extra(commands.Cog):
     async def tips(self, ctx: commands.Context, rol: str = "top"):
         rol_n = ROLES.get(rol.lower())
         if not rol_n:
-            await ctx.reply("Uso: `-tips <top|jungla|mid|adc|support>`")
+            await ctx.reply("Uso: `-tips <top|jungla|mid|adc|support>`", ephemeral=True)
             return
         consejos = await self.datos.consejos()
         nombres = {"combate": "Combate", "efectividad": "Efectividad", "economia": "Economía", "linea": "Línea",
@@ -231,8 +245,9 @@ class Extra(commands.Cog):
     async def comparar(self, ctx: commands.Context, jugador: str, otro: str, cola: str | None = None, rol: str | None = None):
         pa, pb = await self.datos.buscar(jugador), await self.datos.buscar(otro)
         if not pa or not pb:
-            await ctx.reply("No encontré a alguno de los dos. Uso: `-comparar <jugador> <otro> [solo|flex|normal] [rol]`")
+            await ctx.reply("No encontré a alguno de los dos. Uso: `-comparar <jugador> <otro> [solo|flex|normal] [rol]`", ephemeral=True)
             return
+        await ctx.defer()
         await ctx.reply(view=await tarjeta_comparar(self.bot, pa["id"], pb["id"],
                                                     COLAS.get((cola or "").lower()), ROLES.get((rol or "").lower())))
 
@@ -243,6 +258,7 @@ class Extra(commands.Cog):
             jugador, tipo = None, jugador
         if not (p := await self._persona(ctx, jugador, "grafico")):
             return
+        await ctx.defer()  # dibujar el PNG puede pasar los 3 s
         view, png = await armar_grafico(self.bot, p, tipo, rol)
         if png is None:
             await ctx.reply(view)
@@ -295,6 +311,8 @@ class Extra(commands.Cog):
             d = await self.datos.ranking("semana")
             nombres = {p["id"]: p["nombre"] for p in await self.datos.personas()}
             nc = (await self.datos.ajustes()).get("nombres_cola", {})
+            feed = self.bot.get_cog("Feed")
+            destacados = await feed.destacados_semana() if feed else []
         except Exception:
             logger.exception("No pude leer el ranking semanal")
             return
@@ -304,6 +322,8 @@ class Extra(commands.Cog):
                 continue
             try:
                 await canal.send(view=tarjeta_top(d, "solo", nombres, nc))
+                if destacados:
+                    await canal.send(view=tarjeta_simple(destacados, WEB))
                 self._config(int(gid), "ultimo_ranking", semana)
             except discord.HTTPException:
                 logger.exception("No pude publicar el ranking semanal en %s", gid)

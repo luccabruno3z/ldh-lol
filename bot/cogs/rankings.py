@@ -66,9 +66,10 @@ class Rankings(commands.Cog):
     async def top(self, ctx: commands.Context, periodo: str = "mes", cola: str = "solo"):
         periodo, cola = periodo.lower(), COLAS.get(cola.lower())
         if periodo not in PERIODOS or not cola:
-            await ctx.reply("Uso: `-top [semana|mes|temporada] [solo|flex|normal]`")
+            await ctx.reply("Uso: `-top [semana|mes|temporada] [solo|flex|normal]`", ephemeral=True)
             return
         from bot.ui.rankings_vista import TopVista
+        await ctx.defer()
         vista = TopVista(self.bot, ctx.author.id, periodo, cola)  # con menús para cambiar período y cola
         await vista.pintar()
         await ctx.reply(view=vista)
@@ -77,9 +78,10 @@ class Rankings(commands.Cog):
     async def top_rol(self, ctx: commands.Context, rol: str = "top", cola: str = "solo", ventana: str = "temporada"):
         rol, cola = ROLES.get(rol.lower()), COLAS.get(cola.lower())
         if not rol or not cola:
-            await ctx.reply("Uso: `-top_rol <top|jungla|mid|adc|support> [solo|flex|normal] [temporada|reciente]`")
+            await ctx.reply("Uso: `-top_rol <top|jungla|mid|adc|support> [solo|flex|normal] [temporada|reciente]`", ephemeral=True)
             return
         from bot.ui.rankings_vista import TopRolVista
+        await ctx.defer()
         vista = TopRolVista(self.bot, ctx.author.id, rol, cola, "reciente" if ventana.lower().startswith("rec") else "historico")
         await vista.pintar()
         await ctx.reply(view=vista)

@@ -75,3 +75,12 @@ Si cambia `extract_match_stats`, subir `EXTRACTOR_VERSION` en `ldh/base.py`.
 - `-comparar a b [cola] [rol]`, `-glosario`, `-ayuda`, `-tips <rol>`, `-sugerencia <texto>`.
 - **Ranking semanal:** alguien con *Gestionar servidor* corre `-canal_ranking #canal`; los lunes desde las 12 (hora argentina) se publica el top de la semana en solo/dúo, una vez por semana. `-canal_ranking` sin canal lo apaga.
 - **Sugerencias:** se guardan en el volumen (`sugerencias.json`) y, si hay `-canal_sugerencias #canal`, también se publican ahí.
+
+## Política de Riot y feed
+
+- **Sin estimar rangos:** el Performance se compara solo contra la franja propia. Se sacó "rendís como un Plata–Oro": mapear el rendimiento a un rango es una calculadora de ELO, y la política de Riot prohíbe las alternativas al sistema de rangos oficial.
+- **Avisos:** el aviso de que Riot no respalda el proyecto está en el pie de la web, en `-menu`, `-ayuda` y `-glosario`. El de privacidad (vincularse hace públicas las estadísticas) está en `-vincular` y en el glosario de la web.
+- **Al pedir la clave personal:** registrar el producto (web y bot) en el portal de Riot; es obligatorio para todo producto de cara a jugadores.
+- **Feed:** `-canal_feed #canal` publica cada partida nueva del grupo (resultado, KDA, LP exacto) y los ascensos y descensos de división en solo/dúo. El bot lee `recientes.json` cada 5 minutos: el feed llega cuando corre la actualización, no al terminar la partida. La primera vez solo anota lo que hay, para no inundar el canal.
+- **Competencias:** `-competencia <desde> [hasta] [cola]` sale de `partidas_resumen.json`. El LP solo suma las partidas con LP exacto.
+- **Slash commands:** se sincronizan solo cuando cambian (huella en el volumen, `slash_huella.txt`).

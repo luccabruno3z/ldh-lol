@@ -57,9 +57,9 @@ def tarjeta_performance(p: dict, d: dict, pedido: str | None) -> discord.ui.Layo
               f"-# {rol} en solo/dúo · {r['n']} partidas · contra {d['franja']}",
               f"# {_num(pf['v'] * 100)}/100",
               f"-# {F.rango(pf, 0, k=100)} · confianza {r['confianza']}"]
-    if pf.get("como"):
-        lineas.append(f"Rendís como un **{pf['como']}** típico" +
-                      (f" (también podría ser {' o '.join(pf['pisan'])})" if pf["pisan"] else "") + ".")
+    # Solo contra la propia franja: "rendís como un X" sería estimar un rango (Riot prohíbe MMR/ELO).
+    lado = ("por encima de" if pf["lo"] > 0.5 else "por debajo de" if pf["hi"] < 0.5 else "a la par de")
+    lineas.append(f"Estás {lado} la mitad de los jugadores de {d['franja']} en {rol}.")
     lineas.append("### Componentes")
     for c in r["componentes"]:
         if c["sin_dato"]:
@@ -133,9 +133,10 @@ class Coaching(commands.Cog):
         p = await self.bot.get_cog("Perfil")._persona(ctx, jugador, comando)
         if not p:
             return None, None, None
+        await ctx.defer()
         d = await self.bot.datos.coaching(p["id"])
         if not d:
-            await ctx.reply("Todavía no hay coaching publicado para este jugador.")
+            await ctx.reply("Todavía no hay coaching publicado para este jugador.", ephemeral=True)
             return None, None, None
         return p, d, rol
 

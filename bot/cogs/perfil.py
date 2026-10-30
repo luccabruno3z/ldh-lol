@@ -20,6 +20,10 @@ COLORES = {"IRON": 0x6b5a4e, "BRONZE": 0xa0703c, "SILVER": 0x8a96a8, "GOLD": 0xc
            "EMERALD": 0x1fa65a, "DIAMOND": 0x4b7bec, "MASTER": 0xb05ce0, "GRANDMASTER": 0xd64545,
            "CHALLENGER": 0xf1c40f}
 WEB = "https://luccabruno3z.github.io/ldh-lol/"
+# La política de Riot pide este aviso donde los jugadores lo vean (la web lo tiene en el pie).
+AVISO_RIOT = ("LDH Stats LoL no está respaldado por Riot Games y no refleja la opinión de Riot Games ni de nadie "
+              "involucrado oficialmente en la producción o gestión de League of Legends. League of Legends y "
+              "Riot Games son marcas registradas de Riot Games, Inc.")
 
 
 async def autocompletar_jugador(interaction: discord.Interaction, actual: str) -> list[app_commands.Choice[str]]:
@@ -166,11 +170,13 @@ class Perfil(commands.Cog):
         p = await self.datos.buscar(jugador)
         if not p:
             await ctx.reply(f"No encontré a **{discord.utils.escape_markdown(jugador)}** entre los jugadores publicados. "
-                            "Solo aparecen las cuentas que se vincularon: pedile a Lucca que te sume.")
+                            "Solo aparecen las cuentas que se vincularon: pedile a Lucca que te sume.", ephemeral=True)
             return
         self.vinculos.set(str(ctx.author.id), p["id"])
         await ctx.reply(f"Listo: quedaste vinculado a **{discord.utils.escape_markdown(p['nombre'])}**. "
-                        "Ahora `-perfil` sin nombre muestra el tuyo.")
+                        "Ahora `-perfil` sin nombre muestra el tuyo.\n"
+                        "-# Tus estadísticas son públicas en la web y en el bot porque te sumaste al grupo. "
+                        "Si querés dejar de aparecer, pedíselo a Lucca y se saca tu cuenta.")
 
     @commands.hybrid_command(name="desvincular", description="Borra tu vínculo")
     async def desvincular(self, ctx: commands.Context):
@@ -184,18 +190,19 @@ class Perfil(commands.Cog):
         else:
             pid = self.vinculos.get(str(ctx.author.id))
             if not pid:
-                await ctx.reply(f"No estás vinculado. Usá `-vincular <tu nombre o Riot ID>` o `-{comando} <jugador>`.")
+                await ctx.reply(f"No estás vinculado. Usá `-vincular <tu nombre o Riot ID>` o `-{comando} <jugador>`.", ephemeral=True)
                 return None
             p = {"id": pid}
         perfil = await self.datos.perfil(p["id"]) if p else None
         if not perfil:
-            await ctx.reply("No encontré ese jugador. Solo aparecen las cuentas que se vincularon.")
+            await ctx.reply("No encontré ese jugador. Solo aparecen las cuentas que se vincularon.", ephemeral=True)
         return perfil
 
     async def _abrir(self, ctx: commands.Context, jugador: str | None, comando: str, tab: str):
         """El perfil con pestañas, abierto en la pestaña pedida."""
         from bot.ui.perfil_vista import render
         if p := await self._persona(ctx, jugador, comando):
+            await ctx.defer()  # armar la tarjeta lee varios JSON: Discord corta a los 3 s
             await ctx.reply(view=await render(self.bot, p["id"], tab, "t", ctx.author.id))
 
     @commands.hybrid_command(name="perfil", description="Tu perfil con pestañas: resumen, roles, campeones, coaching y partidas")

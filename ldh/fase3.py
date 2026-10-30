@@ -294,17 +294,9 @@ def _rol(filas: list[dict], rol: str, franja: str, celdas: dict) -> dict | None:
         comps.append({"clave": clave, "nombre": nombre, "metricas": ms, "nivel": _r(nv), "lo": lo, "hi": hi,
                       "peso": w, "aporte": _r(w * nv), "margen": _r(w * (1 - nv)), "sin_dato": sin})
 
-    # Performance contra cada franja: "rendís como un…".
-    por_franja = {}
-    for fr in FRANJAS:
-        c = celdas.get((fr, rol))
-        if c is None or c.n_jugadores < REF["min_jugadores"]:
-            continue
-        e = ev if fr == franja else _evaluar(filas, c, rol, idx)
-        lo, hi = _ic(e["perf"][1:])
-        por_franja[fr] = {"v": _r(e["perf"][0]), "lo": lo, "hi": hi}
-    como = min(por_franja, key=lambda fr: abs(por_franja[fr]["v"] - 0.5)) if por_franja else None
-    pisan = [fr for fr, x in por_franja.items() if fr != como and x["lo"] is not None and x["lo"] <= 0.5 <= x["hi"]]
+    # Antes se calculaba el Performance contra cada franja ("rendís como un Plata–Oro"). Se sacó:
+    # mapear el rendimiento a un rango es una estimación de ELO, y la política de Riot prohíbe
+    # las alternativas al sistema de rangos oficial (calculadoras de MMR/ELO).
     lo, hi = _ic(ev["perf"][1:])
 
     # Fortalezas y a mejorar: el intervalo del percentil entero de un lado.
@@ -347,8 +339,7 @@ def _rol(filas: list[dict], rol: str, franja: str, celdas: dict) -> dict | None:
 
     return {"n": n, "confianza": est.confianza(n), "franja": franja, "n_ref": celda.n_jugadores,
             "ref_winrate_crudo": _r(celda.winrate_crudo),
-            "performance": {"v": _r(ev["perf"][0]), "lo": lo, "hi": hi, "por_franja": por_franja,
-                            "como": como, "pisan": pisan},
+            "performance": {"v": _r(ev["perf"][0]), "lo": lo, "hi": hi},
             "componentes": comps, "metricas": metricas,
             "fortalezas": [item(k, x, False) for k, x in fort],
             "mejorar": [item(k, x, True) for k, x in debil],

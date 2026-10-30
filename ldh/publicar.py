@@ -112,10 +112,26 @@ def _evolucion(filas: list[dict], lp: list[dict]) -> dict:
         if len(g) < v:
             continue
         puntos = []
-        for fin in range(v, len(g) + 1, paso):
+        # Un punto cada `paso` partidas y siempre uno en la última, para que "hoy" sea hoy.
+        fines = list(range(v, len(g) + 1, paso))
+        if fines[-1] != len(g):
+            fines.append(len(g))
+        for fin in fines:
             w = g[fin - v:fin]
             puntos.append({"t": w[-1]["inicio_ms"], "i": fin, **est.wilson(sum(f["win"] for f in w), v)})
-        colas[cola] = {"n": len(g), "puntos": puntos}
+        # La pregunta del gráfico: ¿venís mejor o peor que en el resto de la temporada? Las últimas
+        # v partidas contra las anteriores, con Fisher, y el promedio de la temporada como referencia.
+        ult, resto = g[-v:], g[:-v]
+        a, b = sum(f["win"] for f in ult), sum(f["win"] for f in resto)
+        p = est.fisher(a, len(ult) - a, b, len(resto) - b) if resto else None
+        mejor = max(puntos, key=lambda x: x["v"])
+        peor = min(puntos, key=lambda x: x["v"])
+        colas[cola] = {"n": len(g), "puntos": puntos,
+                       "temporada": est.wilson(sum(f["win"] for f in g), len(g)),
+                       "ultimas": est.wilson(a, len(ult)), "resto": est.wilson(b, len(resto)),
+                       "p": None if p is None else round(p, 3),
+                       "senal": p is not None and p < AJUSTES["ajuste_muestra"]["alfa"],
+                       "mejor": {"t": mejor["t"], "v": mejor["v"]}, "peor": {"t": peor["t"], "v": peor["v"]}}
     return {"ventana": v, "colas": colas, "lp": lp}
 
 
@@ -238,17 +254,30 @@ def publicar() -> dict:
     recientes = defaultdict(lambda: {"jugadores": []})
     for r in db.execute("""
         SELECT pa.match_id, pa.inicio_ms, pa.cola, pa.duracion_seg, pt.persona_id, pt.champion_id, pt.rol,
-               pt.win, pt.kills, pt.deaths, pt.assists
-        FROM partidas pa JOIN participantes pt USING(match_id)
+               pt.win, pt.kills, pt.deaths, pt.assists, c.riot_id
+        FROM partidas pa JOIN participantes pt USING(match_id) LEFT JOIN cuentas c ON c.puuid = pt.puuid
         WHERE pt.persona_id IS NOT NULL AND pa.match_id IN
             (SELECT match_id FROM partidas ORDER BY inicio_ms DESC LIMIT 30)
         ORDER BY pa.inicio_ms DESC"""):
         m = recientes[r["match_id"]]
         m.update({"id": r["match_id"], "inicio": r["inicio_ms"], "cola": r["cola"],
                   "dur": round(r["duracion_seg"] / 60, 1)})
+        l = lp.get((r["match_id"], r["riot_id"]))
         m["jugadores"].append({"persona": r["persona_id"], "champ": r["champion_id"], "rol": r["rol"],
-                               "win": r["win"], "k": r["kills"], "d": r["deaths"], "a": r["assists"]})
+                               "win": r["win"], "k": r["kills"], "d": r["deaths"], "a": r["assists"],
+                               # LP solo cuando es exacto (una partida entre dos fotos de rango): el feed lo muestra.
+                               "lp": l["delta"] if l and l["exacto"] else None})
     _escribir("recientes.json", list(recientes.values()))
+
+    # Una fila mínima por partida de cada persona: el bot arma con esto el resumen semanal y las
+    # competencias por fecha sin bajar todos los historiales.
+    resumen = []
+    for pid, fs in filas_por.items():
+        for f in fs:
+            l = lp.get((f["match_id"], f["riot_id"]))
+            resumen.append({"p": pid, "t": f["inicio_ms"], "c": f["cola"], "w": int(bool(f["win"])),
+                            "ch": f["champion_id"], "lp": l["delta"] if l and l["exacto"] else None})
+    _escribir("partidas_resumen.json", sorted(resumen, key=lambda x: x["t"]))
 
     static = get_static()
     _escribir("campeones.json", {"version": static.version,
