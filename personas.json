@@ -222,5 +222,15 @@
     "riot_id": "Drakes inutiles#Facto"
    }
   ]
+ },
+ {
+  "id": "danuuhood",
+  "nombre": "DanuuHood",
+  "cuentas": [
+   {
+    "riot_id": "DanuuHood#EHE",
+    "principal": true
+   }
+  ]
  }
 ]
