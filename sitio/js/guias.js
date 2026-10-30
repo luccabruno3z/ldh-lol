@@ -61,6 +61,25 @@ async function modeloVictoria() {
     </section>`;
 }
 
+/** Qué acompaña a ganar en el rol: cada componente por separado (fase 5). No cambia el Performance. */
+async function acompanan(rol) {
+    const d = await cachedFetch('acompanan_ganar.json', { silent: true });
+    const r = d?.roles?.[rol];
+    if (!r) return '';
+    const max = Math.max(...r.componentes.map(c => Math.abs(c.dif.hi)), 0.01);
+    const filas = r.componentes.map(c => {
+        const w = (v) => `${(Math.abs(v) / max) * 50}%`;
+        const lado = c.dif.v >= 0 ? 'left:50%' : `right:50%`;
+        return `<div class="ag-fila"><span class="ag-nombre">${escapeHtml(c.nombre)}<span class="dim small"> · pesa ${num(c.peso_fijo * 100, 0)} en tu Performance</span></span>
+          <span class="ag-pista"><span class="ag-barra ${c.dif.lo > 0 ? 'ag-pos' : c.dif.hi < 0 ? 'ag-neg' : 'ag-nada'}" style="${lado};width:${w(c.dif.v)}"></span><span class="ag-cero"></span></span>
+          <span class="ag-num"><strong>${c.dif.v > 0 ? '+' : ''}${num(c.dif.v * 100, 0)} pts</strong> <span class="dim">${num(c.arriba.v * 100, 0)} % contra ${num(c.abajo.v * 100, 0)} %</span></span></div>`;
+    }).join('');
+    return `<section class="section"><h3>Qué acompaña a ganar · ${rol}</h3>
+      <p class="dim">Winrate de las partidas con cada componente en la mitad de arriba de la franja, contra la mitad de abajo (${num(r.n_partidas, 0)} partidas de ${r.n_jugadores} jugadores de referencia).</p>
+      <div class="ag-lista">${filas}</div>
+      <p class="nota">${escapeHtml(d.nota)} La Efectividad (participación en kills y % del daño) casi no se mueve: son porciones del equipo, y en una derrota tu porción puede ser alta. Probamos aprender los pesos del Performance con estos datos y el KDA se llevaba casi todo (es casi el resultado); por eso quedan los pesos fijos.</p></section>`;
+}
+
 async function render() {
     const [ref, consejos, eq] = await Promise.all([cachedFetch('referencia.json'), cachedFetch('consejos.json'), cachedFetch('equipos.json')]);
     const cont = document.getElementById('guias-cuerpo');
@@ -96,6 +115,7 @@ async function render() {
             <td>${j.roles[rol].campeones.slice(0, 4).map(c => `<span class="quien">${iconoCampeon(c.id, 22)} ${escapeHtml(campeon(c.id))} <span class="dim">${c.n}</span></span>`).join(' ') || '<span class="dim">—</span>'}</td></tr>`).join('')}</tbody></table></div>`
           : `<p class="empty-state">Nadie del grupo tiene ${eq.min_rol}+ partidas de ${rol}.</p>`}
         <p class="nota">Todas las colas de Grieta. El winrate ajustado suma 10 partidas al 50 % para que nadie quede arriba con 3 de 3.</p></section>
+      ${await acompanan(rol).catch(() => '')}
       ${await modeloVictoria().catch(() => '')}`;
 }
 

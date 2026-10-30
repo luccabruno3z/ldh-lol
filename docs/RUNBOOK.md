@@ -94,3 +94,23 @@ Si cambia `extract_match_stats`, subir `EXTRACTOR_VERSION` en `ldh/base.py`.
 - **Guías** (página Guías): medianas de la referencia por franja y rol, consejos del rol y quién del grupo lo juega mejor.
 - **Partida en vivo:** pendiente. Necesita consultar Spectator-V5 seguido, así que espera la clave personal.
 - **Builds por ventana de parche:** pendiente. Con las partidas del grupo no alcanza: de los 18 pares (campeón, rol) que juegan los amigos en los dos últimos parches, el que más tiene suma 70 partidas contando a los diez jugadores, y repartidas por combinación de ítems casi ninguna llega a 15 partidas y 2 jugadores. Hace falta scoutear especialistas por (campeón, rol), como `scout.py` de Coach AI, con la clave personal. Los ítems se agrupan por id y se clasifican por receta (`from`/`into` de item.json), nunca por nombre.
+
+## Fase 5: lo que salió de la investigación (tesis de xPetu, PandaSkill, Deng 2024, iTero)
+
+- **Rachas y pausas** (`ldh/fase5.py::rachas`): estado de cada partida (inicio de sesión, después de ganar, de 1
+  derrota, de 2+ seguido o cortando). El grupo se mide con Mantel–Haenszel, cada persona contra sí misma.
+  Configuración en `config/ajustes.json → fase5`.
+- **Probabilidad de ganar** (`ldh/victoria.py`): regresión logística simétrica sobre el estado de la partida,
+  entrenada con las timelines del grupo. Se reentrena sola cuando cambian las partidas (`.cache/fase5_modelo.json`).
+  Control antes de publicar: ningún decil de la calibración a más de 5 puntos; si falla, no se publica nada que
+  dependa del modelo (muertes y curvas de partida).
+- **Costo de las muertes y gráfico de cada partida**: un minuto después de la muerte, con y sin la kill, su oro y
+  lo que el rival tomó en ese minuto. Las posiciones del lado rojo se espejan.
+- **Curva de aprendizaje**: el índice de la tendencia menos el nivel normal en el rol, según la partida con ese
+  campeón. El grupo solo usa campeones que aparecen después del primer mes del historial.
+- **Pesos aprendidos del Performance: decisión, no se usan.** Con una regresión de la victoria sobre los
+  componentes, el KDA (casi el resultado) se llevaba todo el peso y la Efectividad salía negativa. Se publica solo
+  "qué acompaña a ganar" (`acompanan_ganar.json`, cada componente por separado) en Guías. `fase5.pesos_aprendidos()`
+  queda para repetir el análisis cuando la referencia tenga 100 por celda.
+- Bot: `-rachas`, `-partida` (◀ ▶), `-coaching` con las vistas nuevas (muertes, curva, rachas) y el momento clave
+  en el feed.

@@ -14,6 +14,7 @@ import gzip
 import json
 import math
 import sqlite3
+import warnings
 from collections import defaultdict
 from typing import Callable
 
@@ -424,6 +425,151 @@ def curvas(indices: dict) -> tuple[dict, dict]:
     return por, grupo
 
 
+# ---------------------------------------------------------------- E. pesos aprendidos
+
+def _auc(p, y) -> float:
+    """Área bajo la curva ROC (probabilidad de que una victoria tenga más puntaje que una derrota)."""
+    import numpy as np
+    p, y = np.asarray(p), np.asarray(y)
+    orden = np.argsort(p)
+    rangos = np.empty(len(p))
+    rangos[orden] = np.arange(1, len(p) + 1)
+    n1, n0 = y.sum(), len(y) - y.sum()
+    return float((rangos[y == 1].sum() - n1 * (n1 + 1) / 2) / max(n1 * n0, 1))
+
+
+def pesos_aprendidos() -> dict:
+    """Qué distingue a los que ganan, por rol (PandaSkill): regresión logística de la victoria sobre el percentil
+    por partida de cada componente del Performance, en las partidas de referencia (las tres franjas juntas: los
+    percentiles ya son contra la franja de cada uno). Winrate y consistencia quedan fuera: una es el resultado y la
+    otra es de jugador, no de partida. IC por bootstrap de jugadores. Se compara cuánto predice en jugadores
+    apartados contra los pesos fijos. Ojo: el oro y la participación suben porque se gana; esto mide qué acompaña
+    a ganar, no qué lo causa. No cambia el Performance: es para decidir."""
+    import numpy as np
+    from sklearn.linear_model import LogisticRegression
+    from . import fase3 as F3
+    from .referencia import cargar_filas
+    filas = cargar_filas()
+    fijos = F3.PERF["pesos"]
+    rng = np.random.default_rng(AJUSTES["bootstrap_semilla"])
+    out = {}
+    for rol in F3.ROLES:
+        comps = [(c, ms) for c, _, ms in F3._componentes(rol) if c not in ("winrate", "consistencia")]
+        g_rol = [f for f in filas if f["role"] == rol]
+        X, y, jug = [], [], []
+        for fr in {f["franja"] for f in g_rol}:
+            g = [f for f in g_rol if f["franja"] == fr]
+            m = F3._matriz(g)
+            m["kda"] = (m["_k"] + m["_a"]) / np.maximum(m["_d"], 1)
+            pct = {}
+            for _, ms in comps:
+                for k in ms:
+                    if k in m and k not in pct:
+                        ref = np.sort(m[k][~np.isnan(m[k])])
+                        pct[k] = F3._pct(m[k], ref)
+            cols = []
+            for _, ms in comps:
+                ps = [pct[k] for k in ms if k in pct]
+                with np.errstate(invalid="ignore"):
+                    cols.append(np.nanmean(np.stack(ps), axis=0) if ps else np.full(len(g), np.nan))
+            Xg = np.stack(cols, axis=1)
+            ok = ~np.isnan(Xg).any(axis=1)
+            X.append(Xg[ok])
+            y.append(m["_w"][ok])
+            jug += [f["jugador"] for f, o in zip(g, ok) if o]
+        X, y, jug = np.vstack(X), np.concatenate(y), np.array(jug)
+        if len(y) < 200:
+            continue
+        ajuste = lambda Xa, ya: LogisticRegression(C=1.0, max_iter=1000).fit(Xa - 0.5, ya).coef_[0]  # noqa: E731
+        coef = ajuste(X, y)
+        jugadores = np.unique(jug)
+        idx = {j: np.where(jug == j)[0] for j in jugadores}
+        boot = []
+        for _ in range(200):
+            ii = np.concatenate([idx[j] for j in rng.choice(jugadores, size=len(jugadores))])
+            boot.append(ajuste(X[ii], y[ii]))
+        boot = np.array(boot)
+        # Cuánto predice cada esquema en jugadores apartados (5 grupos por jugador).
+        perm = rng.permutation(jugadores)
+        pliegue = {j: i % 5 for i, j in enumerate(perm)}
+        fold = np.array([pliegue[j] for j in jug])
+        p_fijo, p_apr = np.zeros(len(y)), np.zeros(len(y))
+        wf = np.array([fijos[c] for c, _ in comps])
+        for k in range(5):
+            tr, te = fold != k, fold == k
+            p_apr[te] = (X[te] - 0.5) @ ajuste(X[tr], y[tr])
+            p_fijo[te] = (X[te] - 0.5) @ wf
+        positivos = np.maximum(coef, 0)
+        total = sum(fijos[c] for c, _ in comps)  # lo que los pesos fijos les dan a estos componentes
+        out[rol] = {
+            "n_partidas": int(len(y)), "n_jugadores": int(len(jugadores)),
+            "componentes": [{"clave": c, "metricas": ms, "coef": round(float(coef[i]), 3),
+                             "lo": round(float(np.percentile(boot[:, i], 2.5)), 3),
+                             "hi": round(float(np.percentile(boot[:, i], 97.5)), 3),
+                             "peso_aprendido": round(float(positivos[i] / positivos.sum() * total), 3) if positivos.sum() else None,
+                             "peso_fijo": fijos[c]} for i, (c, ms) in enumerate(comps)],
+            "auc_fijo": round(_auc(p_fijo, y), 3), "auc_aprendido": round(_auc(p_apr, y), 3),
+        }
+    return out
+
+
+def acompanan_ganar() -> dict:
+    """Para mostrar (decisión de LDH: el Performance sigue con pesos fijos). Por rol y componente, cada uno por
+    separado: winrate de las partidas con ese componente en la mitad de arriba de la franja contra la mitad de
+    abajo, con IC bootstrap por jugador. Por separado y no en un modelo conjunto: juntos, el KDA (casi el
+    resultado) se lleva todo y la participación en kills sale negativa por la correlación, lo que confunde."""
+    import numpy as np
+    from . import fase3 as F3
+    from .referencia import cargar_filas
+    filas = cargar_filas()
+    rng = np.random.default_rng(AJUSTES["bootstrap_semilla"])
+    nombres = {c: n for c, n, _ in F3._componentes("Top")}
+    out = {}
+    for rol in F3.ROLES:
+        comps = [(c, ms) for c, _, ms in F3._componentes(rol) if c not in ("winrate", "consistencia")]
+        cols, ys, jug = defaultdict(list), [], []
+        for fr in sorted({f["franja"] for f in filas if f["role"] == rol}):
+            g = [f for f in filas if f["role"] == rol and f["franja"] == fr]
+            m = F3._matriz(g)
+            m["kda"] = (m["_k"] + m["_a"]) / np.maximum(m["_d"], 1)
+            for c, ms in comps:
+                ps = []
+                for k in ms:
+                    if k in m:
+                        ref = np.sort(m[k][~np.isnan(m[k])])
+                        ps.append(F3._pct(m[k], ref))
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    cols[c].append(np.nanmean(np.stack(ps), axis=0))
+            ys.append(m["_w"])
+            jug += [f["jugador"] for f in g]
+        y, jug = np.concatenate(ys), np.array(jug)
+        jugadores = np.unique(jug)
+        idx = {j: np.where(jug == j)[0] for j in jugadores}
+        res = []
+        for c, ms in comps:
+            x = np.concatenate(cols[c])
+            ok = ~np.isnan(x)
+            arriba, abajo = ok & (x >= 0.5), ok & (x < 0.5)
+            dif = y[arriba].mean() - y[abajo].mean()
+            boot = []
+            for _ in range(300):
+                ii = np.concatenate([idx[j] for j in rng.choice(jugadores, size=len(jugadores))])
+                xa, ya, oka = x[ii], y[ii], ok[ii]
+                a, b = oka & (xa >= 0.5), oka & (xa < 0.5)
+                if a.sum() and b.sum():
+                    boot.append(ya[a].mean() - ya[b].mean())
+            res.append({"clave": c, "nombre": nombres.get(c, c), "metricas": ms,
+                        "arriba": est.wilson(int(y[arriba].sum()), int(arriba.sum())),
+                        "abajo": est.wilson(int(y[abajo].sum()), int(abajo.sum())),
+                        "dif": {"v": round(float(dif), 3), "lo": round(float(np.percentile(boot, 2.5)), 3),
+                                "hi": round(float(np.percentile(boot, 97.5)), 3)},
+                        "peso_fijo": F3.PERF["pesos"][c]})
+        out[rol] = {"n_partidas": int(len(y)), "n_jugadores": int(len(jugadores)),
+                    "componentes": sorted(res, key=lambda r: -r["dif"]["v"])}
+    return out
+
+
 # ---------------------------------------------------------------- generar
 
 def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: Callable, indices: dict | None = None) -> None:
@@ -437,6 +583,11 @@ def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: 
                                                      "(el historial arranca el 8/1: antes no se sabe si eran nuevos)."})
         for pid, d in cp.items():
             escribir(f"curvas/{pid}.json", {"modos": d, "tramos": tramos, "nota": nota})
+    escribir("acompanan_ganar.json", {
+        "roles": acompanan_ganar(),
+        "nota": "Cada componente por separado, en las partidas de referencia: winrate cuando está en la mitad de arriba "
+                "de la franja contra la mitad de abajo. Acompaña a ganar, no lo causa: el que gana mata más y muere menos. "
+                "Tu Performance sigue con los pesos fijos."})
     m = modelo(db)
     escribir("modelo_victoria.json", {**m, "equivalencias": _equivalencias(m)})
     if m["validacion"]["aprobado"]:  # sin un modelo validado no se publica nada que dependa de él
