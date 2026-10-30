@@ -12,6 +12,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from bot.cogs.extra import autocompletar_opciones
 from bot.cogs.perfil import WEB, autocompletar_jugador, tarjeta_simple
 from bot.services import formato as F
 
@@ -94,7 +95,7 @@ class Fase4(commands.Cog):
         await ctx.reply(view=await tarjeta_inhouse(self.bot, jugadores))
 
     @commands.hybrid_command(name="matchups", description="Cómo te va contra cada campeón rival directo")
-    @app_commands.autocomplete(jugador=autocompletar_jugador)
+    @app_commands.autocomplete(jugador=autocompletar_jugador, cola=autocompletar_opciones("solo", "flex", "normal"))
     async def matchups(self, ctx: commands.Context, jugador: str | None = None, cola: str = "solo"):
         if not (p := await self._persona(ctx, jugador, "matchups")):
             return
@@ -145,7 +146,8 @@ class Fase4(commands.Cog):
         return self._mapa
 
     @commands.hybrid_command(name="mapa", description="Dónde morís o matás, sobre el minimapa (por lado)")
-    @app_commands.autocomplete(jugador=autocompletar_jugador)
+    @app_commands.autocomplete(jugador=autocompletar_jugador, tipo=autocompletar_opciones("muertes", "kills"),
+                               lado=autocompletar_opciones("azul", "rojo"))
     async def mapa(self, ctx: commands.Context, jugador: str | None = None, tipo: str = "muertes", lado: str = "azul"):
         if jugador and jugador.lower() in ("muertes", "kills", "azul", "rojo"):
             jugador, tipo, lado = None, jugador if jugador.lower() in ("muertes", "kills") else tipo, \

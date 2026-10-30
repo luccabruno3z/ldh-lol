@@ -127,6 +127,13 @@ async def tarjeta_comparar(bot, a: str, b: str, cola: str | None, rol: str | Non
     return tarjeta_simple(lineas, url)
 
 
+def autocompletar_opciones(*opciones: str):
+    """Autocompletado de una lista fija (tipo de gráfico, rol, lado) para los slash commands."""
+    async def _auto(interaction: discord.Interaction, actual: str) -> list[app_commands.Choice[str]]:
+        return [app_commands.Choice(name=o, value=o) for o in opciones if actual.lower() in o][:25]
+    return _auto
+
+
 async def tarjeta_tips(bot, rol: str) -> discord.ui.LayoutView:
     """Los consejos de config/consejos.json para un rol (compartido por -tips y el menú)."""
     consejos = await bot.datos.consejos()
@@ -282,7 +289,8 @@ class Extra(commands.Cog):
                                                     COLAS.get((cola or "").lower()), ROLES.get((rol or "").lower())))
 
     @commands.hybrid_command(name="grafico", description="Evolución del winrate, tendencia de mejora o radar de tus componentes")
-    @app_commands.autocomplete(jugador=autocompletar_jugador)
+    @app_commands.autocomplete(jugador=autocompletar_jugador, tipo=autocompletar_opciones("tendencia", "evolucion", "radar"),
+                               rol=autocompletar_opciones("top", "jungla", "mid", "adc", "support"))
     async def grafico(self, ctx: commands.Context, jugador: str | None = None, tipo: str = "evolucion", rol: str | None = None):
         if jugador and jugador.lower() in ("evolucion", "evolución", "radar", "tendencia"):  # -grafico radar
             jugador, tipo = None, jugador
