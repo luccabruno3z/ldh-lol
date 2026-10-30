@@ -77,7 +77,7 @@
     "dias_rol_reciente": 30
   },
   "referencia": {
-    "_": "Muestra de referencia de la fase 3: jugadores al azar de cada división de solo/dúo (LAS) con 10+ partidas en su rol principal. Usa el 60 % del límite de la clave porque la comparte Coach AI.",
+    "_": "Muestra de referencia de la fase 3: jugadores al azar de cada división de solo/dúo (LAS) con 10+ partidas en su rol principal. Usa casi todo el límite de la clave (95 de 100 cada 2 min); si Coach AI la usa a la vez, el cliente espera lo que pida Riot.",
     "franjas": {
       "Hierro–Bronce": [
         "IRON",
@@ -107,11 +107,11 @@
     "min_jugadores": 20,
     "rate_limits": [
       [
-        10,
+        18,
         1.0
       ],
       [
-        60,
+        95,
         120.0
       ]
     ]

@@ -50,7 +50,7 @@ Si cambia `extract_match_stats`, subir `EXTRACTOR_VERSION` en `ldh/base.py`.
 
 ## Fase 3: referencia y coaching
 
-- **Muestra de referencia:** `python -m ldh referencia` baja jugadores al azar de cada división de solo/dúo (league-v4 entries) y se queda con los que tienen 10+ partidas en su rol principal. Va al 60 % del límite de la clave porque la comparte Coach AI. Se puede cortar y retomar: el crudo queda en `.cache/referencia/` (no va a git) y el avance en `.cache/referencia/estado.json`.
+- **Muestra de referencia:** `python -m ldh referencia` baja jugadores al azar de cada división de solo/dúo (league-v4 entries) y se queda con los que tienen 10+ partidas en su rol principal. Usa 95 de los 100 pedidos cada 2 minutos; si otra herramienta usa la misma clave, el cliente respeta el Retry-After. Se puede cortar y retomar: el crudo queda en `.cache/referencia/` (no va a git) y el avance en `.cache/referencia/estado.json`.
 - `python -m ldh referencia armar` reduce ese crudo a `datos/referencia/filas.jsonl.gz` (una fila por partida y jugador, con id anónimo). Eso es lo único que va a la rama `datos`; `publicar` lo lee de ahí.
 - **Celdas:** 3 franjas (Hierro–Bronce, Plata–Oro, Platino–Esmeralda) × 5 roles. Una celda con menos de 20 jugadores no da percentiles; el perfil lo dice.
 - **La franja de cada persona** sale de su mejor rango actual de solo/dúo. Sin rango, no hay percentiles (sí los primeros 15 minutos).
