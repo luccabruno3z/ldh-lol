@@ -1,0 +1,226 @@
+[
+ {
+  "id": "lucca",
+  "nombre": "Lucca",
+  "cuentas": [
+   {
+    "riot_id": "LuccaBruno#LAS",
+    "principal": true
+   },
+   {
+    "riot_id": "DoesHeKnow#uva"
+   }
+  ]
+ },
+ {
+  "id": "ahitevan",
+  "nombre": "AhiTeVan47cm",
+  "cuentas": [
+   {
+    "riot_id": "AhiTeVan47cm#RAWR",
+    "principal": true
+   },
+   {
+    "riot_id": "LaTengoChiquita#RAWR"
+   }
+  ]
+ },
+ {
+  "id": "zwietracht",
+  "nombre": "PeronInLoveWith",
+  "cuentas": [
+   {
+    "riot_id": "PeronInLoveWith#menor",
+    "principal": true
+   },
+   {
+    "riot_id": "Zwietracht#1730"
+   }
+  ]
+ },
+ {
+  "id": "mac55",
+  "nombre": "mac55",
+  "cuentas": [
+   {
+    "riot_id": "mac55#LAS",
+    "principal": true
+   }
+  ]
+ },
+ {
+  "id": "pcmcleart",
+  "nombre": "PCMCleArT",
+  "cuentas": [
+   {
+    "riot_id": "PCMCleArT#LAS",
+    "principal": true
+   }
+  ]
+ },
+ {
+  "id": "busconovia",
+  "nombre": "BuscoNoviaPlzDm",
+  "cuentas": [
+   {
+    "riot_id": "BuscoNoviaPlzDm#ECDF",
+    "principal": true
+   }
+  ]
+ },
+ {
+  "id": "pandaman",
+  "nombre": "pandaman98",
+  "cuentas": [
+   {
+    "riot_id": "pandaman98#LAS",
+    "principal": true
+   }
+  ]
+ },
+ {
+  "id": "khaleevee",
+  "nombre": "Khaleevee",
+  "cuentas": [
+   {
+    "riot_id": "Khaleevee な#rawr",
+    "principal": true
+   },
+   {
+    "riot_id": "Sopita ˇ#rawr"
+   }
+  ]
+ },
+ {
+  "id": "sn00pzera",
+  "nombre": "sn00pzera",
+  "cuentas": [
+   {
+    "riot_id": "sn00pzera#ECDF",
+    "principal": true
+   }
+  ]
+ },
+ {
+  "id": "vjob",
+  "nombre": "vjob",
+  "cuentas": [
+   {
+    "riot_id": "vjob#vitor",
+    "principal": true
+   }
+  ]
+ },
+ {
+  "id": "cristoreyes",
+  "nombre": "cristoreyesir",
+  "cuentas": [
+   {
+    "riot_id": "cristoreyesir#LAS",
+    "principal": true
+   }
+  ]
+ },
+ {
+  "id": "glarrex",
+  "nombre": "Glarrex",
+  "cuentas": [
+   {
+    "riot_id": "Glarrex#glx",
+    "principal": true
+   },
+   {
+    "riot_id": "glarrex#LAS"
+   }
+  ]
+ },
+ {
+  "id": "lanafta",
+  "nombre": "lanaftaoelculo",
+  "cuentas": [
+   {
+    "riot_id": "lanaftaoelculo#plata",
+    "principal": true
+   }
+  ]
+ },
+ {
+  "id": "mktmaxi",
+  "nombre": "MKTMaxi",
+  "cuentas": [
+   {
+    "riot_id": "MKTMaxi#MKT",
+    "principal": true
+   }
+  ]
+ },
+ {
+  "id": "shiani",
+  "nombre": "Shiani",
+  "cuentas": [
+   {
+    "riot_id": "Shiani#Chano",
+    "principal": true
+   }
+  ]
+ },
+ {
+  "id": "seagranda",
+  "nombre": "SeAgrandaSolo",
+  "cuentas": [
+   {
+    "riot_id": "SeAgrandaSolo#Riven",
+    "principal": true
+   }
+  ]
+ },
+ {
+  "id": "yinju",
+  "nombre": "Yinju",
+  "cuentas": [
+   {
+    "riot_id": "Yinju#owo",
+    "principal": true
+   }
+  ]
+ },
+ {
+  "id": "ratsqueen",
+  "nombre": "RATSQUEEN",
+  "cuentas": [
+   {
+    "riot_id": "RATSQUEEN#QUEEN",
+    "principal": true
+   }
+  ]
+ },
+ {
+  "id": "monarca",
+  "nombre": "monarca",
+  "cuentas": [
+   {
+    "riot_id": "monarca#fack",
+    "principal": true
+   }
+  ]
+ },
+ {
+  "id": "tgeblaster",
+  "nombre": "TGE Blaster",
+  "cuentas": [
+   {
+    "riot_id": "TGE Blaster#Tango",
+    "principal": true
+   },
+   {
+    "riot_id": "Maestro shifu#Yiiii"
+   },
+   {
+    "riot_id": "DrakesNoImportan#xdd"
+   },
+   {
+    "riot_id": "Drakes inutiles#Facto"
+   }
+  ]
+ }
+]
