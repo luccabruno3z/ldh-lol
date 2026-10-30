@@ -58,4 +58,11 @@ Si cambia `extract_match_stats`, subir `EXTRACTOR_VERSION` en `ldh/base.py`.
 - **Participación en objetivos:** dragones, Heraldo y Barón, sin larvas ni estructuras. Con larvas y estructuras Lucca y Glarrex daban igual (0,35); así reproduce la brecha conocida (0,65 contra 0,42 en solo/dúo desde el 14/08).
 - **Contra tu campeón:** sin API. Compara con los desconocidos que jugaron el mismo campeón y rol en las partidas de solo/dúo del grupo, en la misma franja, sacando las partidas donde su rival directo era alguien del grupo.
 - **Consejos:** `config/consejos.json`, por componente o métrica y por rol. Solo aparecen cuando el número marca la brecha.
-- **Refrescar la referencia:** con la clave personal, volver a correr `python -m ldh referencia` cada tanto (los jugadores ya bajados no se vuelven a pedir). Las timelines de los amigos siguen en la rama `datos` desde la fase 1; el doc de lecciones pide sacarlas de git (pendiente).
+- **Refrescar la referencia:** con la clave personal, volver a correr `python -m ldh referencia` cada tanto (los jugadores ya bajados no se vuelven a pedir).
+
+## Timelines
+
+- No van a git. La copia local está en `./timelines/` y la durable en el release `timelines` del repo, un `.tar` por mes (`timelines-la2-2026-01.tar`).
+- El workflow las baja antes de correr (`gh release download`), las abre con `python -m ldh timelines desempaquetar tl-tar` y al final sube solo los meses que cambiaron (`empaquetar --desde`, `gh release upload --clobber`).
+- Si faltan las timelines de más del 5 % de las partidas, `reconstruir` se frena en vez de publicar una base incompleta.
+- En otra PC: `gh release download timelines -p 'timelines-*.tar' -D tl-tar` y `python -m ldh timelines desempaquetar tl-tar`.

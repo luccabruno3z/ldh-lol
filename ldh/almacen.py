@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-from .ajustes import DATOS
+from .ajustes import DATOS, TIMELINES
 
 ANON_CAMPOS = ("puuid", "riotIdGameName", "riotIdTagline", "riotIdName", "summonerName", "summonerId")
 
@@ -136,7 +136,8 @@ def compactar_timeline(tl: dict, vinculados: set[str]) -> dict:
 def _ruta(tipo: str, match_id: str, inicio_ms: int) -> Path:
     plataforma = match_id.split("_", 1)[0].lower()
     mes = datetime.fromtimestamp(inicio_ms / 1000, timezone.utc).strftime("%Y-%m")
-    return DATOS / tipo / plataforma / mes / f"{match_id}.json.gz"
+    base = TIMELINES if tipo == "timelines" else DATOS / tipo
+    return base / plataforma / mes / f"{match_id}.json.gz"
 
 
 def _indice_existentes() -> set[str]:
@@ -168,7 +169,7 @@ def iterar_partidas() -> Iterator[tuple[dict, dict | None]]:
     """(match, timeline o None) de todo el crudo, en orden de archivo."""
     for ruta in sorted((DATOS / "partidas").glob("*/*/*.json.gz")):
         match = json.loads(gzip.decompress(ruta.read_bytes()))
-        rtl = DATOS / "timelines" / ruta.relative_to(DATOS / "partidas")
+        rtl = TIMELINES / ruta.relative_to(DATOS / "partidas")
         tl = json.loads(gzip.decompress(rtl.read_bytes())) if rtl.exists() else None
         yield match, tl
 

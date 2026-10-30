@@ -1,4 +1,4 @@
-"""python -m ldh [ingestar|reconstruir|publicar|todo|referencia [armar]]"""
+"""python -m ldh [ingestar|reconstruir|publicar|todo|referencia [armar]|timelines empaquetar|desempaquetar <carpeta>]"""
 
 from __future__ import annotations
 
@@ -22,8 +22,19 @@ def main(argv: list[str]) -> int:
     if orden in ("ingestar", "todo"):
         from .ingesta import correr
         correr()
+    if orden == "timelines":
+        from . import timelines
+        accion, carpeta = argv[1], argv[2]
+        if accion == "empaquetar":
+            desde = float(argv[argv.index("--desde") + 1]) if "--desde" in argv else None
+            timelines.empaquetar(carpeta, desde)
+        else:
+            timelines.desempaquetar(carpeta)
+        return 0
     if orden in ("reconstruir", "todo"):
         from .base import reconstruir
+        from .timelines import verificar
+        verificar()
         reconstruir()
     if orden in ("publicar", "todo"):
         from .publicar import publicar

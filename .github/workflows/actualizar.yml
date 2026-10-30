@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write   # solo se pushea a la rama `datos`, nunca a main
+  contents: write   # rama `datos` y assets del release `timelines`; nunca main
   pages: write
   id-token: write
 
@@ -33,6 +33,15 @@ jobs:
         with:
           ref: datos
           path: datos
+
+      - name: Timelines (release "timelines")
+        # No van a git: se bajan del release, un .tar por mes. Si falla, se corta acá; sin
+        # timelines la base saldría sin los datos de los 10 y 15 minutos (ldh/timelines.py).
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "INICIO=$(date +%s)" >> "$GITHUB_ENV"
+          gh release download timelines --repo "${{ github.repository }}" -p 'timelines-*.tar' -D tl-tar
 
       - name: Python
         uses: actions/setup-python@v5
@@ -61,6 +70,9 @@ jobs:
             echo "::error::La clave de Riot está vencida o es inválida (HTTP $code). No se commitea nada."; exit 1
           fi
 
+      - name: Abrir timelines
+        run: python -m ldh timelines desempaquetar tl-tar
+
       - name: Ingesta, base y publicación
         id: ingesta
         env:
@@ -79,6 +91,17 @@ jobs:
           git add -A
           git diff --staged --quiet || git commit -m "Datos: corrida ${{ github.run_number }}"
           git push origin HEAD:datos
+
+      - name: Subir timelines nuevas al release
+        # Solo los meses que cambiaron en esta corrida; --clobber reemplaza el .tar de ese mes.
+        if: always() && steps.ingesta.outcome != 'skipped'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m ldh timelines empaquetar tl-nuevos --desde "$INICIO"
+          if ls tl-nuevos/*.tar >/dev/null 2>&1; then
+            gh release upload timelines tl-nuevos/*.tar --clobber --repo "${{ github.repository }}"
+          fi
 
       - name: Subir sitio
         uses: actions/upload-pages-artifact@v3
