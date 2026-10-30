@@ -37,7 +37,8 @@ class Bot(commands.Bot):
         # Botones persistentes (DynamicItems): siguen andando después de un reinicio o un redeploy.
         from bot.ui.menu import MenuBoton
         from bot.ui.perfil_vista import PerfilBoton
-        self.add_dynamic_items(PerfilBoton, MenuBoton)
+        from bot.ui.rankings_vista import SelectorRanking
+        self.add_dynamic_items(PerfilBoton, MenuBoton, SelectorRanking)
         await self._sincronizar()
 
     async def _sincronizar(self):
