@@ -116,9 +116,10 @@ async function jungla(p, cont) {
 }
 
 /** Los tres bloques, cada uno aislado. En la vista de una sola cuenta no se muestran. */
-export function bloquesFase4(p, cont) {
-    if (p._cuenta) { cont.innerHTML = ''; return; }
-    cont.innerHTML = '<div id="f4-jungla"></div><div id="f4-matchups"></div><div id="f4-heatmap"></div>';
-    [['jungla', jungla], ['matchups', matchups], ['heatmap', heatmap]].forEach(([n, fn]) =>
-        fn(p, cont.querySelector(`#f4-${n}`)).catch(err => console.error(`[${n}]`, err)));
+export function bloquesFase4(p, conts) {
+    // conts: un contenedor por bloque ({jungla, matchups, heatmap}); el perfil los reparte en pestañas.
+    if (p._cuenta) return;
+    [['jungla', jungla], ['matchups', matchups], ['heatmap', heatmap]].forEach(([n, fn]) => {
+        if (conts[n]) fn(p, conts[n]).catch(err => console.error(`[${n}]`, err));
+    });
 }

@@ -325,3 +325,12 @@ section.section { scroll-margin-top: calc(var(--header-h) + 56px); }
 
 .guias-tabs { margin-bottom: 12px; }
 .data-table th .ic { display: block; font-size: .72rem; color: var(--text-dim); font-weight: 400; }
+
+/* Pestañas del perfil (reemplazan al índice: el perfil entero era muy largo) */
+.perfil-tabs { position: sticky; top: var(--header-h); z-index: 4; display: flex; gap: 4px; overflow-x: auto;
+    padding: 8px 0; margin-bottom: 12px; background: var(--bg); border-bottom: 1px solid var(--border); scrollbar-width: none; }
+.perfil-tabs::-webkit-scrollbar { display: none; }
+.perfil-tab { flex: none; padding: 8px 14px; border-radius: var(--r-md) var(--r-md) 0 0; text-decoration: none;
+    color: var(--text-muted); font-weight: 500; white-space: nowrap; border-bottom: 2px solid transparent; }
+.perfil-tab:hover, .perfil-tab:focus-visible { color: var(--text); }
+.perfil-tab.is-active { color: var(--accent); border-bottom-color: var(--accent); }

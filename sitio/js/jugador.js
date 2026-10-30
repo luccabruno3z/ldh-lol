@@ -51,8 +51,6 @@ function cabecera(p) {
     </section>`;
 }
 
-let observadorIndice = null;
-
 /** Lo importante de un vistazo: rango, winrate de la cola principal, mejor rol y forma reciente. */
 function resumen(p) {
     const todos = (p.kpis?.todas || []).filter(f => f.rol === 'Todos');
@@ -72,18 +70,6 @@ function resumen(p) {
                 dif?.ruido ? 'igual que tu resto (ruido)' : dif?.v > 0 ? 'mejor que tu resto' : 'peor que tu resto',
                 dif?.ruido ? '' : dif?.v > 0 ? 'res-bien' : 'res-mal') : ''}
     </div>`;
-}
-
-/** Índice fijo con las secciones que efectivamente cargaron (cada bloque llega por su lado). */
-function armarIndice(cont) {
-    const nav = cont.querySelector('#perfil-indice');
-    if (!nav) return;
-    const secciones = [...cont.querySelectorAll('section.section h3')].filter(h => h.offsetParent !== null);
-    nav.innerHTML = secciones.map((h, i) => {
-        const sec = h.closest('section');
-        sec.id = sec.id || `sec-${i}`;
-        return `<button type="button" class="indice-chip" data-ir="${sec.id}">${escapeHtml(h.childNodes[0]?.textContent.split('·')[0].trim() || h.textContent)}</button>`;
-    }).join('');
 }
 
 /** Colas presentes, la más jugada primero (por la fila "Todos"). */
@@ -200,8 +186,23 @@ async function historial(p, cont) {
     else tbody.innerHTML = '<tr><td colspan="14" class="empty-state">Sin partidas todavía.</td></tr>';
 }
 
-async function mostrar(id) {
+// Pestañas del perfil: el perfil entero era muy largo para el celular. La pestaña y la cuenta van en
+// la URL (#/jugadores/<persona>/<pestaña>/<cuenta>), así se puede compartir el link exacto.
+const PESTANAS = { resumen: 'Resumen', coaching: 'Coaching', campeones: 'Roles y campeones', mapa: 'Mapa y jungla', partidas: 'Partidas' };
+let vistaActual = null;
+
+function mostrarPestana(tab) {
+    const t = PESTANAS[tab] ? tab : 'resumen';
+    document.querySelectorAll('#perfil [data-pestana]').forEach(el => { el.hidden = el.dataset.pestana !== t; });
+    document.querySelectorAll('#perfil .perfil-tab').forEach(a => {
+        a.classList.toggle('is-active', a.dataset.tab === t);
+        a.setAttribute('aria-selected', a.dataset.tab === t);
+    });
+}
+
+async function mostrar(param) {
     const cont = document.getElementById('perfil');
+    const [id, tabRuta, cuentaRuta] = (param || '').split('/');
     if (!id) {
         actual = null;
         cont.innerHTML = `<div class="cards">${state.personas.map(p =>
@@ -209,15 +210,18 @@ async function mostrar(id) {
              <span class="chip ${tierClase(p.solo)}">${escapeHtml(rangoTexto(p.solo))}</span></a>`).join('')}</div>`;
         return;
     }
-    if (actual === id) return;
+    const vista = cuentaRuta != null && cuentaRuta !== '' ? Number(cuentaRuta) : null;
+    // Misma persona y misma cuenta: solo se cambia de pestaña, sin volver a cargar nada.
+    if (actual === id && vistaActual === vista) { mostrarPestana(tabRuta); return; }
     actual = id;
+    vistaActual = vista;
     cont.innerHTML = '<div class="skeleton"></div>';
     let p;
     try { p = await loadPerfil(id); } catch {
         cont.innerHTML = '<div class="error-state">No encontré ese jugador. Solo aparecen las cuentas que se vincularon.</div>';
         return;
     }
-    await pintarPerfil(cont, p, null);
+    await pintarPerfil(cont, p, vista, tabRuta);
 }
 
 /** Botones "Todas · cuenta 1 · cuenta 2" para quien tiene varias cuentas. */
@@ -230,7 +234,7 @@ function botonesCuenta(p, vista) {
 }
 
 /** Arma el perfil entero. vista = null (todas las cuentas) o el índice de una cuenta. */
-async function pintarPerfil(cont, base, vista) {
+async function pintarPerfil(cont, base, vista, tabInicial = 'resumen') {
     let p = base;
     if (vista != null) {
         const c = await cachedFetch(`cuenta/${encodeURIComponent(base.id)}/${vista}.json`);
@@ -240,43 +244,36 @@ async function pintarPerfil(cont, base, vista) {
     let colaK = colasKpis(p.kpis.todas)[0];
     // Orden: lo que se lee de un vistazo (forma) y lo que ayuda a mejorar (coaching, roles, pool)
     // antes que la tabla de KPIs, que es el detalle.
+    const ruta = (tab, v = vista) => `#/jugadores/${encodeURIComponent(base.id)}/${tab}${v != null ? `/${v}` : ''}`;
     cont.innerHTML = `${cabecera(p)}
       ${botonesCuenta(base, vista)}
       ${resumen(p)}
-      <nav class="perfil-indice" id="perfil-indice" aria-label="Ir a una sección del perfil"></nav>
-      ${forma(p.forma)}
-      ${seccionEvolucion(p.evolucion)}
-      <div id="fase3"></div>
-      <div id="fase2"></div>
-      <div id="fase4"></div>
-      <section class="section">
-        <div class="section-head"><h3>KPIs por rol</h3>
-          <label class="selector">Cola <select id="kpi-cola">${colasKpis(p.kpis.todas).map(c => `<option value="${escapeHtml(c)}">${escapeHtml(nombreCola(c))}</option>`).join('')}</select></label>
-        </div>
-        <div id="kpi-tabla">${tablaKpis(p.kpis.todas, colaK)}</div>
-      </section>
-      <div id="historial"></div>`;
+      <nav class="perfil-tabs" role="tablist" aria-label="Secciones del perfil">${Object.entries(PESTANAS).map(([k, l]) =>
+        `<a class="perfil-tab" role="tab" data-tab="${k}" href="${ruta(k)}">${l}</a>`).join('')}</nav>
+      <div data-pestana="resumen">${forma(p.forma)}${seccionEvolucion(p.evolucion)}</div>
+      <div data-pestana="coaching"><div id="fase3"></div></div>
+      <div data-pestana="campeones"><div id="fase2"></div><div id="f4-matchups"></div></div>
+      <div data-pestana="mapa"><div id="f4-heatmap"></div><div id="f4-jungla"></div>
+        ${p._cuenta ? '<p class="empty-state">El mapa y la jungla se calculan con todas tus cuentas juntas.</p>' : ''}</div>
+      <div data-pestana="partidas">
+        <section class="section">
+          <div class="section-head"><h3>KPIs por rol</h3>
+            <label class="selector">Cola <select id="kpi-cola">${colasKpis(p.kpis.todas).map(c => `<option value="${escapeHtml(c)}">${escapeHtml(nombreCola(c))}</option>`).join('')}</select></label>
+          </div>
+          <div id="kpi-tabla">${tablaKpis(p.kpis.todas, colaK)}</div>
+        </section>
+        <div id="historial"></div></div>`;
+    // Las cuentas cambian la URL: el router vuelve a entrar y arma la vista de esa cuenta.
     cont.querySelectorAll('.cuenta-btn').forEach(btn => btn.addEventListener('click', () => {
         const v = btn.dataset.vista === '' ? null : Number(btn.dataset.vista);
-        pintarPerfil(cont, base, v).catch(err => console.error('[perfil]', err));
+        const tab = cont.querySelector('.perfil-tab.is-active')?.dataset.tab || 'resumen';
+        location.hash = ruta(tab, v);
     }));
-    // El índice se rearma cuando termina de llegar cada bloque.
-    // Se ignoran los cambios del propio índice (si no, se rearmaría sin fin) y se corta el del perfil anterior.
-    let pendiente;
-    observadorIndice?.disconnect();
-    observadorIndice = new MutationObserver((ms) => {
-        if (ms.every(m => m.target.closest?.('#perfil-indice'))) return;
-        clearTimeout(pendiente);
-        pendiente = setTimeout(() => armarIndice(cont), 150);
-    });
-    observadorIndice.observe(cont, { childList: true, subtree: true });
-    cont.querySelector('#perfil-indice').addEventListener('click', (e) => {
-        const b = e.target.closest('[data-ir]');
-        if (b) document.getElementById(b.dataset.ir)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+    mostrarPestana(tabInicial);
     bloquesFase3(p, document.getElementById('fase3')).catch(err => console.error('[coaching]', err));
     bloquesFase2(p, document.getElementById('fase2'));
-    bloquesFase4(p, document.getElementById('fase4'));
+    bloquesFase4(p, { matchups: document.getElementById('f4-matchups'), heatmap: document.getElementById('f4-heatmap'),
+                      jungla: document.getElementById('f4-jungla') });
     document.getElementById('kpi-cola')?.addEventListener('change', (e) => {
         colaK = e.target.value;
         document.getElementById('kpi-tabla').innerHTML = tablaKpis(p.kpis.todas, colaK);
