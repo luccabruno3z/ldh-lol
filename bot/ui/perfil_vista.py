@@ -14,8 +14,10 @@ PESTANAS = {"resumen": "Resumen", "roles": "Roles", "campeones": "Campeones", "c
 LIMITE = 3900
 
 
-def _cid(tab: str, vista: str, owner: int, pid: str) -> str:
-    return f"lp:{tab}:{vista}:{owner}:{pid}"[:100]
+def _cid(tab: str, vista: str, owner: int, pid: str, cuentas: bool = False) -> str:
+    # La fila de cuentas lleva ":c": si no, "Todas las cuentas" repetía el id de la pestaña activa
+    # (misma pestaña, misma vista) y Discord rechazaba el mensaje entero (perfiles con 2+ cuentas).
+    return f"lp:{tab}:{vista}:{owner}:{pid}{':c' if cuentas else ''}"[:100]
 
 
 def _texto(view: discord.ui.LayoutView) -> str:
@@ -24,16 +26,18 @@ def _texto(view: discord.ui.LayoutView) -> str:
 
 
 class PerfilBoton(discord.ui.DynamicItem[discord.ui.Button],
-                  template=r"lp:(?P<tab>[a-z]+):(?P<vista>[a-z0-9]+):(?P<owner>\d+):(?P<pid>[A-Za-z0-9_-]+)"):
-    def __init__(self, tab: str, vista: str, owner: int, pid: str, *, label: str, activo: bool = False):
+                  template=r"lp:(?P<tab>[a-z]+):(?P<vista>[a-z0-9]+):(?P<owner>\d+):(?P<pid>[A-Za-z0-9_-]+)(?P<c>:c)?"):
+    def __init__(self, tab: str, vista: str, owner: int, pid: str, *, label: str, activo: bool = False,
+                 cuentas: bool = False):
         self.tab, self.vista, self.owner, self.pid = tab, vista, owner, pid
         super().__init__(discord.ui.Button(
-            label=label[:80], custom_id=_cid(tab, vista, owner, pid),
+            label=label[:80], custom_id=_cid(tab, vista, owner, pid, cuentas),
             style=discord.ButtonStyle.primary if activo else discord.ButtonStyle.secondary))
 
     @classmethod
     async def from_custom_id(cls, interaction, item, match):
-        return cls(match["tab"], match["vista"], int(match["owner"]), match["pid"], label=item.label or "")
+        return cls(match["tab"], match["vista"], int(match["owner"]), match["pid"], label=item.label or "",
+                   cuentas=bool(match["c"]))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id == self.owner:
@@ -111,9 +115,9 @@ async def render(bot, pid: str, tab: str = "resumen", vista: str = "t", owner: i
                                         for t, l in PESTANAS.items()]))
     vistas = base.get("vistas_cuenta") or []
     if vistas:
-        botones = [PerfilBoton(tab, "t", owner, pid, label="Todas las cuentas", activo=vista == "t")]
+        botones = [PerfilBoton(tab, "t", owner, pid, label="Todas las cuentas", activo=vista == "t", cuentas=True)]
         botones += [PerfilBoton(tab, str(v["indice"]), owner, pid, label=f"{v['riot_id']} ({v['n']})",
-                                activo=vista == str(v["indice"])) for v in vistas[:4]]
+                                activo=vista == str(v["indice"]), cuentas=True) for v in vistas[:4]]
         items.append(discord.ui.ActionRow(*botones))
     items.append(discord.ui.ActionRow(discord.ui.Button(label="Ver en la web", url=f"{WEB}#/jugadores/{pid}")))
 
