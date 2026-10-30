@@ -140,7 +140,7 @@ function contraCampeon(lista) {
     // Los dos con más partidas a la vista; el resto plegado (con 9 campeones el bloque era media página).
     return bloques.slice(0, 2).join('') +
         (bloques.length > 2 ? `<details class="plegable"><summary>${bloques.length - 2} campeones más</summary>${bloques.slice(2).join('')}</details>` : '') +
-        '<p class="nota">"Ellos" son los desconocidos que jugaron el mismo campeón en el mismo rol en las partidas de solo/dúo del grupo, en tu franja; se sacan las partidas donde su rival directo era alguien del grupo. Es por partida (casi todos aparecen una vez), por eso va la columna de jugadores distintos.</p>';
+        '<p class="nota">"Ellos" son los desconocidos que jugaron el mismo campeón en el mismo rol en las partidas de solo/dúo del grupo, en tu franja; se sacan las partidas donde su rival directo era alguien del grupo. Es por partida (casi todos aparecen una vez), por eso va la columna de jugadores distintos. Son compañeros y rivales del grupo en partes iguales y en total ganan el 50 %, así que jugar con o contra ustedes no los sesga.</p>';
 }
 
 // ---- Armado ----
@@ -153,7 +153,7 @@ export async function bloquesFase3(p, cont) {
     }
     const d = await cachedFetch(`coaching/${encodeURIComponent(p.id)}.json`);
     const roles = Object.keys(d.roles || {});
-    let rol = d.rol_principal || roles[0];
+    let rol = d.rol_con_referencia || d.rol_principal || roles[0];
     const colasT = COLAS.filter(c => d.temprano?.[c]);
     let colaT = colasT.includes('solo') ? 'solo' : colasT[0];
     const rolesT = () => Object.keys(d.temprano?.[colaT] || {});

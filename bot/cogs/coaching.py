@@ -30,7 +30,7 @@ def _jugador_y_rol(texto: str | None) -> tuple[str | None, str | None]:
 
 
 def _rol(d: dict, pedido: str | None) -> tuple[str | None, dict | None]:
-    rol = pedido or d.get("rol_principal")
+    rol = pedido or d.get("rol_con_referencia") or d.get("rol_principal")
     return rol, (d.get("roles") or {}).get(rol)
 
 

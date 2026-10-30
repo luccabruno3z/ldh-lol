@@ -16,6 +16,7 @@ import gzip
 import json
 import math
 import sqlite3
+from datetime import datetime, timezone
 from collections import defaultdict
 from typing import Callable
 
@@ -151,9 +152,14 @@ def _valores(m: dict[str, np.ndarray], idx: np.ndarray, peso: np.ndarray | None 
 
 
 def _pct(x: np.ndarray | float, ref: np.ndarray) -> np.ndarray:
-    """Percentil (0–1) de x entre los valores de referencia, contando la mitad de los empates."""
+    """Percentil (0–1) de x entre los valores de referencia, contando la mitad de los empates.
+
+    Con N jugadores de referencia, nadie queda en 0 ni en 100 exactos: estar debajo de los 22 no
+    dice "peor que todos los de la franja". Se usa (rango + 0,5) / (N + 1), que va de ~2 a ~98
+    con 22 jugadores (lo de AhiTeVan: daba 0 de consistencia con 15 partidas)."""
     x = np.asarray(x, dtype=float)
-    p = (np.searchsorted(ref, x, "left") + np.searchsorted(ref, x, "right")) / (2 * len(ref))
+    rango = (np.searchsorted(ref, x, "left") + np.searchsorted(ref, x, "right")) / 2
+    p = (rango + 0.5) / (len(ref) + 1)
     return np.where(np.isnan(x), np.nan, p)
 
 
@@ -295,12 +301,21 @@ def tendencia(filas: list[dict], celda: "Celda", rol: str) -> dict | None:
     v = cfg["ventana"]
     movil = np.convolve(y, np.ones(v) / v, mode="valid")
     paso = max(1, len(movil) // 60)  # unos 60 puntos alcanzan para la línea
-    puntos = [{"t": int(t[i + v - 1]), "v": _r(movil[i], 1)} for i in range(0, len(movil), paso)]
-    if puntos[-1]["t"] != int(t[-1]):
-        puntos.append({"t": int(t[-1]), "v": _r(movil[-1], 1)})
+    # El eje es el número de partida (la recta se ajusta por partida): con fechas, los días de muchas
+    # partidas se apretaban y la línea daba saltos. Las fechas quedan como rótulos, una por mes.
+    puntos = [{"i": i + v - 1, "t": int(t[i + v - 1]), "v": _r(movil[i], 1)} for i in range(0, len(movil), paso)]
+    if puntos[-1]["i"] != n - 1:
+        puntos.append({"i": n - 1, "t": int(t[-1]), "v": _r(movil[-1], 1)})
+    meses, visto = [], None
+    for i, ts in enumerate(t):
+        m_ = datetime.fromtimestamp(ts / 1000, timezone.utc).month
+        if m_ != visto:
+            meses.append({"i": i, "mes": m_})
+            visto = m_
     a, b = np.polyfit(x, y, 1)
-    return {"n": n, "ventana": v, "puntos": puntos,
-            "recta": {"desde": {"t": int(t[0]), "v": _r(b, 1)}, "hasta": {"t": int(t[-1]), "v": _r(a * (n - 1) + b, 1)}},
+    return {"n": n, "ventana": v, "puntos": puntos, "meses": meses,
+            "recta": {"desde": {"i": 0, "t": int(t[0]), "v": _r(b, 1)},
+                      "hasta": {"i": n - 1, "t": int(t[-1]), "v": _r(a * (n - 1) + b, 1)}},
             "pendiente": _r(pendiente * 100, 1), "lo": _r(lo * 100, 1), "hi": _r(hi * 100, 1),
             "veredicto": "mejorando" if lo > 0 else "empeorando" if hi < 0 else "sin tendencia clara",
             "inicio": _r(float(np.mean(y[:v])), 1), "ahora": _r(float(np.mean(y[-v:])), 1),
@@ -500,6 +515,10 @@ def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], rangos: di
             "franja": franja, "rango": rango and {k: rango[k] for k in ("tier", "division", "lp")},
             "roles": roles,
             "rol_principal": max(roles, key=lambda r: roles[r]["n"]) if roles else None,
+            # El que se muestra por defecto: el de más partidas entre los que tienen referencia. Si el
+            # principal cae en una celda sin referencia, se ve el siguiente en vez de "no hay datos".
+            "rol_con_referencia": max((r for r in roles if not roles[r].get("sin_referencia")),
+                                      key=lambda r: roles[r]["n"], default=None),
             "temprano": temprano(filas),
             "campeones": contra_campeon(mias, otros) if franja else [],
         })

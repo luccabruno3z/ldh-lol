@@ -141,7 +141,7 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None):
     nombre = p["nombre"]
     if tipo.lower().startswith("ten"):
         d = await bot.datos.coaching(p["id"])
-        rol_n = ROLES.get((rol or "").lower()) or (d or {}).get("rol_principal")
+        rol_n = ROLES.get((rol or "").lower()) or (d or {}).get("rol_con_referencia") or (d or {}).get("rol_principal")
         r = ((d or {}).get("roles") or {}).get(rol_n) or {}
         t = r.get("tendencia")
         if not t:
@@ -156,7 +156,7 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None):
                  f"{d['franja']} en {rol_n}. Mide cómo jugás, no si ganaste. 50 = la mitad de tu franja.")
     elif tipo.lower().startswith("rad"):
         d = await bot.datos.coaching(p["id"])
-        rol_n = ROLES.get((rol or "").lower()) or (d or {}).get("rol_principal")
+        rol_n = ROLES.get((rol or "").lower()) or (d or {}).get("rol_con_referencia") or (d or {}).get("rol_principal")
         r = ((d or {}).get("roles") or {}).get(rol_n)
         if not r or r.get("sin_referencia"):
             return (f"Todavía no hay referencia para el radar de {nombre} en {rol_n or 'ningún rol'}: hacen falta "

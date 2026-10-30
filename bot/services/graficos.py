@@ -81,24 +81,29 @@ def evolucion(evo: dict, cola: str, nombre_cola: str, titulo: str) -> io.BytesIO
 
 def tendencia(t: dict, titulo: str, franja: str) -> io.BytesIO:
     """¿Estás mejorando? El índice por partida (promedio móvil) y la recta de toda la temporada."""
-    import matplotlib.dates as mdates
-
-    fecha = lambda ms: datetime.fromtimestamp(ms / 1000, timezone.utc)
-    xs = [fecha(p["t"]) for p in t["puntos"]]
+    # Eje = número de partida (la recta se ajusta por partida); los meses quedan como rótulos.
+    MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+    xs = [p["i"] for p in t["puntos"]]
     fig, ax = _figura()
     ax.axhline(50, color=TENUE, lw=1, ls=(0, (4, 4)))
-    ax.annotate(f"mitad de {franja}", (xs[0], 50), xytext=(2, 5), textcoords="offset points", color=TENUE, fontsize=9)
+    ax.annotate(f"mitad de {franja}", (0, 50), xytext=(2, 5), textcoords="offset points", color=TENUE, fontsize=9)
     ax.plot(xs, [p["v"] for p in t["puntos"]], color=ACENTO, lw=2.4)
     color = {"mejorando": "#00e07a", "empeorando": "#ff4466"}.get(t["veredicto"], TENUE)
     r = t["recta"]
-    ax.plot([fecha(r["desde"]["t"]), fecha(r["hasta"]["t"])], [r["desde"]["v"], r["hasta"]["v"]],
-            color=color, lw=2.4, ls=(0, (8, 5)))
+    ax.plot([r["desde"]["i"], r["hasta"]["i"]], [r["desde"]["v"], r["hasta"]["v"]], color=color, lw=2.4, ls=(0, (8, 5)))
     ax.scatter([xs[-1]], [t["puntos"][-1]["v"]], color=ACENTO, s=36, zorder=4)
     vs = [p["v"] for p in t["puntos"]]
     ax.set_ylim(max(0, min(vs + [40]) - 8), min(100, max(vs + [60]) + 8))
+    ax.set_xlim(0, t["n"] - 1)
     ax.set_ylabel(f"índice (promedio de {t['ventana']} partidas)", color=TENUE)
-    ax.xaxis.set_major_locator(mdates.MonthLocator())
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b"))
+    ax.set_xlabel(f"partidas ({t['n']})", color=TENUE)
+    marcas, ultimo = [], -1e9
+    for mm in t.get("meses", []):
+        if mm["i"] - ultimo > t["n"] / 14:  # sin rótulos pegados
+            marcas.append(mm)
+            ultimo = mm["i"]
+    ax.set_xticks([mm["i"] for mm in marcas])
+    ax.set_xticklabels([MESES[mm["mes"] - 1] for mm in marcas])
     ax.grid(color=GRILLA, lw=0.6)
     signo = lambda v: f"{'+' if v > 0 else ''}{v:.1f}".replace(".", ",")
     ax.set_title(f"{titulo}\nDe {t['inicio']:.0f} a {t['ahora']:.0f} → {t['veredicto']} "

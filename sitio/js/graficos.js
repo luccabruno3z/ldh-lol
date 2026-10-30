@@ -107,16 +107,17 @@ document.addEventListener('click', (e) => {
 export function seccionTendencia(t, rol, franja) {
     if (!t) return `<p class="dim">Hacen falta 30 partidas de ${escapeHtml(rol)} en solo/dúo para medir una tendencia.</p>`;
     const W = 640, H = 210, m = { l: 34, r: 12, t: 14, b: 24 };
-    const t0 = t.puntos[0].t, t1 = t.puntos[t.puntos.length - 1].t;
+    // Eje = número de partida (la recta se ajusta por partida); los meses quedan como rótulos.
+    const n1 = Math.max(1, t.n - 1);
     const vs = t.puntos.map(p => p.v), lo = Math.max(0, Math.min(...vs, 40) - 8), hi = Math.min(100, Math.max(...vs, 60) + 8);
-    const x = (ts) => m.l + (t1 === t0 ? 0.5 : (ts - t0) / (t1 - t0)) * (W - m.l - m.r);
+    const x = (i) => m.l + (i / n1) * (W - m.l - m.r);
     const y = (v) => m.t + (1 - (v - lo) / (hi - lo)) * (H - m.t - m.b);
-    const linea = t.puntos.map(p => `${x(p.t)},${y(p.v)}`).join(' ');
-    const meses = [];
-    for (let d = new Date(t0); d.getTime() <= t1; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
-        const ini = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
-        if (ini >= t0) meses.push(`<text x="${x(ini)}" y="${H - 6}" class="g-eje" text-anchor="middle">${MESES[d.getMonth()]}</text>`);
-    }
+    const linea = t.puntos.map(p => `${x(p.i)},${y(p.v)}`).join(' ');
+    // Un rótulo por mes, salteando los que quedarían pegados al anterior.
+    let ultimo = -99;
+    const meses = (t.meses || []).filter(mm => { const ok = x(mm.i) - ultimo > 28; if (ok) ultimo = x(mm.i); return ok; })
+        .map(mm => `<line x1="${x(mm.i)}" x2="${x(mm.i)}" y1="${m.t}" y2="${H - m.b}" class="g-grilla"/>
+          <text x="${x(mm.i) + 3}" y="${H - 6}" class="g-eje">${MESES[mm.mes - 1]}</text>`);
     const clase = t.veredicto === 'mejorando' ? 'win' : t.veredicto === 'empeorando' ? 'loss' : '';
     const signo = (v) => `${v > 0 ? '+' : ''}${num(v, 1)}`;
     return `<p class="evo-lectura">Empezaste la temporada en <strong>${num(t.inicio, 0)}</strong> y hoy estás en <strong>${num(t.ahora, 0)}</strong>
@@ -127,8 +128,9 @@ export function seccionTendencia(t, rol, franja) {
         <text x="${m.l - 6}" y="${y(50) + 4}" class="g-eje" text-anchor="end">50</text>
         <text x="${m.l + 4}" y="${y(50) - 5}" class="g-eje">mitad de ${escapeHtml(franja)}</text>
         <polyline points="${linea}" class="g-linea"/>
-        <line x1="${x(t.recta.desde.t)}" y1="${y(t.recta.desde.v)}" x2="${x(t.recta.hasta.t)}" y2="${y(t.recta.hasta.v)}" class="g-recta g-recta--${clase || 'neutra'}"/>
-        <circle cx="${x(t1)}" cy="${y(t.puntos[t.puntos.length - 1].v)}" r="5" class="g-punto"/>
+        <line x1="${x(t.recta.desde.i)}" y1="${y(t.recta.desde.v)}" x2="${x(t.recta.hasta.i)}" y2="${y(t.recta.hasta.v)}" class="g-recta g-recta--${clase || 'neutra'}"/>
+        <circle cx="${x(t.n - 1)}" cy="${y(t.puntos[t.puntos.length - 1].v)}" r="5" class="g-punto"/>
+        <text x="${W - m.r}" y="${H - 6}" class="g-eje" text-anchor="end">partida ${t.n}</text>
         ${meses.join('')}
       </svg>
       <p class="nota">Cada partida recibe un índice de 0 a 100: el promedio de tus percentiles en ${t.metricas.map(escapeHtml).join(', ').toLowerCase()}, contra jugadores de ${escapeHtml(franja)} en ${escapeHtml(rol)} (las muertes cuentan al revés). La línea celeste es el promedio de tus últimas ${t.ventana} partidas en cada momento y la recta, la tendencia de toda la temporada (${t.n} partidas). Mide cómo jugás, no si ganaste: el winrate depende demasiado de los compañeros. "Sin tendencia clara" quiere decir que el intervalo de la pendiente cruza el cero.</p>`;

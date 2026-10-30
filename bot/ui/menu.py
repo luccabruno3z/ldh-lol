@@ -91,7 +91,7 @@ class MenuBoton(discord.ui.DynamicItem[discord.ui.Button], template=r"lm:(?P<acc
         if self.accion == "tips":
             pid = bot.get_cog("Perfil").vinculos.get(str(self.owner))
             d = await bot.datos.coaching(pid) if pid else None
-            rol = (d or {}).get("rol_principal")
+            rol = (d or {}).get("rol_con_referencia") or (d or {}).get("rol_principal")
             if not rol:
                 await interaction.response.send_message(
                     "No sé tu rol principal (hace falta estar vinculado y tener 10+ partidas de solo/dúo en un rol). "

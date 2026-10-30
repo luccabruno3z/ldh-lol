@@ -39,22 +39,24 @@ function metrica(m, clave) {
 
 // ---- Roles ----
 
-function tablaRoles(d, cola) {
+function tablaRoles(d, cola, co) {
     const filas = d.tabla.filter(t => t.cola === cola);
     if (!filas.length) return '<p class="empty-state">Sin partidas en esta cola.</p>';
     return `<div class="table-wrap"><table class="data-table">
       <thead><tr><th>Rol</th><th class="num">n</th><th class="num">Winrate ajustado</th><th class="num">KDA ajustado</th>
-        <th>Métrica del rol</th><th class="num">Mediana del grupo</th><th>Confianza</th></tr></thead>
+        <th>Métrica del rol</th><th class="num">${cola === 'solo' && co ? 'Contra tu franja' : 'Mediana del grupo'}</th><th>Confianza</th></tr></thead>
       <tbody>${filas.map(t => {
         const ms = d.metricas[t.rol] || [];
         const ref = t.referencia || {};
+        // En solo/dúo hay referencia de tu franja (fase 3): mejor que la mediana de un grupo de amigos.
+        const fr = cola === 'solo' && co?.roles?.[t.rol]?.metricas?.[ms[0]?.clave];
         return `<tr class="${t.muestra_chica ? 'chica' : ''}">
           <td>${escapeHtml(t.rol)}${t.muestra_chica ? ' <span class="tag">muestra chica</span>' : ''}</td>
           <td class="num mono">${t.n}</td>
           <td class="num">${winrateAj(t)}</td>
           <td class="num">${kdaAj(t)}</td>
           <td>${ms.map(m => `<div class="metrica-rol"><span class="dim">${escapeHtml(m.nombre)}</span> ${metrica(t[m.clave], m.clave)}</div>`).join('')}</td>
-          <td class="num">${ref.jugadores ? `<span class="v">${pct(ref.winrate)}</span><span class="ic">${ms[0] ? `${escapeHtml(ms[0].nombre)}: ${num(ref[ms[0].clave], ms[0].clave.startsWith('dif_oro') ? 0 : 2)} · ` : ''}${ref.jugadores} jugadores</span>` : '<span class="dim">sin referencia</span>'}</td>
+          <td class="num">${fr ? `<span class="v">mejor que el ${Math.round(fr.pct * 100)} %</span><span class="ic">mediana de ${escapeHtml(co.franja)}: ${num(fr.mediana, ms[0].clave.startsWith('dif_oro') ? 0 : 2)} · ${fr.n_ref} jugadores</span>` : ref.jugadores ? `<span class="v">${pct(ref.winrate)}</span><span class="ic">${ms[0] ? `${escapeHtml(ms[0].nombre)}: ${num(ref[ms[0].clave], ms[0].clave.startsWith('dif_oro') ? 0 : 2)} · ` : ''}${ref.jugadores} jugadores</span>` : '<span class="dim">sin referencia</span>'}</td>
           <td>${chipConf(t.confianza)}</td></tr>`;
     }).join('')}</tbody></table></div>`;
 }
@@ -62,6 +64,7 @@ function tablaRoles(d, cola) {
 async function roles(p, cont) {
     // En la vista de una cuenta, los roles vienen calculados con solo esas partidas.
     const d = p._cuenta ? p._cuenta.roles : await cachedFetch(`roles/${encodeURIComponent(p.id)}.json`);
+    const co = p._cuenta ? null : await cachedFetch(`coaching/${encodeURIComponent(p.id)}.json`).catch(() => null);
     let cola = colaPrincipal(d.tabla);
     if (!cola) return;
     const mejor = () => {
@@ -72,12 +75,12 @@ async function roles(p, cont) {
     cont.innerHTML = `<section class="section">
       <div class="section-head"><h3>Tus roles</h3>${selectorCola('roles-cola', GRIETA, cola)}</div>
       <p class="lead" id="roles-mejor">${mejor()}</p>
-      <div id="roles-tabla">${tablaRoles(d, cola)}</div>
+      <div id="roles-tabla">${tablaRoles(d, cola, co)}</div>
       <p class="nota">El winrate ajustado suma ${state.ajustes?.ajuste_muestra?.k_tasa ?? 10} partidas al 50 % y el KDA ajustado ${state.ajustes?.ajuste_muestra?.k_muertes ?? 20} muertes a la mediana del rol: con poca muestra el valor se acerca al centro. La métrica de cada rol se mide contra el rival directo de la misma partida. La referencia es la mediana del grupo en la misma cola y rol, entre quienes tienen ${state.ajustes?.min_partidas ?? 10}+ partidas.</p>
     </section>`;
     cont.querySelector('#roles-cola').addEventListener('change', (e) => {
         cola = e.target.value;
-        cont.querySelector('#roles-tabla').innerHTML = tablaRoles(d, cola);
+        cont.querySelector('#roles-tabla').innerHTML = tablaRoles(d, cola, co);
         cont.querySelector('#roles-mejor').innerHTML = mejor();
     });
 }
