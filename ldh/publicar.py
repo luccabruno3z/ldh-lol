@@ -102,6 +102,34 @@ def _forma(filas: list[dict]) -> dict | None:
     }
 
 
+def _evolucion(filas: list[dict], lp: list[dict]) -> dict:
+    """Winrate móvil (ventana fija, con Wilson) por cola de Grieta y la historia del LP de solo/dúo."""
+    cfg = AJUSTES["evolucion"]
+    v, paso = cfg["ventana"], cfg["paso"]
+    colas = {}
+    for cola in ("solo", "flex", "normal"):
+        g = sorted((f for f in filas if f["cola"] == cola), key=lambda f: f["inicio_ms"])
+        if len(g) < v:
+            continue
+        puntos = []
+        for fin in range(v, len(g) + 1, paso):
+            w = g[fin - v:fin]
+            puntos.append({"t": w[-1]["inicio_ms"], "i": fin, **est.wilson(sum(f["win"] for f in w), v)})
+        colas[cola] = {"n": len(g), "puntos": puntos}
+    return {"ventana": v, "colas": colas, "lp": lp}
+
+
+def lp_fotos(db: sqlite3.Connection, pid: str, riot_id: str | None = None) -> list[dict]:
+    """Cada cambio de rango de solo/dúo anotado por el cron, en escala continua (valor)."""
+    q = """SELECT r.t, r.tier, r.division, r.lp, r.valor, c.riot_id FROM rango_fotos r JOIN cuentas c USING(puuid)
+           WHERE c.persona_id=? AND r.cola='solo' AND r.valor IS NOT NULL"""
+    args = [pid]
+    if riot_id:
+        q += " AND c.riot_id=?"
+        args.append(riot_id)
+    return [dict(r) for r in db.execute(q + " ORDER BY r.t", args)]
+
+
 def _historial(f: dict, lp: dict | None) -> dict:
     return {
         "id": f["match_id"], "inicio": f["inicio_ms"], "cola": f["cola"], "cuenta": f["riot_id"],
@@ -172,9 +200,28 @@ def publicar() -> dict:
                      **{c["riot_id"]: _tabla([f for f in filas if f["riot_id"] == c["riot_id"]])
                         for c in cuentas if len(cuentas) > 1}},
             "forma": _forma(filas),
+            "evolucion": _evolucion(filas, lp_fotos(db, pid)),
             **resumen_f2.get(pid, {"mejor_rol": {}, "mejor_companero": None}),
             "historial_paginas": paginas,
+            "vistas_cuenta": [],
         }
+        # Quien tiene varias cuentas puede mirar cada una por separado (pedido de Khaleevee):
+        # la misma lectura que el perfil, con las partidas y el rango de esa cuenta sola.
+        if len(cuentas) > 1:
+            for i, c in enumerate(cuentas):
+                fc = [f for f in filas if f["riot_id"] == c["riot_id"]]
+                if not fc:
+                    continue
+                pc = fase2.por_cuenta(fc)
+                _escribir(f"cuenta/{pid}/{i}.json", {
+                    "riot_id": c["riot_id"], "n": len(fc), "ultima": fc[0]["inicio_ms"],
+                    "rango": {c["riot_id"]: rangos[pid].get(c["riot_id"], {})},
+                    "kpis": _tabla(fc), "forma": _forma(fc),
+                    "evolucion": _evolucion(fc, lp_fotos(db, pid, c["riot_id"])),
+                    "mejor_rol": pc["roles"]["mejor"], "roles": pc["roles"], "campeones": pc["campeones"],
+                    "historial": [_historial(f, lp.get((f["match_id"], f["riot_id"]))) for f in fc[:por_pag]],
+                })
+                perfil["vistas_cuenta"].append({"riot_id": c["riot_id"], "indice": i, "n": len(fc)})
         _escribir(f"perfil/{pid}.json", perfil)
         for i in range(paginas):
             _escribir(f"historial/{pid}/{i + 1}.json", {

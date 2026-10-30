@@ -1,7 +1,8 @@
 /* jugador.js — perfil: cabecera con rango, KPIs por cola y rol (con n e intervalo),
    forma reciente con su prueba, los bloques de la fase 2 (fase2.js), el coaching (fase3.js) e historial. */
 
-import { state, loadPerfil, loadHistorial } from './data.js';
+import { state, loadPerfil, loadHistorial, cachedFetch } from './data.js';
+import { seccionEvolucion } from './graficos.js';
 import { onRoute, go } from './router.js';
 import { bloquesFase2 } from './fase2.js';
 import { bloquesFase3 } from './fase3.js';
@@ -182,6 +183,11 @@ async function historial(p, cont) {
         <tbody></tbody></table></div>
       <button class="btn" type="button" hidden>Ver más</button></section>`;
     const tbody = cont.querySelector('tbody'), btn = cont.querySelector('button');
+    if (p._cuenta) {  // vista de una cuenta: sus últimas partidas vienen en el mismo archivo
+        tbody.innerHTML = p._cuenta.historial.map(filaHistorial).join('')
+            || '<tr><td colspan="14" class="empty-state">Sin partidas todavía.</td></tr>';
+        return;
+    }
     const mas = async () => {
         pagina += 1;
         const h = await loadHistorial(p.id, pagina);
@@ -210,25 +216,48 @@ async function mostrar(id) {
         cont.innerHTML = '<div class="error-state">No encontré ese jugador. Solo aparecen las cuentas que se vincularon.</div>';
         return;
     }
-    const vistas = Object.keys(p.kpis);
-    let cuenta = 'todas', colaK = colasKpis(p.kpis.todas)[0];
+    await pintarPerfil(cont, p, null);
+}
+
+/** Botones "Todas · cuenta 1 · cuenta 2" para quien tiene varias cuentas. */
+function botonesCuenta(p, vista) {
+    if (!p.vistas_cuenta?.length) return '';
+    const b = (idx, txt, n) => `<button type="button" class="cuenta-btn${vista === idx ? ' is-active' : ''}" data-vista="${idx ?? ''}"
+        aria-pressed="${vista === idx}">${txt}${n != null ? ` <span class="dim">${n}</span>` : ''}</button>`;
+    return `<div class="cuentas-vista" role="group" aria-label="Ver el perfil de una sola cuenta">
+      ${b(null, 'Todas las cuentas', p.n)}${p.vistas_cuenta.map(v => b(v.indice, escapeHtml(v.riot_id), v.n)).join('')}</div>`;
+}
+
+/** Arma el perfil entero. vista = null (todas las cuentas) o el índice de una cuenta. */
+async function pintarPerfil(cont, base, vista) {
+    let p = base;
+    if (vista != null) {
+        const c = await cachedFetch(`cuenta/${encodeURIComponent(base.id)}/${vista}.json`);
+        p = { ...base, cuentas: [{ riot_id: c.riot_id, n: c.n }], rango: c.rango, n: c.n, ultima: c.ultima,
+              kpis: { todas: c.kpis }, forma: c.forma, evolucion: c.evolucion, mejor_rol: c.mejor_rol, _cuenta: c };
+    }
+    let colaK = colasKpis(p.kpis.todas)[0];
     // Orden: lo que se lee de un vistazo (forma) y lo que ayuda a mejorar (coaching, roles, pool)
     // antes que la tabla de KPIs, que es el detalle.
     cont.innerHTML = `${cabecera(p)}
+      ${botonesCuenta(base, vista)}
       ${resumen(p)}
       <nav class="perfil-indice" id="perfil-indice" aria-label="Ir a una sección del perfil"></nav>
       ${forma(p.forma)}
+      ${seccionEvolucion(p.evolucion)}
       <div id="fase3"></div>
       <div id="fase2"></div>
       <section class="section">
-        <div class="section-head"><h3>KPIs por rol</h3><span>
+        <div class="section-head"><h3>KPIs por rol</h3>
           <label class="selector">Cola <select id="kpi-cola">${colasKpis(p.kpis.todas).map(c => `<option value="${escapeHtml(c)}">${escapeHtml(nombreCola(c))}</option>`).join('')}</select></label>
-          ${vistas.length > 1 ? `<label class="selector">Cuenta
-            <select id="kpi-cuenta">${vistas.map(v => `<option value="${escapeHtml(v)}">${v === 'todas' ? 'Todas las cuentas' : escapeHtml(v)}</option>`).join('')}</select></label>` : ''}
-        </span></div>
+        </div>
         <div id="kpi-tabla">${tablaKpis(p.kpis.todas, colaK)}</div>
       </section>
       <div id="historial"></div>`;
+    cont.querySelectorAll('.cuenta-btn').forEach(btn => btn.addEventListener('click', () => {
+        const v = btn.dataset.vista === '' ? null : Number(btn.dataset.vista);
+        pintarPerfil(cont, base, v).catch(err => console.error('[perfil]', err));
+    }));
     // El índice se rearma cuando termina de llegar cada bloque.
     // Se ignoran los cambios del propio índice (si no, se rearmaría sin fin) y se corta el del perfil anterior.
     let pendiente;
@@ -245,9 +274,10 @@ async function mostrar(id) {
     });
     bloquesFase3(p, document.getElementById('fase3')).catch(err => console.error('[coaching]', err));
     bloquesFase2(p, document.getElementById('fase2'));
-    const pintarKpis = () => { document.getElementById('kpi-tabla').innerHTML = tablaKpis(p.kpis[cuenta] || [], colaK); };
-    document.getElementById('kpi-cola').addEventListener('change', (e) => { colaK = e.target.value; pintarKpis(); });
-    document.getElementById('kpi-cuenta')?.addEventListener('change', (e) => { cuenta = e.target.value; pintarKpis(); });
+    document.getElementById('kpi-cola')?.addEventListener('change', (e) => {
+        colaK = e.target.value;
+        document.getElementById('kpi-tabla').innerHTML = tablaKpis(p.kpis.todas, colaK);
+    });
     await historial(p, document.getElementById('historial'));
 }
 

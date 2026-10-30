@@ -60,7 +60,8 @@ function tablaRoles(d, cola) {
 }
 
 async function roles(p, cont) {
-    const d = await cachedFetch(`roles/${encodeURIComponent(p.id)}.json`);
+    // En la vista de una cuenta, los roles vienen calculados con solo esas partidas.
+    const d = p._cuenta ? p._cuenta.roles : await cachedFetch(`roles/${encodeURIComponent(p.id)}.json`);
     let cola = colaPrincipal(d.tabla);
     if (!cola) return;
     const mejor = () => {
@@ -132,7 +133,7 @@ function bloquePool(pool, cola) {
 }
 
 async function campeones(p, cont) {
-    const d = await cachedFetch(`campeones/${encodeURIComponent(p.id)}.json`);
+    const d = p._cuenta ? p._cuenta.campeones : await cachedFetch(`campeones/${encodeURIComponent(p.id)}.json`);
     let cola = colaPrincipal(d.tabla), todos = false;
     if (!cola) return;
     const pintar = () => {
@@ -164,6 +165,7 @@ export function difWinrate(d) {
 export const senal = (r) => (r.senal ? `<span class="tag ${r.dif.v > 0 ? 'win' : 'loss'}">señal</span>` : '<span class="tag">ruido</span>');
 
 async function sinergia(p, cont) {
+    if (p._cuenta) return;  // la sinergia es de la persona: se compara con y sin cada amigo en todas sus cuentas
     const d = await cachedFetch('sinergia.json');
     const filas = d.filas.filter(r => r.persona === p.id);
     if (!filas.length) return;

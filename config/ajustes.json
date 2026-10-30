@@ -134,5 +134,10 @@
     "umbral_fortaleza": 0.6,
     "umbral_debilidad": 0.4,
     "min_partidas_campeon": 15
+  },
+  "evolucion": {
+    "_": "Winrate móvil de las últimas 'ventana' partidas de cada cola, un punto cada 'paso' partidas, con su intervalo de Wilson.",
+    "ventana": 20,
+    "paso": 5
   }
 }

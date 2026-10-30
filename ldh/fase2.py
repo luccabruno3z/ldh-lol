@@ -296,12 +296,24 @@ def rankings_rol(filas_por: dict[str, list[dict]], ahora_ms: int) -> dict:
     return out
 
 
+# Medianas del grupo de la última corrida de generar(): la vista de una sola cuenta se compara
+# contra el mismo grupo que la persona entera.
+_MEDIANAS: dict = {}
+
+
+def por_cuenta(filas: list[dict]) -> dict:
+    """Roles, campeones y pool de una sola cuenta (las filas ya pasaron por _enriquecer)."""
+    r = roles(filas, _MEDIANAS["kda"], _MEDIANAS["rol"])
+    return {"roles": r, "campeones": {"tabla": campeones(filas, _MEDIANAS["kda"]), "pool": pool(filas)}}
+
+
 def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: Callable) -> dict:
     """Escribe roles/, campeones/, sinergia.json y rankings/. Devuelve lo que el perfil resume."""
     _enriquecer(db, filas_por)
     med_kda = _medianas_kda(filas_por, lambda f: (f["cola"], f["rol_ldh"]))
     med_kda_cola = _medianas_kda(filas_por, lambda f: f["cola"])
     med_rol = _medianas_rol(filas_por)
+    _MEDIANAS.update(kda=med_kda, rol=med_rol)
     sin = sinergia(filas_por)
     escribir("sinergia.json", {"alfa": AJ["alfa"], "min_juntos": AJUSTES["sinergia"]["min_juntos"],
                                "nota": "Con contra sin el compañero, en la misma cola. 'señal' usa el p ajustado "

@@ -5,6 +5,7 @@
 import { state, cachedFetch } from './data.js';
 import { escapeHtml, nombreCola, iconoCampeon, campeon, num } from './utils.js';
 import { pct, chipConf } from './fase2.js';
+import { radar } from './graficos.js';
 
 const COLAS = ['solo', 'flex', 'normal'];
 
@@ -45,10 +46,14 @@ function performance(r, franja) {
         : '';
     const franjas = Object.entries(pf.por_franja).map(([f, x]) =>
         `<div class="perf-franja${f === franja ? ' actual' : ''}"><span class="dim">contra ${escapeHtml(f)}</span> <span class="v">${num(x.v * 100, 0)}</span><span class="ic">${num(x.lo * 100, 0)} a ${num(x.hi * 100, 0)}</span></div>`).join('');
-    return `<div class="perf">
+    return `<div class="perf-radar">
+      <div class="perf">
         <div class="perf-num"><span class="perf-v">${num(pf.v * 100, 0)}</span><span class="dim">/100</span>
           <span class="ic">${num(pf.lo * 100, 0)} a ${num(pf.hi * 100, 0)}</span></div>
         <div><p class="lead">${lectura}</p><div class="perf-franjas">${franjas}</div></div>
+      </div>
+      <div>${radar(r.componentes, { titulo: `Tus 7 componentes contra ${franja}; el anillo punteado es la mitad de tu franja` })}
+        <p class="nota" style="text-align:center">El anillo punteado es la mitad de tu franja (50).</p></div>
       </div>
       <div class="table-wrap"><table class="data-table">
         <thead><tr><th>Componente</th><th>Nivel en tu franja</th><th class="num">Peso</th><th class="num">Aporta</th><th class="num">Puede sumar</th></tr></thead>
@@ -140,6 +145,11 @@ function contraCampeon(lista) {
 // ---- Armado ----
 
 export async function bloquesFase3(p, cont) {
+    if (p._cuenta) {
+        // El coaching necesita muestra y una franja por rango: se calcula con todas las cuentas juntas.
+        cont.innerHTML = '<section class="section"><h3>Coaching</h3><p class="empty-state">El coaching, los primeros 15 minutos y la sinergia se calculan con todas tus cuentas juntas. Volvé a "Todas las cuentas" para verlos.</p></section>';
+        return;
+    }
     const d = await cachedFetch(`coaching/${encodeURIComponent(p.id)}.json`);
     const roles = Object.keys(d.roles || {});
     let rol = d.rol_principal || roles[0];
