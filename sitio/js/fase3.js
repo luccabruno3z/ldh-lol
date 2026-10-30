@@ -5,7 +5,7 @@
 import { state, cachedFetch } from './data.js';
 import { escapeHtml, nombreCola, iconoCampeon, campeon, num } from './utils.js';
 import { pct, chipConf } from './fase2.js';
-import { radar } from './graficos.js';
+import { radar, seccionTendencia } from './graficos.js';
 
 const COLAS = ['solo', 'flex', 'normal'];
 
@@ -168,6 +168,7 @@ export async function bloquesFase3(p, cont) {
         }
         return `<h4>Tu Performance <span class="dim">· ${escapeHtml(rol)} en solo/dúo · ${r.n} partidas</span> ${chipConf(r.confianza)}</h4>${performance(r, d.franja)}
           <h4>Tu juego en una mirada</h4>${mirada(r)}
+          <h4>¿Estás mejorando?</h4>${seccionTendencia(r.tendencia, rol, d.franja)}
           <h4>Cómo sumar</h4>${sumar(r)}`;
     };
     cont.innerHTML = `<section class="section" id="f3-coaching">

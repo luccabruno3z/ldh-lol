@@ -61,6 +61,12 @@ METRICAS: dict[str, tuple] = {
 NO_APLICA = {"Support": {"cs_min", "cs10", "cs15", "dif_cs10", "dif_cs15"}, "Jungla": {"obj"}}
 # Las métricas que forman la "nota" por partida que mide la consistencia.
 NOTA = ("kp", "dano", "oro_min", "vision_min")
+# Índice por partida para la tendencia: lo que depende de cómo jugaste, no del resultado (el winrate
+# depende de los compañeros y tiene demasiado ruido para ver una tendencia). Muertes cuentan al revés.
+INDICE = {
+    "_": ("kp", "dano", "oro_min", "vision_min", "dif_oro15", "muertes_min"),
+    "Support": ("kp", "dano", "oro_min", "vision_min", "dif_vision_min", "muertes_min"),
+}
 
 
 def _componentes(rol: str) -> list[tuple[str, str, list[str]]]:
@@ -170,7 +176,7 @@ class Celda:
         self.winrate_crudo = float(mt["_w"].mean()) if len(todas) else None
         p = min(max(self.winrate_crudo or 0.5, 0.05), 0.95)
         # Por partida: base de la "nota" de consistencia.
-        self.partida = {k: np.sort(mt[k][~np.isnan(mt[k])]) for k in NOTA}
+        self.partida = {k: np.sort(mt[k][~np.isnan(mt[k])]) for k in {*NOTA, *[k for ks in INDICE.values() for k in ks]}}
         vals = defaultdict(list)
         for g in jugadores:
             m = _matriz(g)
@@ -254,6 +260,51 @@ def _evaluar(filas: list[dict], celda: Celda, rol: str, idx: np.ndarray) -> dict
 def _consejo(clave: str, rol: str) -> str:
     c = CONSEJOS.get(clave, {})
     return c.get(rol) or c.get("_", "")
+
+
+def tendencia(filas: list[dict], celda: "Celda", rol: str) -> dict | None:
+    """¿Estás mejorando? El índice de cada partida (0–100, percentil promedio contra tu franja y rol)
+    a lo largo del tiempo, con su recta de tendencia. La pendiente va en puntos cada 100 partidas,
+    con intervalo bootstrap (se remuestrean partidas manteniendo su orden en el tiempo)."""
+    cfg = PERF["tendencia"]
+    if len(filas) < cfg["min_partidas"]:
+        return None
+    m = _matriz(filas)
+    ps = []
+    for k in INDICE.get(rol, INDICE["_"]):
+        if k in celda.partida and len(celda.partida[k]):
+            p = _pct(m[k], celda.partida[k])
+            ps.append(1 - p if not METRICAS[k][2] else p)
+    if not ps:
+        return None
+    y = np.nanmean(np.stack(ps), axis=0) * 100
+    ok = ~np.isnan(y)
+    y, t = y[ok], np.array([f["inicio_ms"] for f, o in zip(filas, ok) if o])
+    n = len(y)
+    if n < cfg["min_partidas"]:
+        return None
+    x = np.arange(n, dtype=float)
+    pendiente = float(np.polyfit(x, y, 1)[0])
+    rng = np.random.default_rng(SEMILLA)
+    boot = []
+    for idx in rng.integers(0, n, (REPS, n)):
+        xs = x[idx]
+        if xs.std() > 0:
+            boot.append(np.polyfit(xs, y[idx], 1)[0])
+    lo, hi = np.percentile(boot, (2.5, 97.5))
+    v = cfg["ventana"]
+    movil = np.convolve(y, np.ones(v) / v, mode="valid")
+    paso = max(1, len(movil) // 60)  # unos 60 puntos alcanzan para la línea
+    puntos = [{"t": int(t[i + v - 1]), "v": _r(movil[i], 1)} for i in range(0, len(movil), paso)]
+    if puntos[-1]["t"] != int(t[-1]):
+        puntos.append({"t": int(t[-1]), "v": _r(movil[-1], 1)})
+    a, b = np.polyfit(x, y, 1)
+    return {"n": n, "ventana": v, "puntos": puntos,
+            "recta": {"desde": {"t": int(t[0]), "v": _r(b, 1)}, "hasta": {"t": int(t[-1]), "v": _r(a * (n - 1) + b, 1)}},
+            "pendiente": _r(pendiente * 100, 1), "lo": _r(lo * 100, 1), "hi": _r(hi * 100, 1),
+            "veredicto": "mejorando" if lo > 0 else "empeorando" if hi < 0 else "sin tendencia clara",
+            "inicio": _r(float(np.mean(y[:v])), 1), "ahora": _r(float(np.mean(y[-v:])), 1),
+            "metricas": [METRICAS[k][0] for k in INDICE.get(rol, INDICE["_"])]}
 
 
 def _rol(filas: list[dict], rol: str, franja: str, celdas: dict) -> dict | None:
@@ -343,7 +394,8 @@ def _rol(filas: list[dict], rol: str, franja: str, celdas: dict) -> dict | None:
             "componentes": comps, "metricas": metricas,
             "fortalezas": [item(k, x, False) for k, x in fort],
             "mejorar": [item(k, x, True) for k, x in debil],
-            "sumar": sumar}
+            "sumar": sumar,
+            "tendencia": tendencia(filas, celda, rol)}
 
 
 def temprano(filas: list[dict]) -> dict:

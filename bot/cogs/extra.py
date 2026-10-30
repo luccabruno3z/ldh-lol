@@ -42,7 +42,9 @@ GLOSARIO = {
 
 AYUDA = {
     "Empezar": "`-menu` panel con botones para todo\n`-vincular <tu nombre o Riot ID>` así los comandos sin nombre muestran el tuyo\n"
-               "`-desvincular` borra el vínculo",
+               "`-desvincular` borra el vínculo\n"
+               "`-ayuda` esta guía, por tema · `-glosario [término]` qué significa ajustado, intervalo, ruido, franja…\n"
+               "`-sugerencia <texto>` una idea o un error para mejorar el bot o la web",
     "Perfil": "`-perfil [jugador]` perfil con pestañas: resumen, roles, campeones, coaching y partidas. "
               "Si tenés varias cuentas, hay botones para ver cada una\n`-roles` · `-campeones` · `-sinergia` `[jugador]` "
               "abren esa pestaña directo",
@@ -50,7 +52,10 @@ AYUDA = {
                 "`-mejora [jugador] [rol]` las 3 brechas más grandes como metas en números\n"
                 "`-temprano [jugador] [rol]` CS, oro y XP a los 10 y 15 contra tu rival directo\n"
                 "`-tips <rol>` consejos del rol",
-    "Gráficos": "`-grafico [jugador] [evolucion|radar] [rol]` tu winrate en el tiempo con su banda, o el radar de tus componentes",
+    "Gráficos": "`-grafico [jugador] tendencia [rol]` ¿estás mejorando? Tu índice por partida contra tu franja y su tendencia\n"
+                "`-grafico [jugador] evolucion` ¿venís mejor o peor? Tu winrate de las últimas 20 contra tu temporada\n"
+                "`-grafico [jugador] radar [rol]` la rosa de tus 7 componentes contra tu franja\n"
+                "-# En `-menu`, **Mis gráficos** manda los tres.",
     "Rankings": "`-top [semana|mes|temporada] [cola]` con menús para cambiar período y cola\n"
                 "`-top_rol [rol] [cola]` la métrica de cada rol contra el rival directo\n"
                 "`-comparar <jugador> <otro> [cola] [rol]` métrica por métrica\n"
@@ -117,11 +122,39 @@ async def tarjeta_comparar(bot, a: str, b: str, cola: str | None, rol: str | Non
     return tarjeta_simple(lineas, url)
 
 
+async def tarjeta_tips(bot, rol: str) -> discord.ui.LayoutView:
+    """Los consejos de config/consejos.json para un rol (compartido por -tips y el menú)."""
+    consejos = await bot.datos.consejos()
+    nombres = {"combate": "Combate", "efectividad": "Efectividad", "economia": "Economía", "linea": "Línea",
+               "equipo": "Equipo", "consistencia": "Consistencia"}
+    lineas = [f"## Tips · {rol}", "-# Los que te tocan a vos salen en `-mejora`, según tus números."]
+    for k, n in nombres.items():
+        c = consejos.get(k, {})
+        if txt := c.get(rol) or c.get("_"):
+            lineas.append(f"**{n}**\n> {txt}")
+    return tarjeta_simple(lineas, WEB)
+
+
 async def armar_grafico(bot, p: dict, tipo: str, rol: str | None):
     """(vista, png) del gráfico pedido, o (mensaje, None) si todavía no se puede dibujar."""
     from bot.services import graficos
     nombre = p["nombre"]
-    if tipo.lower().startswith("rad"):
+    if tipo.lower().startswith("ten"):
+        d = await bot.datos.coaching(p["id"])
+        rol_n = ROLES.get((rol or "").lower()) or (d or {}).get("rol_principal")
+        r = ((d or {}).get("roles") or {}).get(rol_n) or {}
+        t = r.get("tendencia")
+        if not t:
+            return (f"Todavía no se puede medir la tendencia de {nombre} en {rol_n or 'ningún rol'}: hacen falta 30 "
+                    "partidas de solo/dúo en el rol y referencia en su franja."), None
+        png = graficos.tendencia(t, f"{nombre} · {rol_n} contra {d['franja']}", d["franja"])
+        signo = lambda v: f"{'+' if v > 0 else ''}{F.num(v, 1)}"
+        texto = (f"## {discord.utils.escape_markdown(nombre)} · ¿estás mejorando?\n"
+                 f"De **{F.num(t['inicio'], 0)}** a **{F.num(t['ahora'], 0)}** → **{t['veredicto']}** "
+                 f"({signo(t['pendiente'])} puntos cada 100 partidas, {signo(t['lo'])} a {signo(t['hi'])})\n"
+                 f"-# Índice de 0 a 100 por partida: tus percentiles en {', '.join(t['metricas']).lower()} contra "
+                 f"{d['franja']} en {rol_n}. Mide cómo jugás, no si ganaste. 50 = la mitad de tu franja.")
+    elif tipo.lower().startswith("rad"):
         d = await bot.datos.coaching(p["id"])
         rol_n = ROLES.get((rol or "").lower()) or (d or {}).get("rol_principal")
         r = ((d or {}).get("roles") or {}).get(rol_n)
@@ -230,15 +263,7 @@ class Extra(commands.Cog):
         if not rol_n:
             await ctx.reply("Uso: `-tips <top|jungla|mid|adc|support>`", ephemeral=True)
             return
-        consejos = await self.datos.consejos()
-        nombres = {"combate": "Combate", "efectividad": "Efectividad", "economia": "Economía", "linea": "Línea",
-                   "equipo": "Equipo", "consistencia": "Consistencia"}
-        lineas = [f"## Tips · {rol_n}", "-# Los que te tocan a vos salen en `-mejora`, según tus números."]
-        for k, n in nombres.items():
-            c = consejos.get(k, {})
-            if txt := c.get(rol_n) or c.get("_"):
-                lineas.append(f"**{n}**\n> {txt}")
-        await ctx.reply(view=tarjeta_simple(lineas, WEB))
+        await ctx.reply(view=await tarjeta_tips(self.bot, rol_n))
 
     @commands.hybrid_command(name="comparar", description="Dos jugadores, métrica por métrica, en la misma cola y rol")
     @app_commands.autocomplete(jugador=autocompletar_jugador, otro=autocompletar_jugador)
@@ -251,10 +276,10 @@ class Extra(commands.Cog):
         await ctx.reply(view=await tarjeta_comparar(self.bot, pa["id"], pb["id"],
                                                     COLAS.get((cola or "").lower()), ROLES.get((rol or "").lower())))
 
-    @commands.hybrid_command(name="grafico", description="Tu winrate en el tiempo con su banda, o el radar de tus componentes")
+    @commands.hybrid_command(name="grafico", description="Evolución del winrate, tendencia de mejora o radar de tus componentes")
     @app_commands.autocomplete(jugador=autocompletar_jugador)
     async def grafico(self, ctx: commands.Context, jugador: str | None = None, tipo: str = "evolucion", rol: str | None = None):
-        if jugador and jugador.lower() in ("evolucion", "evolución", "radar"):  # -grafico radar
+        if jugador and jugador.lower() in ("evolucion", "evolución", "radar", "tendencia"):  # -grafico radar
             jugador, tipo = None, jugador
         if not (p := await self._persona(ctx, jugador, "grafico")):
             return

@@ -134,7 +134,12 @@
     "penalizacion_escala": 4,
     "umbral_fortaleza": 0.6,
     "umbral_debilidad": 0.4,
-    "min_partidas_campeon": 15
+    "min_partidas_campeon": 15,
+    "tendencia": {
+      "_": "Índice por partida (percentil promedio contra la franja y el rol, 0–100) y su recta de tendencia en puntos cada 100 partidas, con bootstrap. Promedio móvil de 'ventana' partidas para la línea.",
+      "min_partidas": 30,
+      "ventana": 15
+    }
   },
   "evolucion": {
     "_": "Winrate móvil de las últimas 'ventana' partidas de cada cola, un punto cada 'paso' partidas, con su intervalo de Wilson.",

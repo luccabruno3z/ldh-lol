@@ -9,7 +9,8 @@ import discord
 from bot.cogs.perfil import AVISO_RIOT
 
 ACCIONES = {"perfil": "Mi perfil", "grafico": "Mis gráficos", "buscar": "Buscar jugador", "top": "Rankings",
-            "toprol": "Top por rol", "comparar": "Comparar", "ayuda": "Ayuda"}
+            "toprol": "Top por rol", "competencia": "Competencia del mes", "comparar": "Comparar",
+            "tips": "Tips de mi rol", "glosario": "Glosario", "ayuda": "Ayuda"}
 
 
 class BuscarModal(discord.ui.Modal, title="Buscar jugador"):
@@ -69,6 +70,37 @@ class MenuBoton(discord.ui.DynamicItem[discord.ui.Button], template=r"lm:(?P<acc
             from bot.cogs.extra import AyudaVista
             await interaction.response.send_message(view=AyudaVista(), ephemeral=True)
             return
+        if self.accion == "glosario":
+            from bot.cogs.extra import GLOSARIO, _VistaTexto
+            await interaction.response.send_message(view=_VistaTexto(GLOSARIO, "Glosario"), ephemeral=True)
+            return
+        if self.accion == "competencia":
+            # Lo que va del mes en solo/dúo; otras fechas o colas con -competencia.
+            from datetime import datetime, timedelta
+
+            from bot.cogs.feed import ARG, tabla_competencia
+            from bot.cogs.perfil import WEB, tarjeta_simple
+            await interaction.response.defer(thinking=True)
+            hoy = datetime.now(ARG)
+            nombres = {p["id"]: p["nombre"] for p in await bot.datos.personas()}
+            lineas = tabla_competencia(await bot.datos.partidas_resumen(), nombres, hoy.replace(day=1, hour=0, minute=0),
+                                       hoy + timedelta(days=1), "solo", "## Competencia del mes · solo/dúo")
+            lineas.append("-# Otras fechas o colas: `-competencia 1/11 30/11 flex`")
+            await interaction.followup.send(view=tarjeta_simple(lineas, WEB))
+            return
+        if self.accion == "tips":
+            pid = bot.get_cog("Perfil").vinculos.get(str(self.owner))
+            d = await bot.datos.coaching(pid) if pid else None
+            rol = (d or {}).get("rol_principal")
+            if not rol:
+                await interaction.response.send_message(
+                    "No sé tu rol principal (hace falta estar vinculado y tener 10+ partidas de solo/dúo en un rol). "
+                    "Usá `-tips <rol>`.", ephemeral=True)
+                return
+            await interaction.response.defer(thinking=True)
+            from bot.cogs.extra import tarjeta_tips
+            await interaction.followup.send(view=await tarjeta_tips(bot, rol))
+            return
         if self.accion == "grafico":
             # La evolución siempre que haya 20+ partidas; el radar (la "rosa") cuando haya referencia.
             pid = bot.get_cog("Perfil").vinculos.get(str(self.owner))
@@ -80,7 +112,7 @@ class MenuBoton(discord.ui.DynamicItem[discord.ui.Button], template=r"lm:(?P<acc
             await interaction.response.defer(thinking=True)
             p = await bot.datos.perfil(pid)
             enviados = 0
-            for tipo in ("evolucion", "radar"):
+            for tipo in ("tendencia", "evolucion", "radar"):
                 view, png = await armar_grafico(bot, p, tipo, None)
                 if png is not None:
                     await interaction.followup.send(view=view, file=discord.File(png, "grafico.png"))
@@ -111,7 +143,8 @@ def menu(owner: int) -> discord.ui.LayoutView:
         discord.ui.TextDisplay("## LDH Stats LoL\nElegí qué querés ver. Los números llevan su intervalo y su n; "
                                "si algo dice **ruido**, con esas partidas no se puede sacar conclusiones.\n-# " + AVISO_RIOT),
         discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("perfil", "grafico", "buscar")]),
-        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("top", "toprol", "comparar", "ayuda")]),
+        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("top", "toprol", "competencia", "comparar")]),
+        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("tips", "glosario", "ayuda")]),
         discord.ui.ActionRow(discord.ui.Button(label="Abrir la web", url="https://luccabruno3z.github.io/ldh-lol/")),
         accent_colour=0x00CCCC))
     return view

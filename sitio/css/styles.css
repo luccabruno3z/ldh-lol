@@ -307,3 +307,5 @@ section.section { scroll-margin-top: calc(var(--header-h) + 56px); }
 .g-temporada-txt { fill: var(--secondary); }
 .g-punto--hito { fill: var(--text-dim); }
 .g-hito { font-size: 10px; } .g-hoy { fill: var(--accent); font-weight: 700; }
+.g-recta { stroke-width: 2.4; stroke-dasharray: 8 5; stroke: var(--text-muted); }
+.g-recta--win { stroke: var(--success); } .g-recta--loss { stroke: var(--danger); }
