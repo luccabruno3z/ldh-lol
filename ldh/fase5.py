@@ -2,6 +2,7 @@
 
 A. Rachas y pausas: ¿te conviene seguir después de 2 derrotas? Cada persona se compara consigo misma
    (si no, el que juega peor aparece más en las rachas y parece que la racha hace perder).
+B. Probabilidad de ganar minuto a minuto (ldh.victoria): se entrena, se valida y se publica con su calibración.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from collections import defaultdict
 from typing import Callable
 
 from . import estadistica as est
+from . import victoria as V
 from .ajustes import AJUSTES
 from .fase2 import GRIETA
 
@@ -112,9 +114,34 @@ def rachas(db: sqlite3.Connection, pids: list[str]) -> tuple[dict, dict]:
     return por, grupo
 
 
+# ---------------------------------------------------------------- B. modelo
+
+def modelo(db: sqlite3.Connection) -> dict:
+    """El modelo de probabilidad de ganar: se reentrena solo si cambiaron las partidas."""
+    n = db.execute("SELECT count(*) FROM partidas WHERE cola IN ('solo','flex','normal') AND tiene_timeline=1").fetchone()[0]
+    m = V.cargar_modelo()
+    if not m or m.get("version") != V.VERSION or m.get("partidas") != n:
+        m = V.entrenar(db)
+        V.guardar_modelo(m)
+    return m
+
+
+def _equivalencias(m: dict) -> list[dict]:
+    """Cuánto vale cada cosa en oro, a mitad de partida (tramo 20–30): coeficiente / coeficiente del oro.
+    Es lo que suma además del oro que ya da (ese está en la diferencia de oro)."""
+    c = dict(zip(m["variables"], m["coef"]))
+    oro = c["oro_20"] / 1000
+    nombres = {"baron": "Barón activo", "ancestral": "Dragón Ancestral activo", "inhib": "Un inhibidor caído",
+               "dragones": "Un dragón", "alma": "El alma (además de sus dragones)", "torres_20": "Una torre",
+               "kills_20": "Una kill", "larvas": "Una larva", "heraldo": "El Heraldo"}
+    return [{"clave": k, "nombre": n, "oro": round(c[k] / oro)} for k, n in nombres.items() if k in c]
+
+
 # ---------------------------------------------------------------- generar
 
 def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: Callable) -> None:
+    m = modelo(db)
+    escribir("modelo_victoria.json", {**m, "equivalencias": _equivalencias(m)})
     por, grupo = rachas(db, list(filas_por))
     textos = {"estados": ESTADOS, "sesion_min": CFG["sesion_min"], "corte_min": CFG["corte_min"],
               "largas_desde": CFG["largas_desde"]}

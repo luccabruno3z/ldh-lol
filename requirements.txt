@@ -1,3 +1,5 @@
 # Pipeline (Actions). Versiones fijas: las mismas que se probaron en local.
 requests==2.34.2
 numpy==2.5.2
+# Modelo de probabilidad de ganar (fase 5): regresión logística y calibración.
+scikit-learn==1.9.1

@@ -389,3 +389,8 @@ section.section { scroll-margin-top: calc(var(--header-h) + 56px); }
 .rb-num { white-space: nowrap; font-size: .85rem; }
 .rb-grupo { margin: 6px 0 10px; padding-left: 18px; font-size: .9rem; display: grid; gap: 4px; }
 @media (max-width: 480px) { .rb-fila { grid-template-columns: 1fr auto; } .rb-pista { grid-column: 1 / -1; grid-row: 2; } }
+
+/* Calibración del modelo de probabilidad de ganar */
+.calib-grid { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.g-calib { width: 100%; max-width: 260px; height: auto; }
+@media (max-width: 640px) { .calib-grid { grid-template-columns: 1fr; } .g-calib { margin: 0 auto; display: block; } }

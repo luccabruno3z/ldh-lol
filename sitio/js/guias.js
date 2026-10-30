@@ -28,6 +28,39 @@ const COMPONENTES = { combate: 'Combate', efectividad: 'Efectividad', economia: 
 
 let rol = 'Top';
 
+/** Predicho contra real por deciles, con la diagonal (calibración perfecta) y el intervalo de cada punto. */
+function grafCalibracion(cal) {
+    const S = 260, m = 30, x = (v) => m + v * (S - 2 * m), y = (v) => S - m - v * (S - 2 * m);
+    const puntos = cal.map(c => {
+        // dif = predicho − real, con su intervalo: el intervalo de lo real es predicho − dif.
+        const lo = c.predicho - (c.dif_hi ?? 0), hi = c.predicho - (c.dif_lo ?? 0);
+        return `<line x1="${x(c.predicho)}" x2="${x(c.predicho)}" y1="${y(Math.min(lo, hi))}" y2="${y(Math.max(lo, hi))}" class="g-recta"/>
+          <circle cx="${x(c.predicho)}" cy="${y(c.real)}" r="4" class="g-punto"><title>Predicho ${num(c.predicho * 100, 0)} %, real ${num(c.real * 100, 0)} % (${c.n} minutos de partida)</title></circle>`;
+    }).join('');
+    const marcas = [0, 0.25, 0.5, 0.75, 1].map(v => `<text x="${x(v)}" y="${S - 10}" class="g-eje" text-anchor="middle">${v * 100}</text>
+        <text x="${m - 6}" y="${y(v) + 4}" class="g-eje" text-anchor="end">${v * 100}</text>`).join('');
+    return `<svg class="g-calib" viewBox="0 0 ${S} ${S}" role="img" aria-label="Calibración: lo que predice el modelo contra lo que pasó, por deciles">
+      <rect x="${m}" y="${m}" width="${S - 2 * m}" height="${S - 2 * m}" class="g-grilla" fill="none"/>
+      <line x1="${x(0)}" y1="${y(0)}" x2="${x(1)}" y2="${y(1)}" class="g-medio"/>${marcas}${puntos}</svg>`;
+}
+
+/** Cómo se calcula la probabilidad de ganar (fase 5): para que el gráfico de cada partida tenga respaldo. */
+async function modeloVictoria() {
+    const d = await cachedFetch('modelo_victoria.json', { silent: true });
+    if (!d) return '';
+    const v = d.validacion;
+    const eq = d.equivalencias.map(e => `<tr><td>${escapeHtml(e.nombre)}</td><td class="num mono">${Math.abs(e.oro) < 200 ? '<span class="dim">casi nada</span>' : `${num(e.oro, 0)} de oro`}</td></tr>`).join('');
+    return `<section class="section"><h3>Cómo calculamos la probabilidad de ganar</h3>
+      <p>Con el estado de la partida en cada minuto (diferencia de oro, XP, kills, torres, dragones, Barón, inhibidores…) un modelo estima la chance de ganar de cada equipo. Es la idea de la tesis de xPetu, entrenada con las ${num(d.partidas, 0)} partidas del grupo.</p>
+      <div class="calib-grid"><div>${grafCalibracion(v.calibracion)}
+        <p class="nota" style="text-align:center">Eje horizontal: lo que predice. Vertical: cuántas se ganaron de verdad. Sobre la diagonal es perfecto.</p></div>
+        <div><p class="lead">En ${num(v.partidas_prueba, 0)} partidas apartadas, la peor franja se desvía <strong>${num(v.peor_decil * 100, 1)} puntos</strong>. A los 15 minutos acierta el ganador el <strong>${num(v.acierto_15 * 100, 0)} %</strong> de las veces (los estudios dan 72–75 %).</p>
+          <h4>Cuánto vale cada cosa, a mitad de partida</h4>
+          <div class="table-wrap"><table class="data-table"><tbody>${eq}</tbody></table></div>
+          <p class="nota">Lo que suma además del oro que ya da (ese está en la diferencia de oro). Por ejemplo, tener el Barón pesa como ir ${num(d.equivalencias.find(e => e.clave === 'baron')?.oro ?? 0, 0)} de oro arriba.</p></div></div>
+    </section>`;
+}
+
 async function render() {
     const [ref, consejos, eq] = await Promise.all([cachedFetch('referencia.json'), cachedFetch('consejos.json'), cachedFetch('equipos.json')]);
     const cont = document.getElementById('guias-cuerpo');
@@ -62,7 +95,8 @@ async function render() {
             <td class="num mono">${num(j.roles[rol].wr_aj * 100, 0)} %<span class="ic">${j.roles[rol].n} partidas</span></td>
             <td>${j.roles[rol].campeones.slice(0, 4).map(c => `<span class="quien">${iconoCampeon(c.id, 22)} ${escapeHtml(campeon(c.id))} <span class="dim">${c.n}</span></span>`).join(' ') || '<span class="dim">—</span>'}</td></tr>`).join('')}</tbody></table></div>`
           : `<p class="empty-state">Nadie del grupo tiene ${eq.min_rol}+ partidas de ${rol}.</p>`}
-        <p class="nota">Todas las colas de Grieta. El winrate ajustado suma 10 partidas al 50 % para que nadie quede arriba con 3 de 3.</p></section>`;
+        <p class="nota">Todas las colas de Grieta. El winrate ajustado suma 10 partidas al 50 % para que nadie quede arriba con 3 de 3.</p></section>
+      ${await modeloVictoria().catch(() => '')}`;
 }
 
 export function initGuias() {
