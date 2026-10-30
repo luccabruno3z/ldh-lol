@@ -77,7 +77,8 @@ async def _cuerpo(bot, p: dict, tab: str, cuenta: dict | None) -> str:
             return "Todavía no hay coaching publicado."
         perf, mejora = _texto(co.tarjeta_performance(p, d, None)), _texto(co.tarjeta_mejora(p, d, None))
         # Sin referencia, las dos tarjetas dicen lo mismo: se muestra una sola vez.
-        return perf if perf == mejora else f"{perf}\n\n{mejora}"
+        pie = "\n\n-# Para elegir rol, modo (solo/dúo, normales o todo) y gráficos con menús: `-coaching`."
+        return (perf if perf == mejora else f"{perf}\n\n{mejora}") + pie
     # partidas
     partidas = cuenta["historial"] if cuenta else ((await datos.historial(p["id"], 1)) or {}).get("partidas", [])
     champs = await datos.campeones()
