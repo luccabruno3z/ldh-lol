@@ -232,3 +232,40 @@ export function activarCurvas(tbody, pid) {
         cont.innerHTML = d ? curvaPartida(d, pid) : '<p class="dim">Esta partida no tiene timeline: no hay gráfico.</p>';
     });
 }
+
+// ---- Informe de coaching: lo escribe Claude a pedido, citando evidencias; las cifras salen de las evidencias ----
+
+const TIPO_EV = { observacion: 'observación', asociacion: 'asociación', estimacion_modelo: 'estimación del modelo', contexto: 'contexto' };
+const FASE_EV = { temprana: 'antes del 14', media: 'del 14 al 25', tardia: 'después del 25' };
+
+function evidenciaHtml(e) {
+    const extra = [e.por_partida_fmt, e.con_objetivo_fmt,
+        e.fases_fmt && Object.entries(e.fases_fmt).map(([k, v]) => `${FASE_EV[k] || k}: ${v}`).join(' · ')].filter(Boolean);
+    return `<li><span class="tag">${TIPO_EV[e.tipo] || e.tipo}</span> ${escapeHtml(e.que)}: <strong class="mono">${escapeHtml(e.fmt || '—')}</strong>
+      ${e.prueba ? ` <span class="dim">· ${escapeHtml(e.prueba)}</span>` : ''}${extra.length ? `<br><span class="small">${extra.map(escapeHtml).join(' · ')}</span>` : ''}
+      ${e.limitaciones?.filter(Boolean).length ? `<br><span class="dim small">${e.limitaciones.filter(Boolean).map(escapeHtml).join(' ')}</span>` : ''}</li>`;
+}
+
+export async function bloqueInforme(p, cont) {
+    if (p._cuenta || !cont) return;
+    const d = await cachedFetch(`informes/${encodeURIComponent(p.id)}.json`, { silent: true });
+    if (!d?.prioridades?.length) { cont.innerHTML = ''; return; }
+    const ev = Object.fromEntries((d.evidencias || []).map(e => [e.id, e]));
+    const lista = (ids) => `<ul class="inf-ev">${(ids || []).map(i => ev[i]).filter(Boolean).map(evidenciaHtml).join('')}</ul>`;
+    const fecha = new Date(`${d.fecha}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+    cont.innerHTML = `<section class="section inf">
+      <h3>Tu informe <span class="dim">· ${escapeHtml(fecha)} · ${escapeHtml(EN_MODO[d.modo] || d.modo)}</span></h3>
+      <p class="lead">${escapeHtml(d.resumen || '')}</p>
+      <div class="inf-prios">${d.prioridades.map((x, i) => `<article class="card inf-prio">
+        <h4><span class="inf-num">${i + 1}</span> ${escapeHtml(x.titulo)}</h4>
+        <p>${escapeHtml(x.observacion)}</p>
+        <details><summary>Ver la evidencia (${x.evidencias.length})</summary>${lista(x.evidencias)}</details>
+        <p><strong>Puede ser porque</strong> ${escapeHtml(x.posible_explicacion)}</p>
+        <p class="dim"><strong>Falta ver:</strong> ${escapeHtml(x.falta_verificar)}</p>
+        <p class="inf-ej"><strong>Para practicar:</strong> ${escapeHtml(x.ejercicio)}</p>
+        <p class="dim"><strong>Cómo revisarlo:</strong> ${escapeHtml(x.como_revisar)}</p></article>`).join('')}</div>
+      ${d.mantener?.length ? `<h4>Lo que conviene mantener</h4><ul>${d.mantener.map(t => `<li>${escapeHtml(t.texto)}${t.evidencias?.length ? `<details><summary>evidencia</summary>${lista(t.evidencias)}</details>` : ''}</li>`).join('')}</ul>` : ''}
+      ${d.proxima_revision ? `<p class="dim">Próxima revisión: ${escapeHtml(d.proxima_revision)}</p>` : ''}
+      <p class="nota">Informe escrito por ${escapeHtml(d.autor || 'Claude')} con los datos al ${escapeHtml((d.datos_al || '').slice(0, 10))}. Cada cifra sale de una evidencia del sitio con su intervalo y n; el texto interpreta, y lo que dice "puede ser" es una hipótesis para revisar en tus partidas, no un diagnóstico.</p>
+    </section>`;
+}

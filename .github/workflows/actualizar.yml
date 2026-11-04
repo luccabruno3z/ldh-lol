@@ -90,6 +90,7 @@ jobs:
           git config user.email "github-actions@github.com"
           git add -A
           git diff --staged --quiet || git commit -m "Datos: corrida ${{ github.run_number }}"
+          git pull --rebase origin datos  # por si entró un commit a mano (informes) mientras corría
           git push origin HEAD:datos
 
       - name: Subir timelines nuevas al release

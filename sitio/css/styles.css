@@ -460,3 +460,13 @@ section.section { scroll-margin-top: calc(var(--header-h) + 56px); }
     .cmp-fila > summary { grid-template-columns: 24px minmax(0, 1fr); }
     .cmp-fila .ag-pista, .cmp-fila .cmp-num { grid-column: 2; }
 }
+
+/* Informe de coaching */
+.inf-prios { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin: 12px 0; }
+.inf-prio h4 { display: flex; gap: 8px; align-items: center; margin: 0 0 8px; }
+.inf-num { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent, #58a6ff); color: var(--bg, #0d1117); font-weight: 700; font-size: .85rem; flex: none; }
+.inf-prio p { margin: 6px 0; }
+.inf-ej { border-left: 3px solid var(--accent, #58a6ff); padding-left: 8px; }
+.inf-ev { margin: 6px 0; padding-left: 18px; }
+.inf-ev li { margin: 4px 0; overflow-wrap: anywhere; }
+.inf details summary { cursor: pointer; color: var(--accent, #58a6ff); }

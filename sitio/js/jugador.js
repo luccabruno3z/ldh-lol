@@ -7,7 +7,7 @@ import { onRoute, go } from './router.js';
 import { bloquesFase2 } from './fase2.js';
 import { bloquesFase3 } from './fase3.js';
 import { bloquesFase4 } from './fase4.js';
-import { bloqueRachas, bloqueMuertes, bloqueCurvas, activarCurvas } from './fase5.js';
+import { bloqueRachas, bloqueMuertes, bloqueCurvas, activarCurvas, bloqueInforme } from './fase5.js';
 import { escapeHtml, rangoTexto, tierClase, nombreCola, conIntervalo, iconoCampeon, campeon, fecha, num } from './utils.js';
 
 const COLS = [
@@ -265,7 +265,7 @@ async function pintarPerfil(cont, base, vista, tabInicial = 'resumen', modoElegi
       <nav class="perfil-tabs" role="tablist" aria-label="Secciones del perfil">${Object.entries(PESTANAS).map(([k, l]) =>
         `<a class="perfil-tab" role="tab" data-tab="${k}" href="${ruta(k)}">${l}</a>`).join('')}</nav>
       <div data-pestana="resumen">${forma(p.forma)}${seccionEvolucion(p.evolucion, modo)}<div id="f5-rachas"></div></div>
-      <div data-pestana="coaching"><div id="fase3"></div><div id="f5-muertes"></div></div>
+      <div data-pestana="coaching"><div id="f5-informe"></div><div id="fase3"></div><div id="f5-muertes"></div></div>
       <div data-pestana="campeones"><div id="fase2"></div><div id="f5-curvas"></div><div id="f4-matchups"></div></div>
       <div data-pestana="mapa"><div id="f4-heatmap"></div><div id="f4-jungla"></div>
         ${p._cuenta ? '<p class="empty-state">El mapa y la jungla se calculan con todas tus cuentas juntas.</p>' : ''}</div>
@@ -291,6 +291,7 @@ async function pintarPerfil(cont, base, vista, tabInicial = 'resumen', modoElegi
     mostrarPestana(tabInicial);
     bloquesFase3(p, document.getElementById('fase3'), modo).catch(err => console.error('[coaching]', err));
     bloquesFase2(p, document.getElementById('fase2'), modo);
+    bloqueInforme(p, document.getElementById('f5-informe')).catch(err => console.error('[informe]', err));
     bloqueRachas(p, document.getElementById('f5-rachas'), modo).catch(err => console.error('[rachas]', err));
     bloqueMuertes(p, document.getElementById('f5-muertes'), modo, state.campeones?.version).catch(err => console.error('[muertes]', err));
     bloqueCurvas(p, document.getElementById('f5-curvas'), modo).catch(err => console.error('[curvas]', err));

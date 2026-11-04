@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from . import estadistica as est
 from . import fase2, fase3, fase4, fase5
-from .ajustes import AJUSTES, RAIZ, SALIDA
+from .ajustes import AJUSTES, DATOS, RAIZ, SALIDA
 from .almacen import cargar_estado
 from .base import RUTA_BASE, valor_rango
 from .fase2 import MODOS, colas_de, en
@@ -194,6 +194,12 @@ def publicar() -> dict:
     salida_f3 = fase3.generar(db, filas_por, rangos, _escribir)
     fase4.generar(db, filas_por, dict(db.execute("SELECT id, nombre FROM personas")), _escribir)
     fase5.generar(db, filas_por, _escribir, salida_f3["indices"])
+    # Informes de coaching: los escribe Claude a pedido y viven en datos/informes (api se borra en cada corrida).
+    # Solo de personas que siguen vinculadas.
+    vinculadas = {r[0] for r in db.execute("SELECT id FROM personas")}
+    for ruta in sorted((DATOS / "informes").glob("*.json")):
+        if ruta.stem in vinculadas:
+            _escribir(f"informes/{ruta.stem}.json", json.loads(ruta.read_text(encoding="utf-8")))
 
     resumen_personas = []
     por_pag = AJUSTES["historial_por_pagina"]

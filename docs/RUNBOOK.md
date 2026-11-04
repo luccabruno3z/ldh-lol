@@ -114,3 +114,16 @@ Si cambia `extract_match_stats`, subir `EXTRACTOR_VERSION` en `ldh/base.py`.
   queda para repetir el análisis cuando la referencia tenga 100 por celda.
 - Bot: `-rachas`, `-partida` (◀ ▶), `-coaching` con las vistas nuevas (muertes, curva, rachas) y el momento clave
   en el feed.
+
+## Informes de coaching (sin API)
+- Los escribe Claude a pedido de Lucca, desde el chat. No hay llamadas a la API de Anthropic.
+- Flujo:
+  1. `python -m ldh evidencia <persona> [solo|normal|todo]` arma el paquete en `.cache/evidencia/`, leyendo `salida/api`.
+  2. Se escribe el borrador.
+  3. `python -m ldh validar_informe <borrador.json>`. Si pasa, queda en `datos/informes/<persona>.json`.
+  4. Commit en la rama `datos`. El push va solo con el OK de Lucca.
+- `publicar` copia los informes a `api/informes/`, solo los de personas que siguen vinculadas.
+- La web lo muestra arriba en Coaching. El bot, con `-informe [jugador]` y con **Mi informe** en `-menu`.
+- Reglas, tipos de evidencia y lo que controla el validador: `docs/REGLAS_EVIDENCIA.md`.
+- Si los datos cambian, el hash del paquete cambia y el validador pide revisar el informe.
+- El workflow hace `git pull --rebase` antes de empujar a `datos`, por si entró un informe mientras corría.

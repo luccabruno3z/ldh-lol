@@ -49,6 +49,7 @@ AYUDA = {
               "Si tenés varias cuentas, hay botones para ver cada una\n`-roles` · `-campeones` · `-sinergia` `[jugador]` "
               "abren esa pestaña directo",
     "Coaching": "`-coaching [jugador]` todo en una tarjeta: elegís qué ver, el rol y el modo con menús\n"
+                "`-informe [jugador]` tu informe: dos prioridades con su evidencia y qué practicar (lo escribe Claude a pedido)\n"
                 "`-performance [jugador] [rol] [solo|normal|todo]` tu índice y sus 7 componentes contra tu franja\n"
                 "`-mejora [jugador] [rol] [solo|normal|todo]` las 3 brechas más grandes como metas en números\n"
                 "`-temprano [jugador] [rol] [solo|normal|todo]` CS, oro y XP a los 10 y 15 contra tu rival directo\n"

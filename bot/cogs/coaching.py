@@ -191,6 +191,15 @@ class Coaching(commands.Cog):
     async def rachas(self, ctx: commands.Context, *, jugador_y_modo: str | None = None):
         await self._abrir(ctx, jugador_y_modo, "rachas", "grac")
 
+    @commands.hybrid_command(name="informe", description="Tu informe de coaching: dos prioridades con su evidencia y qué practicar")
+    async def informe(self, ctx: commands.Context, *, jugador: str | None = None):
+        from bot.ui.informe_vista import tarjeta_informe
+        p = await self.bot.get_cog("Perfil")._persona(ctx, jugador, "informe")
+        if not p:
+            return
+        await ctx.defer()
+        await ctx.reply(view=tarjeta_informe(p, await self.bot.datos.informe(p["id"])))
+
     @commands.hybrid_command(name="coaching", description="Todo tu coaching en una tarjeta: elegí qué ver, el rol y el modo con los menús")
     async def coaching(self, ctx: commands.Context, *, jugador_rol_y_modo: str | None = None):
         await self._abrir(ctx, jugador_rol_y_modo, "coaching", "perf")

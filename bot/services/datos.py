@@ -146,6 +146,9 @@ class Datos:
     async def rachas(self, persona_id: str) -> dict | None:
         return await self._json(f"rachas/{quote(persona_id)}.json")
 
+    async def informe(self, persona_id: str) -> dict | None:
+        return await self._json(f"informes/{quote(persona_id)}.json")
+
     async def rachas_grupo(self) -> dict | None:
         return await self._json("rachas/grupo.json")
 

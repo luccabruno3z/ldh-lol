@@ -8,7 +8,7 @@ import discord
 
 from bot.cogs.perfil import AVISO_RIOT
 
-ACCIONES = {"perfil": "Mi perfil", "coaching": "Mi coaching", "rachas": "¿Sigo jugando?", "partida": "Mi última partida", "grafico": "Mis gráficos", "buscar": "Buscar jugador", "top": "Rankings",
+ACCIONES = {"perfil": "Mi perfil", "coaching": "Mi coaching", "rachas": "Mis rachas", "informe": "Mi informe", "partida": "Mi última partida", "grafico": "Mis gráficos", "buscar": "Buscar jugador", "top": "Rankings",
             "toprol": "Top por rol", "competencia": "Competencia del mes", "comparar": "Comparar",
             "tips": "Tips de mi rol", "glosario": "Glosario", "ayuda": "Ayuda", "inhouse": "Armar inhouse"}
 
@@ -144,6 +144,17 @@ class MenuBoton(discord.ui.DynamicItem[discord.ui.Button], template=r"lm:(?P<acc
             else:
                 await interaction.followup.send(view=view)
             return
+        if self.accion == "informe":
+            pid = bot.get_cog("Perfil").vinculos.get(str(self.owner))
+            if not pid:
+                await interaction.response.send_message(
+                    "Primero vinculate con `-vincular <tu nombre o Riot ID>`, o usá `-informe <jugador>`.", ephemeral=True)
+                return
+            from bot.ui.informe_vista import tarjeta_informe
+            await interaction.response.defer(thinking=True)
+            p = await bot.datos.perfil(pid) or {"id": pid, "nombre": pid}
+            await interaction.followup.send(view=tarjeta_informe(p, await bot.datos.informe(pid)))
+            return
         if self.accion == "perfil":
             pid = bot.get_cog("Perfil").vinculos.get(str(self.owner))
             if not pid:
@@ -168,7 +179,7 @@ def menu(owner: int) -> discord.ui.LayoutView:
                                "si algo dice **ruido**, con esas partidas no se puede sacar conclusiones.\n-# " + AVISO_RIOT),
         discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("perfil", "coaching", "partida", "grafico", "buscar")]),
         discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("rachas", "top", "toprol", "competencia", "comparar")]),
-        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("inhouse", "tips", "glosario", "ayuda")]),
+        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("informe", "inhouse", "tips", "glosario", "ayuda")]),
         discord.ui.ActionRow(discord.ui.Button(label="Abrir la web", url="https://luccabruno3z.github.io/ldh-lol/")),
         accent_colour=0x00CCCC))
     return view

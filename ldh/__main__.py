@@ -1,7 +1,8 @@
-"""python -m ldh [ingestar|reconstruir|publicar|todo|referencia [armar]|timelines empaquetar|desempaquetar <carpeta>]"""
+"""python -m ldh [ingestar|reconstruir|publicar|todo|referencia [armar]|timelines empaquetar|desempaquetar <carpeta>|evidencia <persona> [modo]|validar_informe <archivo>]"""
 
 from __future__ import annotations
 
+import json
 import sys
 
 from .ajustes import cargar_env
@@ -12,6 +13,16 @@ def main(argv: list[str]) -> int:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     cargar_env()
     orden = argv[0] if argv else "todo"
+    if orden == "evidencia":
+        # python -m ldh evidencia <persona> [solo|normal|todo]: el paquete para escribir un informe.
+        from . import evidencia
+        ruta = evidencia.guardar(argv[1], argv[2] if len(argv) > 2 else "solo")
+        print(evidencia.resumen(json.loads(ruta.read_text(encoding="utf-8"))))
+        print(f"\nPaquete completo: {ruta}")
+        return 0
+    if orden == "validar_informe":
+        from .informe import validar_archivo
+        return validar_archivo(argv[1])
     if orden == "referencia":
         # Aparte de "todo": gasta API por horas y se corre a mano (python -m ldh referencia [armar]).
         from . import referencia
