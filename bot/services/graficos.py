@@ -12,7 +12,7 @@ import matplotlib
 matplotlib.use("Agg")  # sin pantalla; va antes de importar pyplot
 import matplotlib.pyplot as plt  # noqa: E402
 
-FONDO, PANEL, TEXTO, TENUE, GRILLA = "#0d1420", "#121a2a", "#e8ecf4", "#7a8296", "#263248"
+FONDO, PANEL, TEXTO, TENUE, GRILLA = "#0d1420", "#121a2a", "#e8ecf4", "#8f97ab", "#263248"
 ACENTO, SEGUNDO = "#00e5e5", "#ffa500"
 # Un tono bien distinto por franja (naranja, dorado, violeta), lejos del celeste de "vos".
 COLOR_FRANJA = ["#f0883e", "#f2cc40", "#a78bfa"]
@@ -54,13 +54,13 @@ def evolucion(evo: dict, cola: str, nombre_cola: str, titulo: str) -> io.BytesIO
         ax.axhline(temp, color=SEGUNDO, lw=1.4, ls=(0, (6, 4)))
         # El rótulo va a la izquierda: a la derecha se pisaba con el de "hoy".
         ax.annotate(f"tu temporada {round(temp)} %", (xs[0], temp), xytext=(2, 5), textcoords="offset points",
-                    color=SEGUNDO, fontsize=9, ha="left")
+                    color=SEGUNDO, fontsize=9.5, ha="left")
     for clave, rotulo, dy in (("mejor", "mejor tramo", 8), ("peor", "peor tramo", -14)):
         if c.get(clave):
             h = c[clave]
             ax.scatter([fecha(h["t"])], [h["v"] * 100], color=TENUE, s=14, zorder=3)
             ax.annotate(f"{rotulo} {round(h['v'] * 100)} %", (fecha(h["t"]), h["v"] * 100), xytext=(0, dy),
-                        textcoords="offset points", color=TENUE, fontsize=8, ha="center")
+                        textcoords="offset points", color=TENUE, fontsize=9.5, ha="center")
     ult = pts[-1]
     ax.scatter([xs[-1]], [ult["v"] * 100], color=ACENTO, zorder=4, s=36)
     ax.annotate(f"hoy {round(ult['v'] * 100)} %", (xs[-1], ult["v"] * 100), xytext=(-8, 8),
@@ -94,10 +94,10 @@ def tendencia(t: dict, titulo: str, franja: str) -> io.BytesIO:
         ax.axhspan(ref["lo"], ref["hi"], color=TENUE, alpha=0.16, lw=0)
         ax.axhline(ref["mediana"], color=TENUE, lw=1.2, ls=(0, (4, 4)))
         ax.annotate(f"{franja}: mediana {ref['mediana']:.0f}, la mitad del medio entre {ref['lo']:.0f} y {ref['hi']:.0f}",
-                    (0, ref["hi"]), xytext=(4, 4), textcoords="offset points", color=TEXTO, fontsize=8.5)
+                    (0, ref["hi"]), xytext=(4, 4), textcoords="offset points", color=TEXTO, fontsize=9.5)
     else:
         ax.axhline(50, color=TENUE, lw=1, ls=(0, (4, 4)))
-        ax.annotate(f"mitad de {franja}", (0, 50), xytext=(2, 5), textcoords="offset points", color=TENUE, fontsize=9)
+        ax.annotate(f"mitad de {franja}", (0, 50), xytext=(2, 5), textcoords="offset points", color=TENUE, fontsize=9.5)
     ax.plot(xs, [p["v"] for p in t["puntos"]], color=ACENTO, lw=2.4)
     color = {"mejorando": "#00e07a", "empeorando": "#ff4466"}.get(t["veredicto"], TENUE)
     r = t["recta"]
@@ -134,7 +134,7 @@ def radar(comps: list[dict], titulo: str, segundo: list[dict] | None = None, eti
     ax.set_theta_direction(-1)
     ax.set_ylim(0, 100)
     ax.set_yticks([25, 50, 75])
-    ax.set_yticklabels(["25", "50", "75"], color=TENUE, fontsize=8)
+    ax.set_yticklabels(["25", "50", "75"], color=TENUE, fontsize=9.5)
     ax.set_xticks(ang[:-1])
     ax.set_xticklabels([c["nombre"] for c in comps], color=TEXTO, fontsize=10)
     ax.grid(color=GRILLA, lw=0.7)
@@ -153,7 +153,7 @@ def radar(comps: list[dict], titulo: str, segundo: list[dict] | None = None, eti
     ax.plot(ang, v1 + v1[:1], color=ACENTO, lw=2.2, label=etiquetas[0])
     if segundo or franjas:
         ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.06), ncol=2, facecolor=PANEL, edgecolor=GRILLA,
-                  labelcolor=TEXTO, fontsize=9)
+                  labelcolor=TEXTO, fontsize=9.5)
     ax.set_title(titulo, color=TEXTO, fontsize=12, pad=24)
     return _png(fig)
 
@@ -181,8 +181,8 @@ def franjas(filas: list[dict], titulo: str, propia: str | None = None) -> io.Byt
     ax.set_xticks([])
     ax.set_yticks(range(n))
     ax.set_yticklabels([f["nombre"] + ("" if f["mejor"] else "  (menos es mejor)") for f in filas], color=TEXTO, fontsize=9.5)
-    ax.annotate("peor ←", (0, n - 0.5), xytext=(0, -14), textcoords="offset points", color=TENUE, fontsize=8.5)
-    ax.annotate("→ mejor", (1, n - 0.5), xytext=(0, -14), textcoords="offset points", color=TENUE, fontsize=8.5, ha="right")
+    ax.annotate("peor ←", (0, n - 0.5), xytext=(0, -14), textcoords="offset points", color=TENUE, fontsize=9.5)
+    ax.annotate("→ mejor", (1, n - 0.5), xytext=(0, -14), textcoords="offset points", color=TENUE, fontsize=9.5, ha="right")
     for s in ax.spines.values():
         s.set_visible(False)
     for i, f in enumerate(filas):
@@ -207,7 +207,7 @@ def franjas(filas: list[dict], titulo: str, propia: str | None = None) -> io.Byt
         u = f" {f['unidad']}" if f["unidad"] else ""
         txt = f"vos {_fmt(f['v'], f['dec'], signo)}{u}   " + "   ".join(
             f"{ABREV.get(fr, fr)} {_fmt(m, f['dec'], signo)}" for fr, m in f["medianas"].items())
-        ax.annotate(txt, (1.03, i), xycoords=("axes fraction", "data"), va="center", color=TENUE, fontsize=8.5)
+        ax.annotate(txt, (1.03, i), xycoords=("axes fraction", "data"), va="center", color=TENUE, fontsize=9.5)
     marcas = [plt.Line2D([], [], color=ACENTO, marker="o", ls="", ms=8, label="vos")] + [
         plt.Line2D([], [], color=COLOR_FRANJA[j], marker="|", ls="", ms=14, mew=3, label=f"mediana {fr}")
         for j, fr in enumerate(nombres_fr)]
@@ -215,7 +215,7 @@ def franjas(filas: list[dict], titulo: str, propia: str | None = None) -> io.Byt
         marcas += [plt.Line2D([], [], color=BIEN, lw=6, alpha=0.55, label=f"arriba de {propia}"),
                    plt.Line2D([], [], color=MAL, lw=6, alpha=0.55, label="abajo")]
     ax.legend(handles=marcas, loc="lower left", bbox_to_anchor=(0, 1.0), ncol=3 if propia else 4, frameon=False, labelcolor=TEXTO,
-              fontsize=8.5, handletextpad=0.6, columnspacing=1.6)
+              fontsize=9.5, handletextpad=0.6, columnspacing=1.6)
     ax.set_title(titulo, color=TEXTO, fontsize=12, loc="left", pad=48 if propia else 30)
     return _png(fig)
 
@@ -236,10 +236,10 @@ def rachas(d: dict, estados: dict, titulo: str) -> io.BytesIO:
             ax.plot([m["lo"] * 100, m["hi"] * 100], [i, i], color=ACENTO, lw=9 if clave else 7,
                     alpha=0.55 if clave else 0.3, solid_capstyle="round")
             ax.scatter([m["v"] * 100], [i], s=60, color=TEXTO, zorder=3)
-            ax.annotate(f"{m['v'] * 100:.0f} %  (n = {m['n']})", (101, i), va="center", color=TEXTO, fontsize=9,
+            ax.annotate(f"{m['v'] * 100:.0f} %  (n = {m['n']})", (101, i), va="center", color=TEXTO, fontsize=9.5,
                         annotation_clip=False)
         else:
-            ax.annotate("sin partidas", (101, i), va="center", color=TENUE, fontsize=9, annotation_clip=False)
+            ax.annotate("sin partidas", (101, i), va="center", color=TENUE, fontsize=9.5, annotation_clip=False)
     ax.set_yticks(range(n))
     ax.set_yticklabels([estados[k] for k in claves], color=TEXTO, fontsize=10)
     for t, k in zip(ax.get_yticklabels(), claves):
@@ -272,7 +272,7 @@ def curva_partida(d: dict, pid: str, titulo: str) -> io.BytesIO:
             ax.scatter([i], [v], s=22, color=BIEN, zorder=4)
         elif e["tipo"] in letras:
             nuestro = e.get("equipo") == eq
-            ax.annotate(letras[e["tipo"]], (i, 4 if nuestro else 96), ha="center", va="center", fontsize=9,
+            ax.annotate(letras[e["tipo"]], (i, 4 if nuestro else 96), ha="center", va="center", fontsize=9.5,
                         fontweight="bold", color=BIEN if nuestro else MAL)
     ax.set_ylim(0, 100)
     ax.set_xlim(0, max(len(ys) - 1, 1))
@@ -301,7 +301,7 @@ def mapa_muertes(puntos: list, mapa: bytes | None, titulo: str) -> io.BytesIO:
     marcas = [plt.Line2D([], [], color=c, marker="o", ls="", ms=8, label=l)
               for c, l in ((COLOR_FRANJA[1], "antes del 14"), (COLOR_FRANJA[0], "del 14 al 25"), (MAL, "después del 25"))]
     ax.legend(handles=marcas, loc="upper center", bbox_to_anchor=(0.5, -0.01), ncol=3, frameon=False,
-              labelcolor=TEXTO, fontsize=9)
+              labelcolor=TEXTO, fontsize=9.5)
     ax.set_title(titulo, color=TEXTO, fontsize=12, loc="left")
     return _png(fig)
 
@@ -325,6 +325,6 @@ def curvas(grupo: list[dict], propias: list[tuple[str, list[dict]]], titulo: str
     ax.set_xlabel("partidas con el campeón", color=TENUE)
     ax.set_ylabel("contra tu nivel normal", color=TENUE)
     ax.grid(color=GRILLA, lw=0.6)
-    ax.legend(loc="upper left", frameon=False, labelcolor=TEXTO, fontsize=9)
+    ax.legend(loc="upper left", frameon=False, labelcolor=TEXTO, fontsize=9.5)
     ax.set_title(titulo, color=TEXTO, fontsize=12, loc="left")
     return _png(fig)
