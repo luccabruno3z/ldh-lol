@@ -10,7 +10,7 @@ import { nombrePersona, pct, chipConf, winrateAj, difWinrate, senal } from './fa
 const GRIETA = ['solo', 'flex', 'normal'];
 const ROLES = ['Top', 'Jungla', 'Mid', 'ADC', 'Support'];
 const PERIODOS = { semana: 'Últimos 7 días', mes: 'Últimos 30 días', temporada: 'Temporada' };
-const TABS = { periodo: 'Por período', roles: 'Por rol', duos: 'Dúos', mejora: 'Quién más mejoró' };
+const TABS = { periodo: 'Por período', roles: 'Por rol', duos: 'Dúos', companeros: 'Mejores compañeros', mejora: 'Quién más mejoró' };
 
 const sel = { tab: 'periodo', periodo: 'mes', cola: 'solo', ventana: 'historico', modo: 'solo' };
 
@@ -109,11 +109,41 @@ async function mejora(cont) {
     cont.querySelector('#rk-modo')?.addEventListener('change', (e) => { sel.modo = e.target.value; render(); });
 }
 
+async function companeros(cont) {
+    const d = await cachedFetch('rankings/companeros.json');
+    const t = d.modos?.[sel.modo] || [];
+    const max = Math.max(...t.filter(r => !r.muestra_chica && r.suma.v != null).map(r => Math.max(Math.abs(r.suma.lo), Math.abs(r.suma.hi))), 0.05);
+    const w = (v) => `${Math.min(50, (Math.abs(v) / max) * 50)}%`;
+    const fila = (r, i) => {
+        const s = r.suma;
+        const clase = r.senal ? (s.v > 0 ? 'ag-pos' : 'ag-neg') : 'ag-nada';
+        const ic = s.lo == null ? '' : `<span class="cmp-ic" style="left:${50 + Math.max(-50, (s.lo / max) * 50)}%;width:${Math.min(100, ((s.hi - s.lo) / max) * 50)}%"></span>`;
+        return `<details class="cmp-fila${r.muestra_chica ? ' chica' : ''}"><summary>
+          <span class="cmp-pos mono">${r.muestra_chica ? '' : i + 1}</span>
+          <span class="cmp-nombre">${persona(r.persona)}${r.muestra_chica ? ' <span class="tag">muestra chica</span>' : ''}</span>
+          <span class="ag-pista">${ic}<span class="ag-barra ${clase}" style="${s.v >= 0 ? 'left:50%' : 'right:50%'};width:${w(s.v || 0)}"></span><span class="ag-cero"></span></span>
+          <span class="cmp-num"><strong>${s.v > 0 ? '+' : ''}${num((s.v || 0) * 100, 1)} pts</strong>
+            ${r.senal ? `<span class="tag ${s.v > 0 ? 'win' : 'loss'}">señal</span>` : '<span class="tag">ruido</span>'}
+            <span class="dim small">${r.companeros} compañeros · ${r.juntos} partidas</span></span></summary>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>Compañero</th><th class="num">Juntos</th><th class="num">Con ${escapeHtml(nombrePersona(r.persona))}</th><th class="num">Sin, mismo período</th></tr></thead>
+            <tbody>${r.detalle.map(x => `<tr><td>${persona(x.companero)}</td><td class="num mono">${x.juntos}</td><td class="num">${conIntervalo(x.con, 'pct')}</td><td class="num">${conIntervalo(x.sin, 'pct')}</td></tr>`).join('')}</tbody></table></div>
+        </details>`;
+    };
+    const grandes = t.filter(r => !r.muestra_chica), chicas = t.filter(r => r.muestra_chica);
+    const top = grandes.find(r => r.senal && r.suma.v > 0);
+    cont.innerHTML = `<div class="section-head">${opciones('rk-modo', MODOS, sel.modo, 'Modo')}</div>
+      <p class="lead">${top ? `Con <strong>${escapeHtml(nombrePersona(top.persona))}</strong> en el equipo, sus compañeros ganan <strong>${num(top.suma.v * 100, 1)} puntos más</strong> que sin esa persona, y no es azar.` : 'Nadie se separa del ruido todavía: con estas partidas no se puede decir quién suma más.'}</p>
+      ${grandes.length ? `<div class="cmp-lista">${grandes.map(fila).join('')}</div>` : '<p class="empty-state">Sin datos en este modo.</p>'}
+      ${chicas.length ? `<details class="plegable"><summary>${chicas.length} con pocas partidas juntos</summary><div class="cmp-lista">${chicas.map(fila).join('')}</div></details>` : ''}
+      <p class="nota">${escapeHtml(d.nota)} La franja es el intervalo del 95 %; "señal" usa el p corregido por Benjamini–Hochberg, porque se compara a todos a la vez. Tocá una fila para ver con quién. Ojo: no mide solo cómo juega cada uno; también pesa con quién y en qué cola suele jugar (en normales, jugar en grupo cambia el emparejamiento).</p>`;
+    cont.querySelector('#rk-modo').addEventListener('change', (e) => { sel.modo = e.target.value; render(); });
+}
+
 function render() {
     const cont = document.getElementById('rankings-cuerpo');
     document.querySelectorAll('#rankings-tabs a').forEach(a => a.classList.toggle('is-active', a.dataset.tab === sel.tab));
     cont.innerHTML = '<div class="skeleton"></div>';
-    const fn = { periodo: porPeriodo, roles: porRol, duos, mejora }[sel.tab];
+    const fn = { periodo: porPeriodo, roles: porRol, duos, companeros, mejora }[sel.tab];
     fn(cont).catch(err => {
         console.error('[rankings]', err);
         cont.innerHTML = '<div class="error-state">No se pudo cargar este ranking.</div>';

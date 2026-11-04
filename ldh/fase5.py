@@ -570,6 +570,55 @@ def acompanan_ganar() -> dict:
     return out
 
 
+# ---------------------------------------------------------------- top de compañeros
+
+def companeros(filas_por: dict[str, list[dict]]) -> dict:
+    """¿Quién hace ganar más a los demás? Para cada jugador Q y cada compañero P del grupo: el winrate de P con Q
+    en su equipo contra sin Q, en el mismo período en que coincidieron (así no pesa que P haya mejorado con el
+    tiempo). Se combina entre compañeros con Mantel–Haenszel: cada P contra sí mismo. Por modo. Las filas ya
+    traen 'companeros' (fase2._enriquecer)."""
+    cfg = AJUSTES["sinergia"]
+    out = {}
+    for modo, colas in MODOS.items():
+        estratos = defaultdict(list)  # Q -> [(ganadas_con, n_con, ganadas_sin, n_sin)] uno por compañero P
+        detalle = defaultdict(list)
+        for p, filas in filas_por.items():
+            de = [f for f in filas if f["cola"] in colas and "companeros" in f]
+            for q in {c for f in de for c in f["companeros"]}:
+                con = [f for f in de if q in f["companeros"]]
+                if len(con) < cfg["min_juntos"]:
+                    continue
+                t0, t1 = min(f["inicio_ms"] for f in con), max(f["inicio_ms"] for f in con)
+                sin = [f for f in de if q not in f["companeros"] and t0 <= f["inicio_ms"] <= t1]
+                if not sin:
+                    continue
+                wc, ws = sum(f["win"] for f in con), sum(f["win"] for f in sin)
+                estratos[q].append((wc, len(con), ws, len(sin)))
+                detalle[q].append({"companero": p, "juntos": len(con), "con": est.wilson(wc, len(con)),
+                                   "sin": est.wilson(ws, len(sin))})
+        tabla = []
+        for q, es in estratos.items():
+            mh = _mh(es)
+            juntos = sum(e[1] for e in es)
+            tabla.append({"persona": q, "suma": mh, "companeros": len(es), "juntos": juntos,
+                          "con": est.wilson(sum(e[0] for e in es), juntos),
+                          "muestra_chica": juntos < cfg["min_mejor"] * 3 or len(es) < 2,
+                          "detalle": sorted(detalle[q], key=lambda d: -d["juntos"])})
+        # Son ~20 personas a la vez: alguna "señal" saldría por azar. p de la normal del MH y Benjamini–Hochberg,
+        # como en la sinergia de dúos.
+        ps = []
+        for r in tabla:
+            s = r["suma"]
+            se = (s["hi"] - s["lo"]) / (2 * 1.959964) if s["v"] is not None else None
+            ps.append(math.erfc(abs(s["v"]) / se / math.sqrt(2)) if se else 1.0)
+        for r, p, pa in zip(tabla, ps, est.benjamini_hochberg(ps) if ps else []):
+            r["p"], r["p_bh"] = est._r(p, 4), est._r(pa, 4)
+            r["senal"] = pa < AJUSTES["ajuste_muestra"]["alfa"] and not r["muestra_chica"]
+        tabla.sort(key=lambda r: (r["muestra_chica"], -(r["suma"]["v"] or -1)))
+        out[modo] = tabla
+    return out
+
+
 # ---------------------------------------------------------------- generar
 
 def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: Callable, indices: dict | None = None) -> None:
@@ -583,6 +632,11 @@ def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: 
                                                      "(el historial arranca el 8/1: antes no se sabe si eran nuevos)."})
         for pid, d in cp.items():
             escribir(f"curvas/{pid}.json", {"modos": d, "tramos": tramos, "nota": nota})
+    escribir("rankings/companeros.json", {
+        "modos": companeros(filas_por),
+        "nota": "Cuántos puntos de winrate les suma cada uno a sus compañeros del grupo: el winrate de cada compañero "
+                "con él contra sin él, en el mismo período, combinado entre compañeros (Mantel–Haenszel, cada uno "
+                "contra sí mismo). 'Ruido' si el intervalo cruza el cero."})
     escribir("acompanan_ganar.json", {
         "roles": acompanan_ganar(),
         "nota": "Cada componente por separado, en las partidas de referencia: winrate cuando está en la mitad de arriba "

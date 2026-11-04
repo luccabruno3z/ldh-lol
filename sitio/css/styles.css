@@ -445,3 +445,18 @@ section.section { scroll-margin-top: calc(var(--header-h) + 56px); }
 .ag-cero { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--text-muted); }
 .ag-num { white-space: nowrap; font-size: .85rem; }
 @media (max-width: 520px) { .ag-fila { grid-template-columns: 1fr auto; } .ag-pista { grid-column: 1 / -1; grid-row: 2; } }
+
+/* Mejores compañeros (Rankings) */
+.cmp-lista { display: grid; gap: 6px; margin: 10px 0; }
+.cmp-fila > summary { display: grid; grid-template-columns: 24px minmax(110px, 1fr) minmax(110px, 2fr) auto; gap: 10px; align-items: center;
+    cursor: pointer; list-style: none; padding: 6px 4px; border-radius: var(--r-sm); }
+.cmp-fila > summary::-webkit-details-marker { display: none; }
+.cmp-fila > summary:hover { background: var(--bg-2); }
+.cmp-fila[open] > summary { background: var(--bg-2); }
+.cmp-fila.chica { opacity: .75; }
+.cmp-ic { position: absolute; top: 3px; bottom: 3px; background: var(--text-muted); opacity: .25; border-radius: 3px; }
+.cmp-num { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: .88rem; }
+@media (max-width: 560px) {
+    .cmp-fila > summary { grid-template-columns: 24px minmax(0, 1fr); }
+    .cmp-fila .ag-pista, .cmp-fila .cmp-num { grid-column: 2; }
+}

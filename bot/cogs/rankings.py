@@ -50,6 +50,25 @@ def tarjeta_top_rol(v: dict, cola: str, rol: str, nombres: dict, nombre_cola: di
     return tarjeta_simple(lineas, f"{WEB}#/rankings/roles")
 
 
+def tarjeta_companeros(d: dict, nombres: dict, modo: str = "todo") -> discord.ui.LayoutView:
+    """Mejores compañeros: cuántos puntos de winrate le suma cada uno a sus compañeros del grupo."""
+    from bot.cogs.coaching import EN_MODO
+    tabla = [r for r in (d.get("modos") or {}).get(modo, []) if not r["muestra_chica"]]
+    lineas = ["## Mejores compañeros", f"-# Cuánto ganan tus compañeros con vos contra sin vos, en {EN_MODO.get(modo, modo)} · "
+                                       "cada compañero contra sí mismo, mismo período"]
+    for i, r in enumerate(tabla[:12], 1):
+        s = r["suma"]
+        tag = (" · **señal**" if r["senal"] else " · ruido")
+        lineas += [f"`{i}.` **{nombres.get(r['persona'], r['persona'])}**: {F.num(s['v'] * 100, 1, True)} pts{tag}",
+                   f"-# {F.num(s['lo'] * 100, 1, True)} a {F.num(s['hi'] * 100, 1, True)} · {r['companeros']} compañeros · "
+                   f"{r['juntos']} partidas"]
+    if not tabla:
+        lineas.append("Todavía no hay suficientes partidas juntos en este modo.")
+    lineas.append("-# 'Señal' con el p corregido por Benjamini–Hochberg (se compara a todos a la vez). No mide solo cómo "
+                  "juega cada uno: también pesa con quién y en qué cola suele jugar.")
+    return tarjeta_simple(lineas, f"{WEB}#/rankings/companeros")
+
+
 def tarjeta_mejora(d: dict, nombres: dict, modo: str = "solo") -> discord.ui.LayoutView:
     from bot.cogs.coaching import EN_MODO
     tabla = (d.get("modos") or {}).get(modo, d["tabla"] if modo == "solo" else [])
@@ -101,6 +120,16 @@ class Rankings(commands.Cog):
         await vista.pintar()
         await ctx.reply(view=vista)
 
+
+    @commands.hybrid_command(name="companeros", description="Mejores compañeros: quién hace ganar más a los demás")
+    async def companeros(self, ctx: commands.Context, modo: str = "todo"):
+        from bot.cogs.coaching import MODOS
+        if (m := MODOS.get(modo.lower())) is None:
+            await ctx.reply("Uso: `-companeros [solo|normal|todo]`", ephemeral=True)
+            return
+        await ctx.defer()
+        nombres, _ = await self._contexto()
+        await ctx.reply(view=tarjeta_companeros(await self.datos.ranking("companeros") or {}, nombres, m))
 
     @commands.hybrid_command(name="mejoraron", description="Quién más mejoró: la tendencia de cada uno contra su franja")
     async def mejoraron(self, ctx: commands.Context, modo: str = "solo"):
