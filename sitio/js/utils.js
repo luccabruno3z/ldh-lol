@@ -72,4 +72,13 @@ export function conIntervalo(m, tipo = 1) {
     return `<span class="v">${f(m.v)}${suf}</span>${ic}`;
 }
 
+/** Una diferencia como pista que diverge del cero: la franja es el intervalo, la marca el valor. rango = media
+    pista (en las mismas unidades que v). tono: 'pos', 'neg' o '' (ruido). */
+export function pistaDif(v, lo, hi, rango, tono = '', etiqueta = '') {
+    const pos = (x) => 50 + (Math.max(-rango, Math.min(rango, x)) / rango) * 50;
+    return `<span class="dv-pista${tono ? ` dv-${tono}` : ''}" role="img" aria-label="${escapeHtml(etiqueta)}">
+        <span class="dv-cero"></span><span class="dv-ic" style="left:${pos(lo)}%;width:${pos(hi) - pos(lo)}%"></span>
+        <span class="dv-v" style="left:${pos(v)}%"></span></span>`;
+}
+
 export { num };

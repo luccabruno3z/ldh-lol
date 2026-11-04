@@ -11,6 +11,7 @@
     --r-sm: 6px; --r-md: 12px; --r-lg: 16px;
     --shadow: 0 1px 3px rgba(0,0,0,.08), 0 6px 20px rgba(0,0,0,.05);
     --t-fast: .18s ease;
+    --glow: none;  /* el brillo de las líneas de luz (TRON): solo en oscuro */
     --font-display: 'Bebas Neue', sans-serif;
     --font-body: 'Montserrat', system-ui, sans-serif;
     --font-mono: 'Roboto Mono', ui-monospace, monospace;
@@ -27,6 +28,7 @@
         --border: rgba(0,255,255,.15); --hairline: rgba(255,255,255,.06);
         --bar-k: #00cccc; --bar-d: #ff4466;
         --shadow: 0 2px 8px rgba(0,0,0,.3), 0 8px 32px rgba(0,0,0,.2);
+        --glow: 0 0 6px color-mix(in srgb, var(--accent) 70%, transparent);
         color-scheme: dark;
     }
 }
@@ -39,6 +41,7 @@
     --border: rgba(0,255,255,.15); --hairline: rgba(255,255,255,.06);
     --bar-k: #00cccc; --bar-d: #ff4466;
     --shadow: 0 2px 8px rgba(0,0,0,.3), 0 8px 32px rgba(0,0,0,.2);
+    --glow: 0 0 6px color-mix(in srgb, var(--accent) 70%, transparent);
     color-scheme: dark;
 }
 
@@ -99,7 +102,6 @@ html.js .view:not(.is-active) { display: none; }
 .data-table tr.chica td { color: var(--text-dim); } /* antes con opacidad: bajaba el contraste de todo, también de los tags */
 .data-table .v { display: block; }
 .data-table .ic { display: block; font-size: .75rem; color: var(--text-dim); font-family: var(--font-mono); }
-.obj-tabla .obj-oro { display: block; }
 /* La celda sigue siendo celda: con display:flex se salía de la fila y quedaba corrida. */
 .data-table td.champ { white-space: nowrap; }
 .data-table td.champ .champ-icon { margin-right: 8px; }
@@ -486,3 +488,35 @@ section.section { scroll-margin-top: calc(var(--header-h) + 56px); }
 .inf-prio p, .inf ul { max-width: 65ch; }
 p, dd, li { text-wrap: pretty; }
 .data-table td, .data-table th { font-variant-numeric: tabular-nums; }
+
+/* Pistas de diferencia (conversión y dúos) y barras del valor de los objetivos: líneas finas de luz sobre una pista
+   oscura, como el resto de los gráficos. El cero es la referencia; la franja, el intervalo; la marca, el valor. */
+.dv-celda, .obj-celda { width: 140px; min-width: 110px; }
+td.num > .tag { margin: 4px 0 0; }
+/* Tablas apilables: en celular cada fila es un bloque (la primera celda de título, el resto con su etiqueta) en vez de
+   una tabla que se desplaza de costado y esconde lo importante a la derecha. Cada td lleva data-label. */
+@media (max-width: 600px) {
+    .tabla-apilable thead { display: none; }
+    .tabla-apilable, .tabla-apilable tbody, .tabla-apilable tr { display: block; }
+    .tabla-apilable tr { padding: 10px 0; border-bottom: 1px solid var(--hairline); }
+    .tabla-apilable td { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 2px 0; border: 0; text-align: right; }
+    .tabla-apilable td:first-child { display: block; text-align: left; font-weight: 600; padding-bottom: 4px; white-space: normal; }
+    .tabla-apilable td[data-label]::before { content: attr(data-label); color: var(--text-dim); font: 400 .8rem var(--font-body); text-align: left; }
+    .tabla-apilable td { flex-wrap: wrap; }
+    .tabla-apilable td .v { display: inline; margin-left: auto; }
+    .tabla-apilable td .ic { display: block; flex-basis: 100%; text-align: right; margin: 0; }
+    .tabla-apilable td > .tag { margin: 2px 0 0 auto; }
+    .tabla-apilable td.dv-celda, .tabla-apilable td.obj-celda, .tabla-apilable td.obj-vacio { display: none; }
+}
+.dv-pista { display: block; position: relative; height: 10px; border-radius: 5px; background: var(--bg-2); box-shadow: inset 0 0 0 1px var(--hairline); }
+.dv-cero { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--text-dim); }
+.dv-ic { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; background: color-mix(in srgb, var(--text-dim) 35%, transparent); }
+.dv-v { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--text); }
+.dv-pos .dv-ic { background: color-mix(in srgb, var(--success) 40%, transparent); } .dv-pos .dv-v { background: var(--success); }
+.dv-neg .dv-ic { background: color-mix(in srgb, var(--danger) 40%, transparent); } .dv-neg .dv-v { background: var(--danger); }
+.obj-pista { display: block; height: 6px; border-radius: 3px; background: var(--bg-2); box-shadow: inset 0 0 0 1px var(--hairline); }
+.obj-barra { display: block; height: 100%; border-radius: 3px; background: var(--accent); box-shadow: var(--glow); }
+tr.chica .obj-barra { background: var(--text-dim); box-shadow: none; }
+.obj-tabla .obj-grupo { text-align: center; border-bottom: 1px solid var(--border); }
+.dv-pista:not(.dv-pos):not(.dv-neg) .dv-ic { background: var(--accent-dim); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
+.dv-pista:not(.dv-pos):not(.dv-neg) .dv-v { background: var(--accent); box-shadow: var(--glow); }

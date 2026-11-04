@@ -4,7 +4,7 @@
 
 import { state, cachedFetch, MODOS, EN_MODO } from './data.js';
 import { onRoute } from './router.js';
-import { escapeHtml, nombreCola, conIntervalo, num } from './utils.js';
+import { escapeHtml, nombreCola, conIntervalo, num, pistaDif } from './utils.js';
 import { nombrePersona, pct, chipConf, winrateAj, difWinrate, senal } from './fase2.js';
 
 const GRIETA = ['solo', 'flex', 'normal'];
@@ -72,14 +72,15 @@ function tablaNormalizada(n) {
     const pts = (v) => `${v > 0 ? '+' : ''}${num(v * 100, 0)}`;
     const pval = (p) => (p < 0.001 ? '< 0,001' : num(p, 3));
     return `<div class="section-head"><h2 class="h3">¿Rinden juntos más que por separado?</h2>${opciones('rk-modo', MODOS, sel.modo, 'Modo')}</div>
-      ${t.length ? `<div class="table-wrap"><table class="data-table">
-        <thead><tr><th>Dúo</th><th class="num">Juntos</th><th class="num">Winrate juntos</th><th class="num">Esperado<span class="ic">por separado</span></th><th class="num">Juntos − esperado<span class="ic">pts</span></th></tr></thead>
+      ${t.length ? `<div class="table-wrap"><table class="data-table tabla-apilable">
+        <thead><tr><th>Dúo</th><th class="num">Juntos</th><th class="num">Winrate juntos</th><th class="num">Esperado<span class="ic">por separado</span></th><th class="num">Juntos − esperado<span class="ic">pts</span></th><th class="dv-celda"><span class="sr-only">Intervalo sobre el cero</span></th></tr></thead>
         <tbody>${t.map(r => `<tr class="${r.muestra_chica ? 'chica' : ''}">
           <td>${persona(r.a)} + ${persona(r.b)}${r.muestra_chica ? ' <span class="tag">muestra chica</span>' : ''}</td>
-          <td class="num mono">${r.juntos}</td>
-          <td class="num">${conIntervalo(r.real, 'pct')}</td>
-          <td class="num"><span class="v">${pct(r.esperado)}</span><span class="ic">${pct(r.sin_a.v)} y ${pct(r.sin_b.v)}</span></td>
-          <td class="num"><span class="v">${pts(r.dif.v)}</span><span class="ic">${pts(r.dif.lo)} a ${pts(r.dif.hi)} · p BH ${pval(r.p_bh)}</span>${r.senal ? ` <span class="tag ${r.dif.v > 0 ? 'win' : 'loss'}">señal</span>` : ''}</td></tr>`).join('')}</tbody></table></div>`
+          <td class="num mono" data-label="Juntos">${r.juntos}</td>
+          <td class="num" data-label="Winrate juntos">${conIntervalo(r.real, 'pct')}</td>
+          <td class="num" data-label="Esperado"><span class="v">${pct(r.esperado)}</span><span class="ic">${pct(r.sin_a.v)} y ${pct(r.sin_b.v)}</span></td>
+          <td class="num" data-label="Juntos − esperado"><span class="v">${pts(r.dif.v)}</span><span class="ic">${pts(r.dif.lo)} a ${pts(r.dif.hi)} · p BH ${pval(r.p_bh)}</span>${r.senal ? `<span class="tag ${r.dif.v > 0 ? 'win' : 'loss'}">señal</span>` : ''}</td>
+          <td class="dv-celda">${r.muestra_chica ? '' : pistaDif(r.dif.v, r.dif.lo, r.dif.hi, 0.5, r.senal ? (r.dif.v > 0 ? 'pos' : 'neg') : '', `${pts(r.dif.v)} puntos, de ${pts(r.dif.lo)} a ${pts(r.dif.hi)}`)}</td></tr>`).join('')}</tbody></table></div>`
         : `<p class="empty-state">No hay dúos con ${n?.min_juntos ?? 15}+ partidas juntos en ${escapeHtml(EN_MODO[sel.modo])}.</p>`}
       <p class="nota">${escapeHtml(n?.nota || '')}</p>`;
 }

@@ -62,18 +62,34 @@ async function modeloVictoria() {
     </section>`;
 }
 
-/** Cuánto mueve cada objetivo la probabilidad de ganar en una partida pareja, por minuto (fase 6, etapa 4). */
+/** Cuánto mueve cada objetivo la probabilidad de ganar en una partida pareja (fase 6, etapa 4). Los puntos casi no
+    cambian con el minuto (un solo peso por objetivo en el modelo), así que van una vez, con una barra; por minuto queda
+    lo que sí cambia: cuánto oro equivale. */
 function valorObjetivos(o) {
     if (!o?.filas?.length) return '';
     const por = {};
     for (const f of o.filas) (por[f.clave] ??= { nombre: f.nombre, min: {} }).min[f.min] = f;
-    const celda = (f) => (!f ? '<td class="num dim">—</td>'
-        : `<td class="num"><span class="v">${f.dp.v > 0 ? '+' : ''}${num(f.dp.v * 100, 1)} pts</span><span class="ic">${num(f.dp.lo * 100, 1)} a ${num(f.dp.hi * 100, 1)}</span><span class="dim small obj-oro">≈ ${num(f.oro.v, 0)} de oro</span></td>`);
-    const filas = Object.values(por).sort((a, b) => Math.max(...Object.values(b.min).map(f => f.dp.v)) - Math.max(...Object.values(a.min).map(f => f.dp.v)))
-        .map(r => `<tr><td>${escapeHtml(r.nombre)}</td>${o.minutos.map(m => celda(r.min[m])).join('')}</tr>`).join('');
+    const p1 = (v) => `${v > 0 ? '+' : ''}${num(v * 100, 1)}`;
+    const filas = Object.values(por).map(r => {
+        const fs = Object.values(r.min);
+        const lo = Math.min(...fs.map(f => f.dp.v)), hi = Math.max(...fs.map(f => f.dp.v));
+        return { ...r, fs, lo, hi };
+    }).sort((a, b) => b.hi - a.hi);
+    const max = Math.max(...filas.map(r => r.hi), 0.01);
+    const cuerpo = filas.map(r => {
+        const f = r.fs.find(x => x.dp.v === r.hi);  // el intervalo, del minuto en que más vale
+        const valor = Math.abs(r.hi - r.lo) < 0.0005 ? `${p1(r.hi)} pts` : `${p1(r.lo)} a ${p1(r.hi)} pts`;
+        const ruido = f.dp.lo <= 0 && f.dp.hi >= 0;
+        return `<tr${ruido ? ' class="chica"' : ''}><td>${escapeHtml(r.nombre)}</td>
+          <td class="num" data-label="Suma a tu chance"><span class="v">${valor}</span><span class="ic">${p1(f.dp.lo)} a ${p1(f.dp.hi)}${ruido ? ' · ruido' : ''}</span></td>
+          <td class="obj-celda"><span class="obj-pista"><span class="obj-barra" style="width:${(Math.max(r.hi, 0) / max) * 100}%"></span></span></td>
+          ${o.minutos.map(m => r.min[m] ? `<td class="num mono" data-label="Oro equivalente, min ${m}">${num(r.min[m].oro.v, 0)}</td>` : '<td class="num dim obj-vacio" title="Ese objetivo no suele estar en ese minuto">—</td>').join('')}</tr>`;
+    }).join('');
     return `<h3 class="h4">Cuánto vale cada objetivo en una partida pareja</h3>
-      <div class="table-wrap"><table class="data-table obj-tabla"><thead><tr><th>Objetivo</th>${o.minutos.map(m => `<th class="num">Minuto ${m}</th>`).join('')}</tr></thead>
-        <tbody>${filas}</tbody></table></div>
+      <div class="table-wrap"><table class="data-table obj-tabla tabla-apilable"><thead><tr><th rowspan="2">Objetivo</th><th rowspan="2" class="num">Suma a tu chance</th><th rowspan="2" class="obj-celda"><span class="sr-only">Barra</span></th>
+          <th colspan="${o.minutos.length}" class="obj-grupo">Equivale a ir arriba en oro, por minuto</th></tr>
+        <tr>${o.minutos.map(m => `<th class="num">Min ${m}</th>`).join('')}</tr></thead>
+        <tbody>${cuerpo}</tbody></table></div>
       <p class="nota">${escapeHtml(o.nota)} Dragones, Heraldo, inhibidores y Barón tienen un solo peso en el modelo, así que los puntos no cambian con el minuto: lo que cambia es cuánto oro equivale. "—" es un minuto en que ese objetivo no suele estar. Intervalo de ${o.reps} reentrenamientos sobre ${num(o.partidas, 0)} partidas.</p>`;
 }
 

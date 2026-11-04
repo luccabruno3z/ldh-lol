@@ -2,7 +2,7 @@
    solo. Cada persona se compara consigo misma: si no, el que juega peor aparece más en las rachas. */
 
 import { cachedFetch, EN_MODO, rolGuardado, elegirRol, alCambiarRol } from './data.js';
-import { escapeHtml, num, campeon, conIntervalo } from './utils.js';
+import { escapeHtml, num, campeon, conIntervalo, pistaDif } from './utils.js';
 
 const pct = (v) => (v == null ? '—' : `${num(v * 100, 0)} %`);
 const pts = (v) => `${v > 0 ? '+' : ''}${num(v * 100, 1)}`;
@@ -164,17 +164,22 @@ export async function bloqueConversion(p, cont, modo) {
     }
     const filas = Object.entries(CONV).map(([k, [nombre, rango]]) => {
         const x = m[k] || { n: 0 };
-        return `<tr${k === 'pareja' ? ' class="chica"' : ''}><td>${nombre} <span class="dim small">(${rango})</span></td>
-          <td class="num mono">${x.n}</td>
-          <td class="num mono">${x.n ? `${x.ganadas} de ${num(x.esperadas, 1)}` : '—'}</td>
-          <td class="num">${x.n && !x.muestra_chica ? conIntervalo({ v: x.v * 100, lo: x.lo * 100, hi: x.hi * 100 }, 1) : '—'}</td>
-          <td>${x.senal ? `<span class="tag ${x.contra_grupo > 0 ? 'win' : 'loss'}">señal</span> ` : ''}${lecturaConversion(x, k)}${x.p_bh != null && x.n ? ` <span class="dim small">· p = ${num(x.p_bh, 2)}</span>` : ''}</td></tr>`;
+        const medible = x.n && !x.muestra_chica;
+        return `<tr${medible ? '' : ' class="chica"'}><td>${nombre} <span class="dim small">(${rango})</span></td>
+          <td class="num mono" data-label="Partidas">${x.n}</td>
+          <td class="num mono" data-label="Ganadas / esperadas">${x.n ? `${x.ganadas} / ${num(x.esperadas, 0)}` : '—'}</td>
+          <td class="num" data-label="Real − esperado">${medible ? `<span class="v">${pts(x.v)}</span><span class="ic">${pts(x.lo)} a ${pts(x.hi)}</span>` : '—'}</td>
+          <td class="dv-celda">${medible ? pistaDif(x.v, x.lo, x.hi, 0.25, x.senal ? (x.contra_grupo > 0 ? 'pos' : 'neg') : '', `${pts(x.v)} puntos por partida, de ${pts(x.lo)} a ${pts(x.hi)}`) : ''}</td>
+          <td data-label="Contra el grupo">${x.senal ? `<span class="tag ${x.contra_grupo > 0 ? 'win' : 'loss'}">señal</span> ` : ''}${lecturaConversion(x, k)}${x.p_bh != null ? `<span class="ic">p = ${num(x.p_bh, 2)}</span>` : ''}</td></tr>`;
     }).join('');
     const v = m.ventaja || {}, dz = m.desventaja || {};
-    const lead = v.n && dz.n ? `Con ventaja al minuto 15 tu equipo ganó <strong>${v.ganadas} de ${v.n}</strong>, y se esperaban ${num(v.esperadas, 0)}. Abajo al 15 remontó <strong>${dz.ganadas} de ${dz.n}</strong>, y se esperaban ${num(dz.esperadas, 0)}.` : '';
+    const frases = [
+        v.n ? `Con ventaja al minuto 15 tu equipo ganó <strong>${v.ganadas} de ${v.n}</strong>, y se esperaban ${num(v.esperadas, 0)}.` : '',
+        dz.n ? `Abajo al 15 remontó <strong>${dz.ganadas} de ${dz.n}</strong>, y se esperaban ${num(dz.esperadas, 0)}.` : '',
+    ].filter(Boolean).join(' ');
     cont.innerHTML = `<section class="section">${titulo}
-      <p class="lead">${lead}</p>
-      <div class="table-wrap"><table class="data-table"><thead><tr><th>Al minuto 15</th><th class="num">Partidas</th><th class="num">Ganadas de esperadas</th><th class="num">Real − esperado<span class="ic">pts por partida</span></th><th>Contra el grupo</th></tr></thead>
+      ${frases ? `<p class="lead">${frases}</p>` : ''}
+      <div class="table-wrap"><table class="data-table tabla-apilable"><thead><tr><th>Al minuto 15</th><th class="num">Partidas</th><th class="num">Ganadas<span class="ic">/ esperadas</span></th><th class="num">Real − esperado<span class="ic">pts por partida</span></th><th class="dv-celda"><span class="sr-only">Intervalo sobre el cero</span></th><th>Contra el grupo</th></tr></thead>
         <tbody>${filas}</tbody></table></div>
       <p class="nota">${escapeHtml(d.nota)}</p></section>`;
 }
