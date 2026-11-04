@@ -124,7 +124,7 @@ export async function bloqueMuertes(p, cont, modo, version) {
         ${conSelector ? `<label class="selector">Rol <select id="mu-rol">${opciones.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r === 'Todos' ? 'Todos los roles' : r)}</option>`).join('')}</select></label>` : ''}</div>
       <div id="mu-cuerpo"></div>
       <div id="mu-caras"></div>
-      <p class="nota">${escapeHtml(d.nota)} Sale del modelo de probabilidad de ganar (Guías → Cómo calculamos la probabilidad de ganar). Morir no siempre es un error: lo que más pesa es morir y que el rival se lleve algo, y morir tarde, cuando un Barón decide la partida (regla 9 del coaching).</p></section>`;
+      <p class="nota">${escapeHtml(d.nota)} Sale del modelo de probabilidad de ganar (Guías → Cómo calculamos la probabilidad de ganar). Morir no siempre es un error: lo que más pesa es morir y que el rival se lleve algo, y morir tarde, cuando un Barón decide la partida.</p></section>`;
     if (!conSelector) rol = opciones[0];
     pintar();
     cont.querySelector('#mu-rol')?.addEventListener('change', (e) => {
@@ -211,17 +211,22 @@ export function curvaPartida(d, pid) {
         const ev = d.eventos.filter(e => e.min > k.min - 1 && e.min <= k.min && (ICONO[e.tipo] || e.tipo === 'muerte'));
         const que = ev.length ? ev.map(e => (e.tipo === 'muerte' ? (e.persona === pid ? 'tu muerte' : 'una muerte de alguien del grupo')
             : `${e.equipo === eq ? 'tu equipo tomó' : 'el rival tomó'} ${OBJ[e.tipo]}`)).join(', ') : 'peleas y oro';
-        lect = `El minuto que más pesó fue el ${k.min}: <strong>${dv > 0 ? '+' : '−'}${P(Math.abs(dv), 0)} pts</strong> (${escapeHtml(que)}).`;
+        lect = `La chance de tu equipo se movió más en el minuto ${k.min}: <strong>${dv > 0 ? '+' : '−'}${P(Math.abs(dv), 0)} puntos</strong> (${escapeHtml(que)}). Está marcado en el gráfico.`;
     }
+    // La muerte que más bajó tus chances es otra cuenta (el modelo con y sin esa muerte): es la bolita más grande,
+    // y puede no ser la del minuto que más se movió. Se dice aparte para que el titular no contradiga al gráfico.
+    const peor = d.eventos.filter(e => e.persona === pid && e.tipo === 'muerte').sort((a, b) => b.costo - a.costo)[0];
+    const lectPeor = peor ? `Tu muerte que más bajó tus chances: minuto ${num(peor.min, 0)}, <strong>−${P(peor.costo, 0)} puntos</strong> (${escapeHtml(perdidos(peor.perdidos))}). Es la bolita roja más grande.` : '';
+    const banda = k ? `<rect x="${x(k.min - 1)}" width="${x(k.min) - x(k.min - 1)}" y="${m.t}" height="${H - m.t - m.b}" class="cp-clave"/>` : '';
     const marcasY = [0, 0.5, 1].map(v => `<text x="${m.l - 5}" y="${y(v) + 4}" class="g-eje" text-anchor="end">${v * 100}</text>`).join('');
     const marcasX = [...Array(Math.floor(n / 5) + 1).keys()].map(i => i * 5).map(t => `<text x="${x(t)}" y="${H - 6}" class="g-eje" text-anchor="middle">${t}</text>`).join('');
     return `<div class="cp">
-      <p class="cp-lectura">${lect}</p>
+      <p class="cp-lectura">${lect}</p>${lectPeor ? `<p class="cp-lectura">${lectPeor}</p>` : ''}
       <svg class="cp-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Probabilidad de ganar de tu equipo minuto a minuto; terminó en ${d.ganador === eq ? 'victoria' : 'derrota'}">
-        <polygon points="${area}" class="cp-area"/>
+        ${banda}<polygon points="${area}" class="cp-area"/>
         <line x1="${m.l}" x2="${W - m.r}" y1="${y(0.5)}" y2="${y(0.5)}" class="g-medio"/>
         <polyline points="${linea}" class="g-linea"/>${marcas}${marcasY}${marcasX}</svg>
-      <p class="fr-leyenda"><span class="fr-item"><span class="fr-sw cp-sw-muerte"></span>tus muertes (más grande, más bajó)</span> <span class="fr-item"><span class="fr-sw cp-sw-kill"></span>tus kills</span> <span class="dim">· B Barón, A Ancestral, D dragón, H Heraldo, I inhibidor (abajo tu equipo, arriba el rival)</span></p></div>`;
+      <p class="fr-leyenda"><span class="dim">Eje vertical: chance de ganar de tu equipo, de 0 a 100 %. Horizontal: minuto.</span> <span class="fr-item"><span class="fr-sw cp-sw-muerte"></span>tus muertes (el tamaño es cuánto estima el modelo que bajó tus chances esa muerte)</span> <span class="fr-item"><span class="fr-sw cp-sw-kill"></span>tus kills</span> <span class="fr-item"><span class="fr-sw cp-sw-clave"></span>el minuto que más se movió</span> <span class="dim">· Objetivos: B Barón, A Ancestral, D dragón, H Heraldo, I inhibidor; abajo y en verde los de tu equipo, arriba y en rojo los del rival. Pasá el mouse por una marca para ver el detalle.</span></p></div>`;
 }
 
 // ---- Curva de aprendizaje: cuánto rendís con un campeón según cuántas partidas llevás con él ----

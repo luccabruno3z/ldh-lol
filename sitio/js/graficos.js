@@ -125,7 +125,7 @@ export function seccionTendencia(t, rol, franja) {
     const signo = (v) => `${v > 0 ? '+' : ''}${num(v, 1)}`;
     return `<p class="evo-lectura">Empezaste la temporada en <strong>${num(t.inicio, 0)}</strong> y hoy estás en <strong>${num(t.ahora, 0)}</strong>
         <span class="tag ${clase}">${escapeHtml(t.veredicto)}</span>
-        <span class="dim">${signo(t.pendiente)} puntos cada 100 partidas (${signo(t.lo)} a ${signo(t.hi)})</span></p>
+        <span class="dim">${signo(t.cambio.v)} puntos en tus ${t.n} partidas (${signo(t.cambio.lo)} a ${signo(t.cambio.hi)})</span></p>
       <svg class="g-evo" viewBox="0 0 ${W} ${H}" role="img" aria-label="Tu índice por partida en ${escapeHtml(rol)} a lo largo de la temporada: de ${num(t.inicio, 0)} a ${num(t.ahora, 0)}, ${escapeHtml(t.veredicto)}">
         ${ref ? `<rect x="${m.l}" width="${W - m.l - m.r}" y="${y(ref.hi)}" height="${y(ref.lo) - y(ref.hi)}" class="g-banda"/>
         <line x1="${m.l}" x2="${W - m.r}" y1="${y(ref.mediana)}" y2="${y(ref.mediana)}" class="g-medio"/>

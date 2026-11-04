@@ -5,7 +5,7 @@
 import { state, cachedFetch, MODOS, EN_MODO } from './data.js';
 import { onRoute } from './router.js';
 import { escapeHtml, nombreCola, conIntervalo, num, pistaDif } from './utils.js';
-import { nombrePersona, pct, chipConf, winrateAj, difWinrate, senal } from './fase2.js';
+import { nombrePersona, pct, chipConf, winrateAj, difWinrate, senal, NOTA_SENAL } from './fase2.js';
 
 const GRIETA = ['solo', 'flex', 'normal'];
 const ROLES = ['Top', 'Jungla', 'Mid', 'ADC', 'Support'];
@@ -79,10 +79,10 @@ function tablaNormalizada(n) {
           <td class="num mono" data-label="Juntos">${r.juntos}</td>
           <td class="num" data-label="Winrate juntos">${conIntervalo(r.real, 'pct')}</td>
           <td class="num" data-label="Esperado"><span class="v">${pct(r.esperado)}</span><span class="ic">${pct(r.sin_a.v)} y ${pct(r.sin_b.v)}</span></td>
-          <td class="num" data-label="Juntos − esperado"><span class="v">${pts(r.dif.v)}</span><span class="ic">${pts(r.dif.lo)} a ${pts(r.dif.hi)} · p BH ${pval(r.p_bh)}</span>${r.senal ? `<span class="tag ${r.dif.v > 0 ? 'win' : 'loss'}">señal</span>` : ''}</td>
+          <td class="num" data-label="Juntos − esperado"><span class="v">${pts(r.dif.v)}</span><span class="ic">${pts(r.dif.lo)} a ${pts(r.dif.hi)} · p BH ${pval(r.p_bh)}</span>${r.muestra_chica ? '' : senal(r)}</td>
           <td class="dv-celda">${r.muestra_chica ? '' : pistaDif(r.dif.v, r.dif.lo, r.dif.hi, 0.5, r.senal ? (r.dif.v > 0 ? 'pos' : 'neg') : '', `${pts(r.dif.v)} puntos, de ${pts(r.dif.lo)} a ${pts(r.dif.hi)}`)}</td></tr>`).join('')}</tbody></table></div>`
         : `<p class="empty-state">No hay dúos con ${n?.min_juntos ?? 15}+ partidas juntos en ${escapeHtml(EN_MODO[sel.modo])}.</p>`}
-      <p class="nota">${escapeHtml(n?.nota || '')}</p>`;
+      <p class="nota">${escapeHtml(n?.nota || '')} ${NOTA_SENAL}</p>`;
 }
 
 async function duos(cont) {
@@ -109,7 +109,7 @@ async function duos(cont) {
           <td class="num">${difWinrate(a.dif)} ${senal(a)}</td>
           <td class="num">${difWinrate(b.dif)} ${senal(b)}</td></tr>`).join('')}</tbody></table></div>`
         : '<p class="empty-state">No hay dúos con suficientes partidas en esta cola.</p>'}
-      <p class="nota">"Para el primero" es cuánto cambia el winrate del primero cuando juega con el segundo, contra cuando juega sin esa persona en la misma cola (y al revés). ${escapeHtml(d.nota)}</p>`;
+      <p class="nota">"Para el primero" es cuánto cambia el winrate del primero cuando juega con el segundo, contra cuando juega sin esa persona en la misma cola (y al revés). ${NOTA_SENAL}</p>`;
     cont.querySelector('#rk-cola').addEventListener('change', (e) => { sel.cola = e.target.value; render(); });
     cont.querySelector('#rk-modo')?.addEventListener('change', (e) => { sel.modo = e.target.value; render(); });
 }
@@ -119,10 +119,10 @@ async function mejora(cont) {
     const tabla = d.modos?.[sel.modo] || d.tabla;
     const signo = (v) => `${v > 0 ? '+' : ''}${num(v, 1)}`;
     cont.innerHTML = `<div class="section-head">${d.modos ? opciones('rk-modo', MODOS, sel.modo, 'Modo') : ''}</div>` + (tabla.length ? `<div class="table-wrap"><table class="data-table">
-      <thead><tr><th>Jugador</th><th>Rol</th><th class="num">Partidas</th><th class="num">De → a</th><th class="num">Cada 100 partidas</th><th></th></tr></thead>
+      <thead><tr><th>Jugador</th><th>Rol</th><th class="num">Partidas</th><th class="num">De → a</th><th class="num">Cambio<span class="ic">en sus partidas</span></th><th></th></tr></thead>
       <tbody>${tabla.map(x => `<tr class="${x.veredicto === 'mejorando' ? '' : 'chica'}"><td>${persona(x.persona)}</td><td>${escapeHtml(x.rol)}</td>
         <td class="num mono">${x.n}</td><td class="num mono">${num(x.inicio, 0)} → ${num(x.ahora, 0)}</td>
-        <td class="num"><span class="v">${signo(x.pendiente)}</span><span class="ic">${signo(x.lo)} a ${signo(x.hi)}</span></td>
+        <td class="num"><span class="v">${signo(x.cambio.v)}</span><span class="ic">${signo(x.cambio.lo)} a ${signo(x.cambio.hi)}</span></td>
         <td><span class="tag ${x.veredicto === 'mejorando' ? 'win' : x.veredicto === 'empeorando' ? 'loss' : ''}">${escapeHtml(x.veredicto)}</span></td></tr>`).join('')}</tbody></table></div>
       <p class="nota">${escapeHtml(d.nota)} Cada uno se mide contra su propia franja, así que se puede comparar a un Hierro con un Esmeralda.</p>`
       : `<p class="empty-state">Nadie tiene 30+ partidas de ${escapeHtml(EN_MODO[sel.modo])} en un rol con referencia.</p>`);
@@ -143,7 +143,7 @@ async function companeros(cont) {
           <span class="cmp-nombre">${persona(r.persona)}${r.muestra_chica ? ' <span class="tag">muestra chica</span>' : ''}</span>
           <span class="ag-pista">${ic}<span class="ag-barra ${clase}" style="${s.v >= 0 ? 'left:50%' : 'right:50%'};width:${w(s.v || 0)}"></span><span class="ag-cero"></span></span>
           <span class="cmp-num"><strong>${s.v > 0 ? '+' : ''}${num((s.v || 0) * 100, 1)} pts</strong>
-            ${r.senal ? `<span class="tag ${s.v > 0 ? 'win' : 'loss'}">señal</span>` : '<span class="tag">ruido</span>'}
+            ${senal(r, s)}
             <span class="dim small">${r.companeros} compañeros · ${r.juntos} partidas</span></span></summary>
           <div class="table-wrap"><table class="data-table"><thead><tr><th>Compañero</th><th class="num">Juntos</th><th class="num">Con ${escapeHtml(nombrePersona(r.persona))}</th><th class="num">Sin, mismo período</th></tr></thead>
             <tbody>${r.detalle.map(x => `<tr><td>${persona(x.companero)}</td><td class="num mono">${x.juntos}</td><td class="num">${conIntervalo(x.con, 'pct')}</td><td class="num">${conIntervalo(x.sin, 'pct')}</td></tr>`).join('')}</tbody></table></div>

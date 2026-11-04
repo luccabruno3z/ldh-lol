@@ -55,9 +55,9 @@ async function modeloVictoria() {
       <div class="calib-grid"><div>${grafCalibracion(v.calibracion)}
         <p class="nota" style="text-align:center">Eje horizontal: lo que predice. Vertical: cuántas se ganaron de verdad. Sobre la diagonal es perfecto.</p></div>
         <div><p class="lead">En ${num(v.partidas_prueba, 0)} partidas apartadas, la peor franja se desvía <strong>${num(v.peor_decil * 100, 1)} puntos</strong>. A los 15 minutos acierta el ganador el <strong>${num(v.acierto_15 * 100, 0)} %</strong> de las veces (los estudios dan 72–75 %).</p>
-          <h3 class="h4">Cuánto vale cada cosa, a mitad de partida</h3>
+          <h3 class="h4">Cuánto pesa cada cosa además de su oro <span class="dim">· a mitad de partida</span></h3>
           <div class="table-wrap"><table class="data-table"><tbody>${eq}</tbody></table></div>
-          <p class="nota">Lo que suma además del oro que ya da (ese está en la diferencia de oro). Por ejemplo, tener el Barón pesa como ir ${num(d.equivalencias.find(e => e.clave === 'baron')?.oro ?? 0, 0)} de oro arriba.</p></div></div>
+          <p class="nota">Sin contar el oro que da cada cosa al equipo: ese ya está en la diferencia de oro. Por ejemplo, tener el Barón activo pesa como ir ${num(d.equivalencias.find(e => e.clave === 'baron')?.oro ?? 0, 0)} de oro arriba, además de los 1.500 que reparte. La tabla de abajo sí suma ese oro, por eso ahí el Barón vale más.</p></div></div>
       ${valorObjetivos(d.objetivos)}
     </section>`;
 }
@@ -78,14 +78,16 @@ function valorObjetivos(o) {
     const max = Math.max(...filas.map(r => r.hi), 0.01);
     const cuerpo = filas.map(r => {
         const f = r.fs.find(x => x.dp.v === r.hi);  // el intervalo, del minuto en que más vale
-        const valor = Math.abs(r.hi - r.lo) < 0.0005 ? `${p1(r.hi)} pts` : `${p1(r.lo)} a ${p1(r.hi)} pts`;
+        // Si el intervalo cruza el cero no se puede decir que suma ni que resta: va "≈ 0" y no un número con signo
+        // (un −0,3 del Heraldo se leía como "el Heraldo te resta").
         const ruido = f.dp.lo <= 0 && f.dp.hi >= 0;
+        const valor = ruido ? '≈ 0' : Math.abs(r.hi - r.lo) < 0.0005 ? `${p1(r.hi)} pts` : `${p1(r.lo)} a ${p1(r.hi)} pts`;
         return `<tr${ruido ? ' class="chica"' : ''}><td>${escapeHtml(r.nombre)}</td>
-          <td class="num" data-label="Suma a tu chance"><span class="v">${valor}</span><span class="ic">${p1(f.dp.lo)} a ${p1(f.dp.hi)}${ruido ? ' · ruido' : ''}</span></td>
+          <td class="num" data-label="Suma a tu chance"><span class="v">${valor}</span><span class="ic">${p1(f.dp.lo)} a ${p1(f.dp.hi)}${ruido ? ' · no se distingue de cero' : ''}</span></td>
           <td class="obj-celda"><span class="obj-pista"><span class="obj-barra" style="width:${(Math.max(r.hi, 0) / max) * 100}%"></span></span></td>
-          ${o.minutos.map(m => r.min[m] ? `<td class="num mono" data-label="Oro equivalente, min ${m}">${num(r.min[m].oro.v, 0)}</td>` : '<td class="num dim obj-vacio" title="Ese objetivo no suele estar en ese minuto">—</td>').join('')}</tr>`;
+          ${o.minutos.map(m => r.min[m] ? `<td class="num mono" data-label="Oro equivalente, min ${m}">${ruido ? '≈ 0' : num(r.min[m].oro.v, 0)}</td>` : '<td class="num dim obj-vacio" title="Ese objetivo no suele estar en ese minuto">—</td>').join('')}</tr>`;
     }).join('');
-    return `<h3 class="h4">Cuánto vale cada objetivo en una partida pareja</h3>
+    return `<h3 class="h4">Cuánto vale cada objetivo contando su oro <span class="dim">· en una partida pareja</span></h3>
       <div class="table-wrap"><table class="data-table obj-tabla tabla-apilable"><thead><tr><th rowspan="2">Objetivo</th><th rowspan="2" class="num">Suma a tu chance</th><th rowspan="2" class="obj-celda"><span class="sr-only">Barra</span></th>
           <th colspan="${o.minutos.length}" class="obj-grupo">Equivale a ir arriba en oro, por minuto</th></tr>
         <tr>${o.minutos.map(m => `<th class="num">Min ${m}</th>`).join('')}</tr></thead>

@@ -78,7 +78,7 @@ async function heatmap(p, cont, modo) {
             v => ({ todas: 'Toda la partida', temprana: 'Antes del 14', media: 'Del 14 al 25', tardia: 'Después del 25' })[v])}
       </div>
       <div id="hm-mapa"></div>
-      <p class="nota">Cada cuadradito junta las muertes (o kills) que cayeron ahí; cuanto más fuerte el color, más se repite. Va separado por lado porque el mapa no se ve igual desde cada base: mezclarlos inventa patrones (regla 4 del coaching).</p></section>`;
+      <p class="nota">Cada cuadradito junta las muertes (o kills) que cayeron ahí; cuanto más fuerte el color, más se repite. Va separado por lado porque el mapa no se ve igual desde cada base: mezclarlos inventa patrones.</p></section>`;
     for (const k of ['tipo', 'lado', 'fase']) {
         cont.querySelector(`#hm-${k}`).addEventListener('change', (e) => { f[k] = e.target.value; pintar(); });
     }

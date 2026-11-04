@@ -347,7 +347,11 @@ def tendencia(filas: list[dict], celda: "Celda", rol: str) -> dict | None:
                       "hasta": {"i": n - 1, "t": int(t[-1]), "v": _r(a * (n - 1) + b, 1)}},
             "pendiente": _r(pendiente * 100, 1), "lo": _r(lo * 100, 1), "hi": _r(hi * 100, 1),
             "veredicto": "mejorando" if lo > 0 else "empeorando" if hi < 0 else "sin tendencia clara",
-            "inicio": _r(float(np.mean(y[:v])), 1), "ahora": _r(float(np.mean(y[-v:])), 1),
+            # De dónde a dónde, sobre la misma recta que decide el veredicto (antes eran promedios de las primeras y
+            # últimas partidas, y podían ir en contra de la pendiente). El cambio es en las partidas jugadas, sin
+            # proyectar: "cada 100 partidas" con 34 partidas daba +70 con un intervalo hasta +126 en un índice 0–100.
+            "inicio": _r(float(np.clip(b, 0, 100)), 1), "ahora": _r(float(np.clip(a * (n - 1) + b, 0, 100)), 1),
+            "cambio": {"v": _r(pendiente * (n - 1), 1), "lo": _r(lo * (n - 1), 1), "hi": _r(hi * (n - 1), 1)},
             "metricas": [METRICAS[k][0] for k in INDICE.get(rol, INDICE["_"])],
             "ref": None if len(celda.indice_jugadores) < REF["min_jugadores"] else {
                 "mediana": _r(float(np.median(celda.indice_jugadores)), 1),
@@ -635,12 +639,14 @@ def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], rangos: di
                 if (t := r.get("tendencia")):
                     mejora[modo].append({"persona": pid, "rol": rol, "franja": franja, "n": t["n"],
                                          "pendiente": t["pendiente"], "lo": t["lo"], "hi": t["hi"],
-                                         "veredicto": t["veredicto"], "inicio": t["inicio"], "ahora": t["ahora"]})
+                                         "veredicto": t["veredicto"], "inicio": t["inicio"], "ahora": t["ahora"],
+                                         "cambio": t["cambio"]})
     # Quién más mejoró: por la pendiente de la tendencia (puntos cada 100 partidas contra su propia
     # franja), así no se comparan winrates de franjas distintas. Primero los que se separan del ruido.
-    orden = {m: sorted(t, key=lambda x: (x["veredicto"] != "mejorando", -x["lo"])) for m, t in mejora.items()}
+    orden = {m: sorted(t, key=lambda x: (x["veredicto"] != "mejorando", -x["cambio"]["lo"])) for m, t in mejora.items()}
     escribir("rankings/mejora.json", {
-        "nota": "Pendiente del índice por partida (0–100, contra la propia franja y rol), en puntos "
-                "cada 100 partidas. 'Mejorando' solo si todo el intervalo está arriba de cero.",
+        "nota": "Índice por partida (0–100, contra la propia franja y rol) sobre la recta de tendencia: de dónde "
+                "arrancó a dónde está, y cuánto cambió a lo largo de sus partidas. 'Mejorando' solo si todo el "
+                "intervalo del cambio está arriba de cero.",
         "tabla": orden["solo"], "modos": orden})
     return {"indices": indices(por_persona, franja_persona, celdas)}

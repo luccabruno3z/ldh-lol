@@ -145,7 +145,18 @@ export function difWinrate(d) {
     return `<span class="v">${s(d.v)} pts</span><span class="ic">${s(d.lo)} a ${s(d.hi)}</span>`;
 }
 
-export const senal = (r) => (r.senal ? `<span class="tag ${r.dif.v > 0 ? 'win' : 'loss'}">señal</span>` : '<span class="tag">ruido</span>');
+/** Tres casos, con el mismo criterio en todo el sitio: "señal" pasa la corrección por comparaciones múltiples (BH);
+    "a confirmar" tiene un intervalo que no cruza el cero pero no la pasa (con tantos pares, alguno sale por azar);
+    "ruido" cruza el cero. Antes se decía "ruido" en el segundo caso y contradecía la nota. */
+export function senal(r, dif = r.dif) {
+    if (r.senal) return `<span class="tag ${dif.v > 0 ? 'win' : 'loss'}">señal</span>`;
+    if (!r.muestra_chica && dif?.lo != null && (dif.lo > 0 || dif.hi < 0)) {
+        return '<span class="tag" title="El intervalo no cruza el cero, pero con tantas comparaciones a la vez puede ser suerte">a confirmar</span>';
+    }
+    return '<span class="tag">ruido</span>';
+}
+
+export const NOTA_SENAL = '"Señal": se separa del azar aun corrigiendo por todas las comparaciones a la vez. "A confirmar": el intervalo no cruza el cero, pero con tantas parejas comparadas alguna sale así por suerte. "Ruido": el intervalo cruza el cero.';
 
 async function sinergia(p, cont, modo) {
     if (p._cuenta) return;  // la sinergia es de la persona: se compara con y sin cada amigo en todas sus cuentas
@@ -171,7 +182,7 @@ async function sinergia(p, cont, modo) {
           <td class="num">${difWinrate(r.dif)}</td>
           <td class="num mono">${num(r.p_bh, 3)}</td>
           <td>${senal(r)}</td></tr>`).join('')}</tbody></table></div>
-      <p class="nota">${escapeHtml(d.nota)} "Mismo período" mira solo las partidas sin ese compañero entre la primera y la última que jugaron juntos, para descartar que la diferencia sea de época.</p>
+      <p class="nota">${NOTA_SENAL} "Mismo período" mira solo las partidas sin ese compañero entre la primera y la última que jugaron juntos, para descartar que la diferencia sea de época.</p>
     </section>`;
 }
 

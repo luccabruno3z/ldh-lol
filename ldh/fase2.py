@@ -333,8 +333,9 @@ def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: 
     _MEDIANAS.update(kda=med_kda, rol=med_rol)
     sin = sinergia(filas_por)
     escribir("sinergia.json", {"alfa": AJ["alfa"], "min_juntos": AJUSTES["sinergia"]["min_juntos"],
-                               "nota": "Con contra sin el compañero, en la misma cola. 'señal' usa el p ajustado "
-                                       "por Benjamini-Hochberg: con tantos pares, alguno sale por azar.",
+                               "nota": "Con contra sin el compañero, en la misma cola. 'Señal' si pasa la corrección de "
+                                       "Benjamini-Hochberg por todas las parejas a la vez; 'a confirmar' si el intervalo "
+                                       "no cruza el cero pero no la pasa; 'ruido' si cruza el cero.",
                                "filas": sin})
     resumen = {}
     for pid, filas in filas_por.items():

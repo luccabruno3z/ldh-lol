@@ -58,7 +58,7 @@ def tarjeta_companeros(d: dict, nombres: dict, modo: str = "todo") -> discord.ui
                                        "cada compañero contra sí mismo, mismo período"]
     for i, r in enumerate(tabla[:12], 1):
         s = r["suma"]
-        tag = (" · **señal**" if r["senal"] else " · ruido")
+        tag = (" · **señal**" if r["senal"] else " · ruido" if s.get("ruido", True) else " · a confirmar")
         lineas += [f"`{i}.` **{nombres.get(r['persona'], r['persona'])}**: {F.num(s['v'] * 100, 1, True)} pts{tag}",
                    f"-# {F.num(s['lo'] * 100, 1, True)} a {F.num(s['hi'] * 100, 1, True)} · {r['companeros']} compañeros · "
                    f"{r['juntos']} partidas"]
@@ -80,7 +80,7 @@ def tarjeta_duos(d: dict, nombres: dict, modo: str = "todo") -> discord.ui.Layou
     pct = lambda v: f"{F.num(v * 100, 0)} %"  # noqa: E731
     for i, r in enumerate(tabla[:12], 1):
         x = r["dif"]
-        tag = (" · **señal**" if r["senal"] else " · ruido")
+        tag = (" · **señal**" if r["senal"] else " · a confirmar" if x["lo"] > 0 or x["hi"] < 0 else " · ruido")
         lineas += [f"`{i}.` **{nombres.get(r['a'], r['a'])} + {nombres.get(r['b'], r['b'])}**: "
                    f"{F.num(x['v'] * 100, 0, True)} pts{tag}",
                    f"-# {F.num(x['lo'] * 100, 0, True)} a {F.num(x['hi'] * 100, 0, True)} · juntos {pct(r['real']['v'])} "
@@ -99,11 +99,11 @@ def tarjeta_mejora(d: dict, nombres: dict, modo: str = "solo") -> discord.ui.Lay
     from bot.cogs.coaching import EN_MODO
     tabla = (d.get("modos") or {}).get(modo, d["tabla"] if modo == "solo" else [])
     en = EN_MODO.get(modo, modo)
-    lineas = ["## Quién más mejoró", f"-# Índice por partida contra su propia franja, en {en} · puntos cada 100 partidas"]
+    lineas = ["## Quién más mejoró", f"-# Índice por partida contra su propia franja, en {en} · cambio a lo largo de sus partidas"]
     for i, x in enumerate(tabla[:10], 1):
         tag = {"mejorando": "**mejorando**", "empeorando": "empeorando"}.get(x["veredicto"], "sin tendencia clara")
         lineas += [f"`{i}.` **{nombres.get(x['persona'], x['persona'])}** · {x['rol']} · {F.num(x['inicio'], 0)} → {F.num(x['ahora'], 0)} · {tag}",
-                   f"-# {F.num(x['pendiente'], 1, True)} cada 100 partidas ({F.num(x['lo'], 1, True)} a {F.num(x['hi'], 1, True)}) · {x['n']} partidas"]
+                   f"-# {F.num(x['cambio']['v'], 1, True)} puntos ({F.num(x['cambio']['lo'], 1, True)} a {F.num(x['cambio']['hi'], 1, True)}) en {x['n']} partidas"]
     if not tabla:
         lineas.append(f"Nadie tiene 30+ partidas de {en} en un rol con referencia.")
     lineas.append("-# Mejorando solo si todo el intervalo está arriba de cero. Cada uno contra su franja: se puede comparar entre rangos.")

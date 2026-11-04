@@ -520,3 +520,7 @@ tr.chica .obj-barra { background: var(--text-dim); box-shadow: none; }
 .obj-tabla .obj-grupo { text-align: center; border-bottom: 1px solid var(--border); }
 .dv-pista:not(.dv-pos):not(.dv-neg) .dv-ic { background: var(--accent-dim); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
 .dv-pista:not(.dv-pos):not(.dv-neg) .dv-v { background: var(--accent); box-shadow: var(--glow); }
+
+/* Gráfico de una partida: el minuto que más movió la chance, para que el titular se vea en el gráfico. */
+.cp-clave { fill: var(--accent-dim); stroke: color-mix(in srgb, var(--accent) 45%, transparent); stroke-width: 1; }
+.cp-sw-clave { background: var(--accent-dim); box-shadow: inset 0 0 0 1px var(--accent); }

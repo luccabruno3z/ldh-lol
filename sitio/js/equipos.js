@@ -107,7 +107,7 @@ function resultado() {
       <p class="evo-lectura">${parejo ? '<span class="tag">parejo</span>' : ''} Equipo A ${pct(pA)} · Equipo B ${pct(1 - pA)}
         <span class="dim">diferencia de fuerza ${num(Math.abs(r.a.fuerza - r.b.fuerza) * 100, 1)} puntos</span></p>
       <div class="eq-grid">${tablaEquipo('Equipo A', r.a, champs, 'eq-a')}${tablaEquipo('Equipo B', r.b, champs, 'eq-b')}</div>
-      <p class="nota">Probabilidad = fuerza A / (fuerza A + fuerza B), como el predictor del doc de funcionalidades. Es una estimación sin calibrar: todavía no hay inhouses registradas para medir si acierta. "Parejo" si la diferencia es menor a 2 puntos. Los campeones sugeridos son los de mejor winrate ajustado en ese rol con 5+ partidas, sin repetir entre equipos.</p>`;
+      <p class="nota">Probabilidad = fuerza A / (fuerza A + fuerza B). Es una estimación sin calibrar: todavía no hay inhouses registradas para medir si acierta. "Parejo" si la diferencia es menor a 2 puntos. Los campeones sugeridos son los de mejor winrate ajustado en ese rol con 5+ partidas, sin repetir entre equipos.</p>`;
 }
 
 function ideal() {

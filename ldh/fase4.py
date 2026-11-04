@@ -57,7 +57,7 @@ def equipos(filas_por: dict[str, list[dict]], nombres: dict) -> dict:
     return {"min_rol": CFG["min_rol"], "min_campeon": CFG["min_campeon"], "jugadores": jugadores,
             "ideal": ideal(jugadores),
             "nota": "Fuerza = winrate ajustado en ese rol (suma 10 partidas al 50 %), en solo, flex y normales juntas. "
-                    "Nadie va a un rol con menos de min_rol partidas ahí."}
+                    f"Nadie va a un rol con menos de {CFG['min_rol']} partidas ahí."}
 
 
 def ideal(jugadores: dict, top: int = 3) -> list[dict]:

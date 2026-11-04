@@ -79,7 +79,7 @@ async def vista_partida(bot, pid: str, i: int, owner: int) -> tuple[discord.ui.L
                                 "una muerte de alguien del grupo" if e["tipo"] == "muerte" else
                                 f"{'tu equipo tomó' if e.get('equipo') == eq else 'el rival tomó'} {OBJ.get(e['tipo'], e['tipo'])}"
                                 for e in ev) or "peleas y oro"
-                lineas.append(f"El minuto que más pesó fue el **{k['min']}**: **{'+' if dv > 0 else '−'}"
+                lineas.append(f"La chance de tu equipo se movió más en el minuto **{k['min']}**: **{'+' if dv > 0 else '−'}"
                               f"{F.num(abs(dv) * 100, 0)} pts** ({que}).")
             muertes = sorted((e for e in d["eventos"] if e["tipo"] == "muerte" and e.get("persona") == pid),
                              key=lambda e: -e["costo"])
@@ -88,7 +88,8 @@ async def vista_partida(bot, pid: str, i: int, owner: int) -> tuple[discord.ui.L
                     f"min {F.num(e['min'], 0)}: −{F.num(e['costo'] * 100, 0)} pts{_perdidos(e.get('perdidos'))}"
                     for e in muertes[:3]))
             lineas.append("-# Probabilidad de ganar de tu equipo minuto a minuto (modelo de la web, Guías). "
-                          "Rojo: tus muertes, más grande = más costó.")
+                          "Rojo: tus muertes; el tamaño es cuánto estima el modelo que bajó tus chances cada una, "
+                          "así que la más grande puede no ser la del minuto que más se movió.")
             texto = "\n".join(lineas)
             png = graficos.curva_partida(d, pid, f"{perfil['nombre']} · {champ} · {'victoria' if m['win'] else 'derrota'}")
     items: list[discord.ui.Item] = [discord.ui.TextDisplay(texto[:3900])]

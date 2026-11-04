@@ -118,7 +118,7 @@ def tendencia(t: dict, titulo: str, franja: str) -> io.BytesIO:
     ax.grid(color=GRILLA, lw=0.6)
     signo = lambda v: f"{'+' if v > 0 else ''}{v:.1f}".replace(".", ",")
     ax.set_title(f"{titulo}\nDe {t['inicio']:.0f} a {t['ahora']:.0f} → {t['veredicto']} "
-                 f"({signo(t['pendiente'])} cada 100 partidas)", color=TEXTO, fontsize=12, loc="left")
+                 f"({signo(t['cambio']['v'])} en {t['n']} partidas)", color=TEXTO, fontsize=12, loc="left")
     return _png(fig)
 
 
