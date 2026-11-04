@@ -50,12 +50,12 @@ async function modeloVictoria() {
     if (!d) return '';
     const v = d.validacion;
     const eq = d.equivalencias.map(e => `<tr><td>${escapeHtml(e.nombre)}</td><td class="num mono">${Math.abs(e.oro) < 200 ? '<span class="dim">casi nada</span>' : `${num(e.oro, 0)} de oro`}</td></tr>`).join('');
-    return `<section class="section"><h3>Cómo calculamos la probabilidad de ganar</h3>
+    return `<section class="section"><h2 class="h3">Cómo calculamos la probabilidad de ganar</h2>
       <p>Con el estado de la partida en cada minuto (diferencia de oro, XP, kills, torres, dragones, Barón, inhibidores…) un modelo estima la chance de ganar de cada equipo. Es la idea de la tesis de xPetu, entrenada con las ${num(d.partidas, 0)} partidas del grupo.</p>
       <div class="calib-grid"><div>${grafCalibracion(v.calibracion)}
         <p class="nota" style="text-align:center">Eje horizontal: lo que predice. Vertical: cuántas se ganaron de verdad. Sobre la diagonal es perfecto.</p></div>
         <div><p class="lead">En ${num(v.partidas_prueba, 0)} partidas apartadas, la peor franja se desvía <strong>${num(v.peor_decil * 100, 1)} puntos</strong>. A los 15 minutos acierta el ganador el <strong>${num(v.acierto_15 * 100, 0)} %</strong> de las veces (los estudios dan 72–75 %).</p>
-          <h4>Cuánto vale cada cosa, a mitad de partida</h4>
+          <h3 class="h4">Cuánto vale cada cosa, a mitad de partida</h3>
           <div class="table-wrap"><table class="data-table"><tbody>${eq}</tbody></table></div>
           <p class="nota">Lo que suma además del oro que ya da (ese está en la diferencia de oro). Por ejemplo, tener el Barón pesa como ir ${num(d.equivalencias.find(e => e.clave === 'baron')?.oro ?? 0, 0)} de oro arriba.</p></div></div>
     </section>`;
@@ -74,7 +74,7 @@ async function acompanan(rol) {
           <span class="ag-pista"><span class="ag-barra ${c.dif.lo > 0 ? 'ag-pos' : c.dif.hi < 0 ? 'ag-neg' : 'ag-nada'}" style="${lado};width:${w(c.dif.v)}"></span><span class="ag-cero"></span></span>
           <span class="ag-num"><strong>${c.dif.v > 0 ? '+' : ''}${num(c.dif.v * 100, 0)} pts</strong> <span class="dim">${num(c.arriba.v * 100, 0)} % contra ${num(c.abajo.v * 100, 0)} %</span></span></div>`;
     }).join('');
-    return `<section class="section"><h3>Qué acompaña a ganar · ${rol}</h3>
+    return `<section class="section"><h2 class="h3">Qué acompaña a ganar · ${rol}</h2>
       <p class="dim">Winrate de las partidas con cada componente en la mitad de arriba de la franja, contra la mitad de abajo (${num(r.n_partidas, 0)} partidas de ${r.n_jugadores} jugadores de referencia).</p>
       <div class="ag-lista">${filas}</div>
       <p class="nota">${escapeHtml(d.nota)} La Efectividad (participación en kills y % del daño) casi no se mueve: son porciones del equipo, y en una derrota tu porción puede ser alta. Probamos aprender los pesos del Performance con estos datos y el KDA se llevaba casi todo (es casi el resultado); por eso quedan los pesos fijos.</p></section>`;
@@ -96,19 +96,19 @@ async function render() {
         .sort(([, a], [, b]) => b.roles[rol].wr_aj - a.roles[rol].wr_aj).slice(0, 6);
     cont.innerHTML = `
       <nav class="tabs guias-tabs">${ROLES.map(r => `<a href="#/guias/${r}" class="${r === rol ? 'is-active' : ''}">${r}</a>`).join('')}</nav>
-      <section class="section"><h3>Los números de cada franja · ${rol}</h3>
+      <section class="section"><h2 class="h3">Los números de cada franja · ${rol}</h2>
         <p class="dim">La mitad de los jugadores de cada franja está por encima de estos números y la mitad por debajo. Es lo que podés apuntar para tu rango y el de arriba.</p>
         <div class="table-wrap"><table class="data-table">
           <thead><tr><th>Métrica</th>${FRANJAS.map(fr => `<th class="num">${fr}<span class="ic">${celda(fr)?.jugadores ?? 0} jugadores</span></th>`).join('')}</tr></thead>
           <tbody>${filas}</tbody></table></div>
         <p class="nota">Medianas por jugador de la muestra de referencia: jugadores al azar de LAS en solo/dúo, con 10+ partidas en ${rol}, bajados el ${escapeHtml(ref.bajada || '—')}. Las victorias y derrotas se ponderan al 50 % (los de Hierro–Bronce venían de bajar). Las diferencias son contra el rival directo de la misma partida.</p></section>
-      <section class="section"><h3>Consejos para ${rol}</h3>
+      <section class="section"><h2 class="h3">Consejos para ${rol}</h2>
         <dl class="glosario">${Object.entries(COMPONENTES).map(([k, n]) => {
             const t = consejos[k]?.[rol] || consejos[k]?.['_'];
             return t ? `<dt>${n}</dt><dd>${escapeHtml(t)}</dd>` : '';
         }).join('')}</dl>
         <p class="nota">Tu perfil te dice cuáles te tocan a vos (Coaching → Cómo sumar), según tus números contra tu franja.</p></section>
-      <section class="section"><h3>Quién del grupo juega ${rol}</h3>
+      <section class="section"><h2 class="h3">Quién del grupo juega ${rol}</h2>
         ${quienes.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Jugador</th><th class="num">Winrate ajustado</th><th>Sus campeones (5+ partidas)</th></tr></thead>
           <tbody>${quienes.map(([pid, j]) => `<tr><td><a href="#/jugadores/${encodeURIComponent(pid)}">${escapeHtml(j.nombre)}</a></td>
             <td class="num mono">${num(j.roles[rol].wr_aj * 100, 0)} %<span class="ic">${j.roles[rol].n} partidas</span></td>

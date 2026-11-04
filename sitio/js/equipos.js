@@ -79,7 +79,7 @@ const nombre = (pid) => escapeHtml(datos.jugadores[pid]?.nombre || pid);
 const pct = (v) => (v == null ? '—' : `${num(v * 100, 0)} %`);
 
 function tablaEquipo(titulo, eq, champs, clase) {
-    return `<div class="card eq-card ${clase}"><h4>${titulo} <span class="dim">fuerza ${pct(eq.fuerza)}</span></h4>
+    return `<div class="card eq-card ${clase}"><h3 class="h4">${titulo} <span class="dim">fuerza ${pct(eq.fuerza)}</span></h3>
       <table class="data-table"><tbody>${eq.asig.map(x => {
         const c = champs?.get(`${x.pid}|${x.rol}`);
         const falta = x.n < datos.min_rol;
@@ -112,7 +112,7 @@ function resultado() {
 
 function ideal() {
     if (!datos.ideal?.length) return '<p class="empty-state">No hay cinco personas distintas con 10+ partidas en cada rol.</p>';
-    return datos.ideal.map((op, i) => `<div class="card eq-card${i ? '' : ' eq-a'}"><h4>${i ? `Opción ${i + 1}` : 'El 5 ideal'} <span class="dim">fuerza ${pct(op.fuerza)}</span></h4>
+    return datos.ideal.map((op, i) => `<div class="card eq-card${i ? '' : ' eq-a'}"><h3 class="h4">${i ? `Opción ${i + 1}` : 'El 5 ideal'} <span class="dim">fuerza ${pct(op.fuerza)}</span></h3>
       <table class="data-table"><tbody>${op.equipo.map(x => `<tr><td class="dim">${x.rol}</td>
         <td><a href="#/jugadores/${encodeURIComponent(x.persona)}">${nombre(x.persona)}</a></td>
         <td class="num mono">${pct(x.wr_aj)}<span class="ic">${x.n} part.</span></td></tr>`).join('')}</tbody></table></div>`).join('');
@@ -123,11 +123,11 @@ async function render() {
     const cont = document.getElementById('equipos-cuerpo');
     const pids = Object.keys(datos.jugadores).sort((a, b) => datos.jugadores[a].nombre.localeCompare(datos.jugadores[b].nombre));
     cont.innerHTML = `
-      <section class="section"><h3>El 5 ideal del grupo</h3>
+      <section class="section"><h2 class="h3">El 5 ideal del grupo</h2>
         <p class="dim">Una persona por rol, todas distintas, con ${datos.min_rol}+ partidas en ese rol, que sume el mejor winrate ajustado.</p>
         <div class="eq-grid">${ideal()}</div>
         <p class="nota">${escapeHtml(datos.nota)}</p></section>
-      <section class="section"><h3>Armar una inhouse</h3>
+      <section class="section"><h2 class="h3">Armar una inhouse</h2>
         <p class="dim">Elegí 10 y el balanceador arma los dos equipos más parejos, con cada uno en un rol donde tenga ${datos.min_rol}+ partidas.</p>
         <div class="eq-elegir">${pids.map(p => `<label class="eq-chip"><input type="checkbox" value="${escapeHtml(p)}"${elegidos.has(p) ? ' checked' : ''}> ${nombre(p)}</label>`).join('')}</div>
         <div id="eq-resultado"></div></section>`;
