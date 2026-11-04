@@ -79,6 +79,12 @@ class Bot(commands.Bot):
         logger.info("Conectado como %s · Python %s · discord.py %s · datos en %s",
                     self.user, platform.python_version(), discord.__version__, DATA_URL)
 
+    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+        # Otro bot del servidor usa el mismo prefijo "-" (-work, -bj…): un comando que no es nuestro no es un error.
+        if isinstance(error, commands.CommandNotFound):
+            return
+        await super().on_command_error(ctx, error)
+
 
 async def main():
     token = os.getenv("DISCORD_TOKEN")
