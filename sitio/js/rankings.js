@@ -66,8 +66,26 @@ async function porRol(cont) {
     cont.querySelector('#rk-cola').addEventListener('change', (e) => { sel.cola = e.target.value; render(); });
 }
 
+/** Dúos normalizados (fase 6): juntos contra lo que daría cada uno por separado en el mismo período. */
+function tablaNormalizada(n) {
+    const t = n?.modos?.[sel.modo] || [];
+    const pts = (v) => `${v > 0 ? '+' : ''}${num(v * 100, 0)}`;
+    const pval = (p) => (p < 0.001 ? '< 0,001' : num(p, 3));
+    return `<div class="section-head"><h2 class="h3">¿Rinden juntos más que por separado?</h2>${opciones('rk-modo', MODOS, sel.modo, 'Modo')}</div>
+      ${t.length ? `<div class="table-wrap"><table class="data-table">
+        <thead><tr><th>Dúo</th><th class="num">Juntos</th><th class="num">Winrate juntos</th><th class="num">Esperado<span class="ic">por separado</span></th><th class="num">Juntos − esperado<span class="ic">pts</span></th></tr></thead>
+        <tbody>${t.map(r => `<tr class="${r.muestra_chica ? 'chica' : ''}">
+          <td>${persona(r.a)} + ${persona(r.b)}${r.muestra_chica ? ' <span class="tag">muestra chica</span>' : ''}</td>
+          <td class="num mono">${r.juntos}</td>
+          <td class="num">${conIntervalo(r.real, 'pct')}</td>
+          <td class="num"><span class="v">${pct(r.esperado)}</span><span class="ic">${pct(r.sin_a.v)} y ${pct(r.sin_b.v)}</span></td>
+          <td class="num"><span class="v">${pts(r.dif.v)}</span><span class="ic">${pts(r.dif.lo)} a ${pts(r.dif.hi)} · p BH ${pval(r.p_bh)}</span>${r.senal ? ` <span class="tag ${r.dif.v > 0 ? 'win' : 'loss'}">señal</span>` : ''}</td></tr>`).join('')}</tbody></table></div>`
+        : `<p class="empty-state">No hay dúos con ${n?.min_juntos ?? 15}+ partidas juntos en ${escapeHtml(EN_MODO[sel.modo])}.</p>`}
+      <p class="nota">${escapeHtml(n?.nota || '')}</p>`;
+}
+
 async function duos(cont) {
-    const d = await cachedFetch('sinergia.json');
+    const [d, n] = await Promise.all([cachedFetch('sinergia.json'), cachedFetch('rankings/duos.json', { silent: true })]);
     // Un par aparece dos veces (A con B y B con A): se muestra una fila con las dos diferencias.
     // Los dúos se prueban cola por cola (sumar "todo" duplicaría las pruebas).
     const cola = GRIETA.includes(sel.cola) ? sel.cola : 'solo';
@@ -79,8 +97,8 @@ async function duos(cont) {
         pares.set(k, e);
     });
     const filas = [...pares.values()].filter(e => e.a && e.b).sort((x, y) => y.a.juntos - x.a.juntos);
-    cont.innerHTML = `
-      <div class="section-head">${opciones('rk-cola', colas(false), cola, 'Cola')}</div>
+    cont.innerHTML = `${n ? tablaNormalizada(n) : ''}
+      <div class="section-head">${n ? '<h2 class="h3">Cuánto cambia cada uno con el otro</h2>' : ''}${opciones('rk-cola', colas(false), cola, 'Cola')}</div>
       ${filas.length ? `<div class="table-wrap"><table class="data-table">
         <thead><tr><th>Dúo</th><th class="num">Juntos</th><th class="num">Winrate juntos</th><th class="num">Para el primero</th><th class="num">Para el segundo</th></tr></thead>
         <tbody>${filas.map(({ a, b }) => `<tr class="${a.muestra_chica ? 'chica' : ''}">
@@ -92,6 +110,7 @@ async function duos(cont) {
         : '<p class="empty-state">No hay dúos con suficientes partidas en esta cola.</p>'}
       <p class="nota">"Para el primero" es cuánto cambia el winrate del primero cuando juega con el segundo, contra cuando juega sin esa persona en la misma cola (y al revés). ${escapeHtml(d.nota)}</p>`;
     cont.querySelector('#rk-cola').addEventListener('change', (e) => { sel.cola = e.target.value; render(); });
+    cont.querySelector('#rk-modo')?.addEventListener('change', (e) => { sel.modo = e.target.value; render(); });
 }
 
 async function mejora(cont) {

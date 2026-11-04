@@ -619,6 +619,73 @@ def companeros(filas_por: dict[str, list[dict]]) -> dict:
     return out
 
 
+MIN_DUO = 15
+
+
+def _logit(p: float) -> float:
+    p = min(max(p, 1e-3), 1 - 1e-3)
+    return math.log(p / (1 - p))
+
+
+def _esperado_duo(pa: float, pb: float) -> float:
+    """Lo que darían juntos si cada uno aporta lo suyo: logit(e) = logit(a) + logit(b) − logit(0,5)."""
+    return 1 / (1 + math.exp(-(_logit(pa) + _logit(pb))))
+
+
+def duos(filas_por: dict[str, list[dict]]) -> dict:
+    """¿Rinden juntos más de lo que da cada uno por separado? Para cada pareja con MIN_DUO+ partidas en el mismo
+    equipo: el winrate de cada uno sin el otro en el mismo período (de la primera a la última juntos) da el
+    esperado; se compara con el real. Intervalo y p por bootstrap paramétrico (también el esperado tiene ruido)
+    y BH entre parejas dentro de cada modo."""
+    import numpy as np
+    rng = np.random.default_rng(AJUSTES["bootstrap_semilla"])
+    reps = AJUSTES["bootstrap_reps"]
+    min_sin = AJUSTES["min_partidas"]
+    out = {}
+    for modo, colas in MODOS.items():
+        de = {p: [f for f in fs if f["cola"] in colas and "companeros" in f] for p, fs in filas_por.items()}
+        tabla = []
+        for a in sorted(de):
+            for b in sorted({c for f in de[a] for c in f["companeros"]}):
+                if b <= a or b not in de:
+                    continue
+                juntos = [f for f in de[a] if b in f["companeros"]]
+                if len(juntos) < MIN_DUO:
+                    continue
+                t0, t1 = min(f["inicio_ms"] for f in juntos), max(f["inicio_ms"] for f in juntos)
+                sin_a = [f["win"] for f in de[a] if b not in f["companeros"] and t0 <= f["inicio_ms"] <= t1]
+                sin_b = [f["win"] for f in de[b] if a not in f["companeros"] and t0 <= f["inicio_ms"] <= t1]
+                if len(sin_a) < min_sin or len(sin_b) < min_sin:
+                    continue
+                n, w = len(juntos), sum(f["win"] for f in juntos)
+                na, wa, nb, wb = len(sin_a), sum(sin_a), len(sin_b), sum(sin_b)
+                e = _esperado_duo(wa / na, wb / nb)
+                # Bootstrap paramétrico: se vuelven a sortear las tres muestras con sus proporciones.
+                ra, rb, rj = rng.binomial(na, wa / na, reps) / na, rng.binomial(nb, wb / nb, reps) / nb, rng.binomial(n, w / n, reps) / n
+                la, lb = np.log(np.clip(ra, 1e-3, 1 - 1e-3) / (1 - np.clip(ra, 1e-3, 1 - 1e-3))), \
+                    np.log(np.clip(rb, 1e-3, 1 - 1e-3) / (1 - np.clip(rb, 1e-3, 1 - 1e-3)))
+                difs = rj - 1 / (1 + np.exp(-(la + lb)))
+                p = min(1.0, max(1 / reps, 2 * min(float((difs <= 0).mean()), float((difs >= 0).mean()))))
+                tabla.append({"a": a, "b": b, "juntos": n, "ganadas": w, "real": est.wilson(w, n),
+                              "sin_a": est.wilson(wa, na), "sin_b": est.wilson(wb, nb), "esperado": round(e, 4),
+                              "dif": {"v": round(w / n - e, 4), "lo": round(float(np.percentile(difs, 2.5)), 4),
+                                      "hi": round(float(np.percentile(difs, 97.5)), 4)},
+                              "p": round(p, 4), "muestra_chica": n < MIN_DUO * 2})
+        for r, q in zip(tabla, est.benjamini_hochberg([r["p"] for r in tabla]) if tabla else []):
+            r["p_bh"] = round(q, 4)
+            r["senal"] = q < AJUSTES["ajuste_muestra"]["alfa"] and not r["muestra_chica"]
+        tabla.sort(key=lambda r: (r["muestra_chica"], not r["senal"], -r["dif"]["v"]))
+        out[modo] = tabla
+    return out
+
+
+NOTA_DUOS = ("El esperado combina el winrate de cada uno sin el otro en el mismo período (de la primera a la última "
+             "partida juntos): si cada uno aporta lo suyo, juntos darían eso. Juntos − esperado es lo que suma la pareja "
+             "además. Intervalo y p por bootstrap (el esperado también tiene ruido), con corrección BH entre parejas. "
+             "Es una asociación: también pesan la cola, el horario y contra quién juegan cuando van juntos. 'Muestra "
+             "chica' con menos de 30 partidas juntos.")
+
+
 # ---------------------------------------------------------------- F. pool objetivo (Machine LoLing)
 
 ULTIMAS_POOL = 20
@@ -902,6 +969,7 @@ def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: 
         "nota": "Cuántos puntos de winrate les suma cada uno a sus compañeros del grupo: el winrate de cada compañero "
                 "con él contra sin él, en el mismo período, combinado entre compañeros (Mantel–Haenszel, cada uno "
                 "contra sí mismo). 'Ruido' si el intervalo cruza el cero."})
+    escribir("rankings/duos.json", {"modos": duos(filas_por), "min_juntos": MIN_DUO, "nota": NOTA_DUOS})
     escribir("acompanan_ganar.json", {
         "roles": acompanan_ganar(),
         "nota": "Cada componente por separado, en las partidas de referencia: winrate cuando está en la mitad de arriba "

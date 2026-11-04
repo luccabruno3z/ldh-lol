@@ -69,6 +69,32 @@ def tarjeta_companeros(d: dict, nombres: dict, modo: str = "todo") -> discord.ui
     return tarjeta_simple(lineas, f"{WEB}#/rankings/companeros")
 
 
+def tarjeta_duos(d: dict, nombres: dict, modo: str = "todo") -> discord.ui.LayoutView:
+    """Dúos normalizados: juntos contra lo que daría cada uno por separado en el mismo período."""
+    from bot.cogs.coaching import EN_MODO
+    todas = (d.get("modos") or {}).get(modo, [])
+    tabla = [r for r in todas if not r["muestra_chica"]]
+    lineas = ["## ¿Rinden juntos más que por separado?",
+              f"-# Dúos con {d.get('min_juntos', 15) * 2}+ partidas juntos en {EN_MODO.get(modo, modo)} · contra el winrate de "
+              "cada uno sin el otro en el mismo período"]
+    pct = lambda v: f"{F.num(v * 100, 0)} %"  # noqa: E731
+    for i, r in enumerate(tabla[:12], 1):
+        x = r["dif"]
+        tag = (" · **señal**" if r["senal"] else " · ruido")
+        lineas += [f"`{i}.` **{nombres.get(r['a'], r['a'])} + {nombres.get(r['b'], r['b'])}**: "
+                   f"{F.num(x['v'] * 100, 0, True)} pts{tag}",
+                   f"-# {F.num(x['lo'] * 100, 0, True)} a {F.num(x['hi'] * 100, 0, True)} · juntos {pct(r['real']['v'])} "
+                   f"en {r['juntos']} · esperado {pct(r['esperado'])} (por separado {pct(r['sin_a']['v'])} y {pct(r['sin_b']['v'])})"]
+    if len(tabla) > 12:
+        lineas.append(f"-# Y {len(tabla) - 12} dúos más en la web.")
+    if not tabla:
+        lineas.append("Todavía no hay dúos con suficientes partidas juntos en este modo."
+                      + (f" Hay {len(todas)} con muestra chica en la web." if todas else ""))
+    lineas.append("-# Esperado: lo que darían juntos si cada uno aporta lo suyo. 'Señal' con bootstrap y corrección BH "
+                  "entre parejas. Es una asociación: también pesan la cola, el horario y contra quién juegan.")
+    return tarjeta_simple(lineas, f"{WEB}#/rankings/duos")
+
+
 def tarjeta_mejora(d: dict, nombres: dict, modo: str = "solo") -> discord.ui.LayoutView:
     from bot.cogs.coaching import EN_MODO
     tabla = (d.get("modos") or {}).get(modo, d["tabla"] if modo == "solo" else [])
@@ -130,6 +156,16 @@ class Rankings(commands.Cog):
         await ctx.defer()
         nombres, _ = await self._contexto()
         await ctx.reply(view=tarjeta_companeros(await self.datos.ranking("companeros") or {}, nombres, m))
+
+    @commands.hybrid_command(name="duos", description="Dúos: si rinden juntos más que lo que da cada uno por separado")
+    async def duos(self, ctx: commands.Context, modo: str = "todo"):
+        from bot.cogs.coaching import MODOS
+        if (m := MODOS.get(modo.lower())) is None:
+            await ctx.reply("Uso: `-duos [solo|normal|todo]`", ephemeral=True)
+            return
+        await ctx.defer()
+        nombres, _ = await self._contexto()
+        await ctx.reply(view=tarjeta_duos(await self.datos.ranking("duos") or {}, nombres, m))
 
     @commands.hybrid_command(name="mejoraron", description="Quién más mejoró: la tendencia de cada uno contra su franja")
     async def mejoraron(self, ctx: commands.Context, modo: str = "solo"):

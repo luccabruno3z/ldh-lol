@@ -78,6 +78,7 @@ AYUDA = {
                 "`-comparar <jugador> <otro> [cola] [rol]` métrica por métrica\n"
                 "`-competencia <desde dd/mm> [hasta dd/mm] [cola]` quién rindió mejor entre dos fechas\n"
                 "`-companeros [solo|normal|todo]` mejores compañeros: quién hace ganar más a los demás\n"
+                "`-duos [solo|normal|todo]` dúos: si rinden juntos más que lo que da cada uno por separado\n"
                 "`-mejoraron [solo|normal|todo]` quién más mejoró, cada uno contra su propia franja",
     "Servidor": "`-canal_feed #canal` publica cada partida del grupo (resultado, KDA y LP) y los ascensos y descensos\n"
                 "`-canal_ranking #canal` publica el top de la semana y lo destacado cada lunes\n"
