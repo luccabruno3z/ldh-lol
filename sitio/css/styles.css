@@ -399,11 +399,11 @@ section.section { scroll-margin-top: calc(var(--header-h) + 56px); }
 /* Calibración del modelo de probabilidad de ganar */
 .calib-grid { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 20px; align-items: start; }
 .g-calib { width: 100%; max-width: 260px; height: auto; }
-@media (max-width: 640px) { .calib-grid { grid-template-columns: 1fr; } .g-calib { margin: 0 auto; display: block; } }
+@media (max-width: 640px) { .calib-grid { grid-template-columns: minmax(0, 1fr); } .g-calib { margin: 0 auto; display: block; } }
 
 /* Costo de las muertes */
 .mu-grid { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 20px; align-items: start; }
-@media (max-width: 720px) { .mu-grid { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .mu-grid { grid-template-columns: minmax(0, 1fr); } }
 .mu-mapa { width: 100%; max-width: 320px; height: auto; display: block; margin: 0 auto; }
 .mu-p { fill-opacity: .55; stroke-width: 1; }
 .mu-temprana { fill: var(--fr-1); stroke: var(--fr-1); background: var(--fr-1); }

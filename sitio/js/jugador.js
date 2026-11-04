@@ -153,7 +153,7 @@ function forma(f) {
 }
 
 function filaHistorial(m) {
-    const lp = m.lp ? (m.lp.exacto ? `${m.lp.delta > 0 ? '+' : ''}${m.lp.delta}` : `tramo de ${m.lp.tramo}: ${m.lp.delta > 0 ? '+' : ''}${m.lp.delta}`) : '';
+    const lp = m.lp ? (m.lp.exacto ? `${m.lp.delta > 0 ? '+' : ''}${m.lp.delta}` : `tramo de ${escapeHtml(String(m.lp.tramo))}: ${m.lp.delta > 0 ? '+' : ''}${m.lp.delta}`) : '';
     return `<tr class="${m.win ? 'r-win' : 'r-loss'}">
       <td><button type="button" class="cp-toggle" data-id="${escapeHtml(m.id)}" aria-expanded="false" aria-label="Ver el gráfico de la partida">▸</button></td>
       <td class="mono">${fecha(m.inicio)}</td>
@@ -188,11 +188,16 @@ async function historial(p, cont) {
             || '<tr><td colspan="15" class="empty-state">Sin partidas todavía.</td></tr>';
         return;
     }
+    // Una página por vez: con doble clic se insertaban desordenadas, y si fallaba se salteaba esa página.
     const mas = async () => {
-        pagina += 1;
-        const h = await loadHistorial(p.id, pagina);
-        tbody.insertAdjacentHTML('beforeend', h.partidas.map(filaHistorial).join(''));
-        btn.hidden = pagina >= h.paginas;
+        if (btn.disabled) return;
+        btn.disabled = true;
+        try {
+            const h = await loadHistorial(p.id, pagina + 1);
+            pagina += 1;
+            tbody.insertAdjacentHTML('beforeend', h.partidas.map(filaHistorial).join(''));
+            btn.hidden = pagina >= h.paginas;
+        } finally { btn.disabled = false; }
     };
     btn.addEventListener('click', () => mas().catch(err => console.error('[historial]', err)));
     if (p.n) await mas();
@@ -203,6 +208,8 @@ async function historial(p, cont) {
 // la URL (#/jugadores/<persona>/<pestaña>/<cuenta>), así se puede compartir el link exacto.
 const PESTANAS = { resumen: 'Resumen', coaching: 'Coaching', campeones: 'Roles y campeones', mapa: 'Mapa y jungla', partidas: 'Partidas' };
 let vistaActual = null;
+// Cada carga del perfil lleva un turno: si mientras tanto se pidió otro jugador o cuenta, la respuesta vieja se descarta.
+let turno = 0;
 
 function mostrarPestana(tab) {
     const t = PESTANAS[tab] ? tab : 'resumen';
@@ -228,13 +235,27 @@ async function mostrar(param) {
     if (actual === id && vistaActual === vista) { mostrarPestana(tabRuta); return; }
     actual = id;
     vistaActual = vista;
+    const mio = ++turno;
     cont.innerHTML = '<div class="skeleton"></div>';
+    const fallar = (txt) => {
+        if (mio !== turno) return;
+        actual = null;  // así volver a entrar al mismo jugador lo carga de nuevo
+        cont.innerHTML = `<div class="error-state">${txt}</div>`;
+    };
     let p;
     try { p = await loadPerfil(id); } catch {
-        cont.innerHTML = '<div class="error-state">No encontré ese jugador. Solo aparecen las cuentas que se vincularon.</div>';
+        fallar('No encontré ese jugador. Solo aparecen las cuentas que se vincularon.');
         return;
     }
-    await pintarPerfil(cont, p, vista, tabRuta);
+    if (mio !== turno) return;
+    if (vista != null && !(Number.isInteger(vista) && (p.vistas_cuenta || []).some(v => v.indice === vista))) {
+        fallar(`Esa cuenta no existe. <a href="#/jugadores/${encodeURIComponent(id)}">Ver el perfil de ${escapeHtml(p.nombre)}</a>.`);
+        return;
+    }
+    try { await pintarPerfil(cont, p, vista, tabRuta, null, mio); } catch (err) {
+        console.error('[perfil]', err);
+        fallar('No pude cargar este perfil. Probá recargar la página.');
+    }
 }
 
 /** Botones "Todas · cuenta 1 · cuenta 2" para quien tiene varias cuentas. */
@@ -247,10 +268,11 @@ function botonesCuenta(p, vista) {
 }
 
 /** Arma el perfil entero. vista = null (todas las cuentas) o el índice de una cuenta. */
-async function pintarPerfil(cont, base, vista, tabInicial = 'resumen', modoElegido = null) {
+async function pintarPerfil(cont, base, vista, tabInicial = 'resumen', modoElegido = null, mio = ++turno) {
     let p = base;
     if (vista != null) {
         const c = await cachedFetch(`cuenta/${encodeURIComponent(base.id)}/${vista}.json`);
+        if (mio !== turno) return;
         p = { ...base, cuentas: [{ riot_id: c.riot_id, n: c.n }], rango: c.rango, n: c.n, ultima: c.ultima,
               kpis: { todas: c.kpis }, forma: c.forma, evolucion: c.evolucion, mejor_rol: c.mejor_rol, _cuenta: c };
     }
@@ -308,8 +330,11 @@ export function initJugador() {
         e.preventDefault();
         const input = document.getElementById('buscar-input');
         const p = buscar(input.value);
-        if (p) { go('jugadores', p.id); input.value = ''; }
-        else document.getElementById('perfil').innerHTML = '<div class="error-state">No encontré a nadie con ese nombre en el grupo.</div>';
+        if (p) { go('jugadores', p.id); input.value = ''; return; }
+        // El aviso va en el mismo buscador: no se pisa el perfil abierto ni se escribe en una vista oculta.
+        input.setCustomValidity('No encontré a nadie con ese nombre en el grupo.');
+        input.reportValidity();
     });
+    document.getElementById('buscar-input').addEventListener('input', (e) => e.target.setCustomValidity(''));
     onRoute('jugadores', (id) => mostrar(id).catch(err => console.error('[perfil]', err)));
 }

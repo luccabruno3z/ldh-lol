@@ -122,6 +122,7 @@ async function render() {
 export function initGuias() {
     onRoute('guias', (param) => {
         if (ROLES.includes(param)) rol = param;
+        else if (param) history.replaceState(null, '', `#/guias/${rol}`);  // rol inválido: la URL dice el que se ve
         render().catch(err => {
             console.error('[guias]', err);
             document.getElementById('guias-cuerpo').innerHTML = '<div class="error-state">No se pudieron cargar las guías.</div>';

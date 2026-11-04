@@ -8,7 +8,7 @@ const CONF = { alta: 'Confianza alta (15+ partidas)', media: 'Confianza media (8
 
 export const nombrePersona = (id) => state.personas.find(p => p.id === id)?.nombre || id;
 export const pct = (v, dec = 0) => (v == null ? '—' : `${num(v * 100, dec)} %`);
-export const chipConf = (c) => `<span class="tag conf-${c}" title="${CONF[c]}">${c}</span>`;
+export const chipConf = (c) => `<span class="tag conf-${escapeHtml(c)}" title="${escapeHtml(CONF[c] || '')}">${escapeHtml(c)}</span>`;
 
 /** Winrate ajustado como valor principal y el real con su IC al lado. */
 export function winrateAj(t) {

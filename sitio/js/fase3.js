@@ -3,7 +3,7 @@
    falla solo. Los percentiles son contra jugadores de ranked solo/dúo de tu franja de rango y tu rol;
    el modo (solo/dúo, normales o todo) elige qué partidas tuyas entran. */
 
-import { state, cachedFetch, rutaCoaching, MODOS, EN_MODO } from './data.js';
+import { state, cachedFetch, rutaCoaching, MODOS, EN_MODO, rolGuardado, elegirRol, alCambiarRol } from './data.js';
 import { escapeHtml, iconoCampeon, campeon, num } from './utils.js';
 import { pct, chipConf } from './fase2.js';
 import { radar, seccionTendencia, graficoFranjas } from './graficos.js';
@@ -164,7 +164,8 @@ export async function bloquesFase3(p, cont, modo = 'solo') {
     }
     const d = await cachedFetch(rutaCoaching(p.id, modo));
     const roles = Object.keys(d.roles || {});
-    let rol = d.rol_con_referencia || d.rol_principal || roles[0];
+    // El rol elegido en otro bloque o antes de cambiar de modo gana; si no, el de siempre.
+    let rol = rolGuardado(p.id, roles) || d.rol_con_referencia || d.rol_principal || roles[0];
     const rolesT = Object.keys(d.temprano?.[modo] || {});
     let rolT = rolesT.includes(rol) ? rol : rolesT[0];
     const nombreModo = MODOS[modo];
@@ -193,12 +194,21 @@ export async function bloquesFase3(p, cont, modo = 'solo') {
         <div id="f3-temprano">${temprano(d, modo, rolT)}</div></section>` : ''}
       ${d.campeones?.length ? `<section class="section"><h3>Contra tu campeón</h3>${contraCampeon(d.campeones, modo)}</section>` : ''}`;
 
-    cont.querySelector('#f3-rol')?.addEventListener('change', (e) => {
-        rol = e.target.value;
-        cont.querySelector('#f3-cuerpo').innerHTML = coaching();
-    });
-    cont.querySelector('#f3-rolT')?.addEventListener('change', (e) => {
-        rolT = e.target.value;
-        cont.querySelector('#f3-temprano').innerHTML = temprano(d, modo, rolT);
-    });
+    const ponerRol = (r) => {
+        if (roles.includes(r) && r !== rol) {
+            rol = r;
+            const sel = cont.querySelector('#f3-rol');
+            if (sel) sel.value = r;
+            cont.querySelector('#f3-cuerpo').innerHTML = coaching();
+        }
+        if (rolesT.includes(r) && r !== rolT) {
+            rolT = r;
+            const sel = cont.querySelector('#f3-rolT');
+            if (sel) sel.value = r;
+            cont.querySelector('#f3-temprano').innerHTML = temprano(d, modo, rolT);
+        }
+    };
+    cont.querySelector('#f3-rol')?.addEventListener('change', (e) => { ponerRol(e.target.value); elegirRol(p.id, e.target.value); });
+    cont.querySelector('#f3-rolT')?.addEventListener('change', (e) => { ponerRol(e.target.value); elegirRol(p.id, e.target.value); });
+    alCambiarRol(cont, p.id, ponerRol);
 }

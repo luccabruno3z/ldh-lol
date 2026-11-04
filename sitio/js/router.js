@@ -17,7 +17,9 @@ function resolve(hash) {
     if (!h.startsWith('/')) return null;
     const [view, ...rest] = h.slice(1).split('/');
     if (!panels[view]) return { view: DEFAULT_VIEW, param: null, canonical: true };
-    return { view, param: rest.length ? decodeURIComponent(rest.join('/')) : null };
+    let param = rest.length ? rest.join('/') : null;
+    try { if (param != null) param = decodeURIComponent(param); } catch { /* hash mal codificado: se usa tal cual */ }
+    return { view, param };
 }
 
 function show(view) {

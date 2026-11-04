@@ -58,7 +58,9 @@ async function render() {
     const ids = state.personas.map(p => p.id);
     sel.a ||= ids[0];
     sel.b ||= ids.find(i => i !== sel.a);
+    const pedido = `${sel.a}|${sel.b}`;
     const [pa, pb] = await Promise.all([loadPerfil(sel.a), loadPerfil(sel.b)]);
+    if (pedido !== `${sel.a}|${sel.b}`) return;  // mientras cargaba se eligió otro jugador: esta respuesta ya no sirve
     const filasDe = (p) => p.kpis.todas;
     const colas = [...new Set(filasDe(pa).map(f => f.cola))].filter(c => filasDe(pb).some(f => f.cola === c));
     if (!colas.includes(sel.cola)) sel.cola = colas[0];

@@ -8,12 +8,43 @@ const memoryCache = new Map();
 
 export const state = { meta: null, personas: [], campeones: null, ajustes: null };
 
-export async function cachedFetch(path, { ttl = CACHE_TTL, silent = false } = {}) {
+/* Rol elegido en el perfil. Lo comparten los selectores de rol de la página (Coaching, primeros 15 minutos y
+   muertes) y sobrevive al cambio de modo, que vuelve a pintar el perfil entero. */
+const rolPerfil = { pid: null, rol: null };
+export function rolGuardado(pid, opciones) {
+    return rolPerfil.pid === pid && opciones.includes(rolPerfil.rol) ? rolPerfil.rol : null;
+}
+export function elegirRol(pid, rol) {
+    rolPerfil.pid = pid; rolPerfil.rol = rol;
+    document.dispatchEvent(new CustomEvent('ldh:rol', { detail: { pid, rol } }));
+}
+/** Escucha los cambios de rol de otros bloques. Un solo oyente por contenedor: al volver a pintar se reemplaza. */
+export function alCambiarRol(cont, pid, fn) {
+    if (cont._oyenteRol) document.removeEventListener('ldh:rol', cont._oyenteRol);
+    cont._oyenteRol = (e) => { if (e.detail.pid === pid && cont.isConnected) fn(e.detail.rol); };
+    document.addEventListener('ldh:rol', cont._oyenteRol);
+}
+
+// Pedidos en curso: dos bloques que piden el mismo JSON a la vez comparten la misma respuesta.
+const enCurso = new Map();
+
+export function cachedFetch(path, opciones = {}) {
     const url = `${API}/${path}`;
     const cached = memoryCache.get(url);
-    if (cached && Date.now() - cached.time < ttl) return cached.data;
+    if (cached && Date.now() - cached.time < (opciones.ttl ?? CACHE_TTL) && (cached.data !== null || opciones.silent)) {
+        return Promise.resolve(cached.data);
+    }
+    const clave = `${url}|${opciones.silent ? 1 : 0}`;
+    if (!enCurso.has(clave)) enCurso.set(clave, pedir(url, opciones).finally(() => enCurso.delete(clave)));
+    return enCurso.get(clave);
+}
+
+async function pedir(url, { silent = false } = {}) {
+    const cached = memoryCache.get(url);
     try {
         const resp = await fetch(url);
+        // Un 404 esperado (un jugador sin informe o sin pool) se guarda como vacío: no se vuelve a pedir en cada pantalla.
+        if (resp.status === 404 && silent) { memoryCache.set(url, { data: null, time: Date.now() }); return null; }
         if (!resp.ok) { if (silent) return null; throw new Error(`HTTP ${resp.status} en ${url}`); }
         const data = await resp.json();
         memoryCache.set(url, { data, time: Date.now() });

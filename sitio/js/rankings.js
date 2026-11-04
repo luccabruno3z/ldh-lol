@@ -142,11 +142,15 @@ async function companeros(cont) {
 function render() {
     const cont = document.getElementById('rankings-cuerpo');
     document.querySelectorAll('#rankings-tabs a').forEach(a => a.classList.toggle('is-active', a.dataset.tab === sel.tab));
-    cont.innerHTML = '<div class="skeleton"></div>';
+    // Cada pestaña pinta en su propia caja: si se cambia de pestaña antes de que cargue, la caja vieja ya no
+    // está en la página y su respuesta tardía no pisa a la nueva.
+    const caja = document.createElement('div');
+    caja.innerHTML = '<div class="skeleton"></div>';
+    cont.replaceChildren(caja);
     const fn = { periodo: porPeriodo, roles: porRol, duos, companeros, mejora }[sel.tab];
-    fn(cont).catch(err => {
+    fn(caja).catch(err => {
         console.error('[rankings]', err);
-        cont.innerHTML = '<div class="error-state">No se pudo cargar este ranking.</div>';
+        caja.innerHTML = '<div class="error-state">No se pudo cargar este ranking.</div>';
     });
 }
 
