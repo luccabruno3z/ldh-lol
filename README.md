@@ -44,6 +44,15 @@ git worktree add datos datos
 .venv/Scripts/python -m http.server 8010 -d salida
 ```
 
-Ver también [docs/RUNBOOK.md](docs/RUNBOOK.md).
+## Documentación
+
+| Documento | Para qué |
+|---|---|
+| [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) | Las piezas, una corrida, cada módulo del pipeline, la web y el bot. |
+| [docs/API.md](docs/API.md) | Cada JSON publicado en `api/`, quién lo usa y su formato. |
+| [docs/BOT.md](docs/BOT.md) | Todos los comandos del bot y cómo agregar uno. |
+| [docs/METODOS.md](docs/METODOS.md) | Cómo sale cada número: intervalos, pruebas, modelo de victoria, conversión, objetivos y dúos. |
+| [docs/RUNBOOK.md](docs/RUNBOOK.md) | Secretos, qué hacer si falla una corrida, límites de los datos y decisiones por fase. |
+| [docs/REGLAS_EVIDENCIA.md](docs/REGLAS_EVIDENCIA.md) | Reglas de los informes de coaching. |
 
 LDH Stats LoL no está respaldado por Riot Games y no refleja la opinión de Riot Games ni de nadie involucrado oficialmente en la producción o gestión de League of Legends.
