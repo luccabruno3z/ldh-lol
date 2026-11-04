@@ -1,0 +1,212 @@
+{
+ "persona": "lucca",
+ "modo": "solo",
+ "hash": "b87d3b22cb28",
+ "resumen": "Como Support en solo/dúo llevás más oro y daño que casi toda tu franja, pero morís bastante más que ella. Lo que más se asocia con ganar es quedarte en tus campeones de siempre.",
+ "prioridades": [
+  {
+   "titulo": "Morir menos como Support",
+   "observacion": "Tus muertes por minuto y tu KDA están en la parte baja de Platino–Esmeralda, y según el modelo cada muerte le baja a tu equipo probabilidad de ganar. En la evidencia está también por fase y al lado de la mediana del grupo, pero esas dos comparaciones no tienen prueba de diferencia: tomalas como orientación.",
+   "evidencias": [
+    "met.Support.muertes_min",
+    "met.Support.kda",
+    "comp.Support.combate",
+    "muertes.Support"
+   ],
+   "posible_explicacion": "jugás supports de daño que se quedan con oro y hacen las jugadas, y eso expone más. No todas las muertes son errores: pesan las que no le dejan nada al equipo.",
+   "falta_verificar": "si las muertes tempranas son en la línea o yendo al río sin visión, y cuántas terminan con un objetivo del rival.",
+   "ejercicio": "En tus próximas 10 partidas de solo/dúo, antes de cruzar el río o pararte adelante de la oleada sin visión, contá cuántos rivales faltan del mapa. Si faltan dos o más, esperá a tu jungla o a un ward.",
+   "como_revisar": "En la próxima actualización mirá en Coaching las muertes por minuto y el bloque de cuánto bajan tus chances al morir, y cómo se reparte por fase. Con 10 partidas todavía puede ser ruido; con 20 ya se ve."
+  },
+  {
+   "titulo": "Solo/dúo con tus campeones de siempre",
+   "observacion": "Dentro de tu pool ganás bastante más que fuera de ella, y la diferencia se separa del ruido. Con Sona, en tus últimas partidas venís por debajo de tu nivel normal en el rol.",
+   "evidencias": [
+    "pool.dentro_fuera",
+    "curva.37.Support"
+   ],
+   "posible_explicacion": "con los campeones que repetís ya tenés resueltos los tradeos y los tiempos; con uno que estás retomando todavía no.",
+   "falta_verificar": "es una asociación: puede pesar que los campeones nuevos los probás en momentos peores o contra rivales que no conocés.",
+   "ejercicio": "Para las ranked, quedate con Xerath, Seraphine y tus otros supports de siempre. Si querés volver a Sona, practicala primero en normales.",
+   "como_revisar": "En Roles y campeones mirá cuánto jugás fuera del pool y la diferencia de dentro contra fuera; con Sona, la curva de aprendizaje en normales."
+  }
+ ],
+ "mantener": [
+  {
+   "texto": "Tu economía y tu parte del daño del equipo como Support: estás entre lo más alto de tu franja.",
+   "evidencias": [
+    "comp.Support.economia",
+    "met.Support.dano"
+   ]
+  }
+ ],
+ "proxima_revision": "Cuando tengas unas 20 partidas más de solo/dúo.",
+ "fecha": "2026-11-04",
+ "nombre": "Lucca",
+ "datos_al": "2026-11-04T07:31:03+00:00",
+ "autor": "Claude, a pedido de Lucca",
+ "evidencias": [
+  {
+   "id": "comp.Support.combate",
+   "tipo": "observacion",
+   "que": "Combate (percentil contra Platino–Esmeralda)",
+   "alcance": {
+    "modo": "solo",
+    "rol": "Support",
+    "cuentas": "todas"
+   },
+   "v": 0.163,
+   "lo": 0.094,
+   "hi": 0.223,
+   "n": 216,
+   "fmt": "16 (9 a 22), n = 216",
+   "prueba": null,
+   "limitaciones": []
+  },
+  {
+   "id": "comp.Support.economia",
+   "tipo": "observacion",
+   "que": "Economía (percentil contra Platino–Esmeralda)",
+   "alcance": {
+    "modo": "solo",
+    "rol": "Support",
+    "cuentas": "todas"
+   },
+   "v": 0.827,
+   "lo": 0.767,
+   "hi": 0.886,
+   "n": 216,
+   "fmt": "83 (77 a 89), n = 216",
+   "prueba": null,
+   "limitaciones": []
+  },
+  {
+   "id": "met.Support.dano",
+   "tipo": "observacion",
+   "que": "% del daño del equipo: percentil 91 de Platino–Esmeralda (mediana 10,6)",
+   "alcance": {
+    "modo": "solo",
+    "rol": "Support",
+    "cuentas": "todas"
+   },
+   "v": 16.88,
+   "lo": 16.168,
+   "hi": 17.646,
+   "n": 216,
+   "fmt": "16,9 % (16,2 a 17,6 %), n = 216",
+   "prueba": null,
+   "limitaciones": [],
+   "lado": "fuerte",
+   "consejo_publicado": null,
+   "nota_publicada": null
+  },
+  {
+   "id": "met.Support.muertes_min",
+   "tipo": "observacion",
+   "que": "Muertes por minuto: percentil 11 de Platino–Esmeralda (mediana 0,199)",
+   "alcance": {
+    "modo": "solo",
+    "rol": "Support",
+    "cuentas": "todas"
+   },
+   "v": 0.259,
+   "lo": 0.247,
+   "hi": 0.272,
+   "n": 216,
+   "fmt": "0,259 (0,247 a 0,272), n = 216",
+   "prueba": null,
+   "limitaciones": [],
+   "lado": "mejorar",
+   "consejo_publicado": "Antes de pasar el río o una línea sin visión, fijate cuántos rivales faltan del mapa. Si faltan dos o más, no vayas solo.",
+   "nota_publicada": "Llevás más oro de tu equipo que el 81 % de tu franja: parte de esas muertes vienen de ser el que hace las jugadas. Lo que cuenta es morir sin que el equipo saque nada a cambio."
+  },
+  {
+   "id": "met.Support.kda",
+   "tipo": "observacion",
+   "que": "KDA: percentil 16 de Platino–Esmeralda (mediana 2,87)",
+   "alcance": {
+    "modo": "solo",
+    "rol": "Support",
+    "cuentas": "todas"
+   },
+   "v": 2.087,
+   "lo": 1.955,
+   "hi": 2.228,
+   "n": 216,
+   "fmt": "2,09 (1,96 a 2,23), n = 216",
+   "prueba": null,
+   "limitaciones": [],
+   "lado": "mejorar",
+   "consejo_publicado": "Mirá en qué minuto morís en tus derrotas: si es antes del 15, el problema es la línea; si es después, las entradas sin visión.",
+   "nota_publicada": null
+  },
+  {
+   "id": "pool.dentro_fuera",
+   "tipo": "asociacion",
+   "que": "Winrate dentro del pool menos fuera del pool",
+   "alcance": {
+    "modo": "solo",
+    "rol": null,
+    "cuentas": "todas"
+   },
+   "v": 0.146,
+   "lo": 0.036,
+   "hi": 0.261,
+   "n": [
+    305,
+    103
+   ],
+   "fmt": "+15 pts (+4 a +26 pts), n = 305 y 103",
+   "prueba": "Fisher p = 0.012",
+   "limitaciones": [
+    "Del pool = ese campeón en esa posición ya tenía 5+ partidas en los 90 días anteriores.",
+    "No demuestra que cambiar de campeón cause la diferencia."
+   ]
+  },
+  {
+   "id": "muertes.Support",
+   "tipo": "estimacion_modelo",
+   "que": "Caída estimada de probabilidad de ganar por muerte",
+   "alcance": {
+    "modo": "solo",
+    "rol": "Support",
+    "cuentas": "todas"
+   },
+   "v": 0.032,
+   "lo": 0.0299,
+   "hi": 0.0339,
+   "n": 1707,
+   "fmt": "3,2 pts (3,0 a 3,4 pts), n = 1707",
+   "prueba": null,
+   "limitaciones": [
+    "Estimación del modelo con y sin la muerte; no es la causa demostrada."
+   ],
+   "por_partida_fmt": "25 pts por partida (mediana del grupo 21)",
+   "con_objetivo_fmt": "37 % con objetivo rival en el minuto siguiente",
+   "fases_fmt": {
+    "temprana": "3,8 pts, n = 575",
+    "media": "2,7 pts, n = 705",
+    "tardia": "3,2 pts, n = 427"
+   }
+  },
+  {
+   "id": "curva.37.Support",
+   "tipo": "observacion",
+   "que": "Sona en Support: últimas partidas contra tu nivel normal (por debajo)",
+   "alcance": {
+    "modo": "solo",
+    "rol": "Support",
+    "cuentas": "todas"
+   },
+   "v": -12.18,
+   "lo": -18.08,
+   "hi": -6.12,
+   "n": 10,
+   "fmt": "−12,2 (−18,1 a −6,1), n = 10",
+   "prueba": null,
+   "limitaciones": [],
+   "partidas_total": 28
+  }
+ ],
+ "publicado": "2026-11-04T08:01:10+00:00"
+}
