@@ -1,10 +1,10 @@
 /* comparar.js — dos jugadores, métrica por métrica, en la misma cola y el mismo rol (regla 4).
    Ruta: #/comparar/<a>/<b>. Sin las partidas de cada uno no hay prueba de diferencia: se dice
-   "se separan" solo si los dos intervalos no se pisan, que es más exigente que una prueba. */
+   "se separan" si el intervalo del 95 % de la diferencia (aproximado desde el de cada uno) no toca el cero. */
 
 import { state, loadPerfil, cachedFetch, rutaCoaching, MODOS, EN_MODO } from './data.js';
 import { onRoute, go } from './router.js';
-import { escapeHtml, nombreCola, conIntervalo, num } from './utils.js';
+import { escapeHtml, nombreCola, conIntervalo, num, seSeparan } from './utils.js';
 import { radar } from './graficos.js';
 
 const METRICAS = [
@@ -24,13 +24,13 @@ function fila(nombre, tipo, ma, mb) {
     const k = tipo === 'pct' ? 1 : 1;
     const max = Math.max(Math.abs(ma.hi ?? ma.v), Math.abs(mb.hi ?? mb.v), 1e-9) * k;
     const w = (m) => `${Math.max(2, Math.min(100, (Math.abs(m.v) / max) * 100))}%`;
-    const separan = ma.lo != null && mb.lo != null && (ma.lo > mb.hi || mb.lo > ma.hi);
+    const separan = seSeparan(ma, mb);
     const gana = separan ? (ma.v > mb.v ? 'a' : 'b') : null;
     return `<div class="vs-fila">
       <span class="vs-nombre">${nombre}</span>
       <div class="vs-lado vs-a${gana === 'a' ? ' gana' : ''}"><span class="vs-val">${conIntervalo(ma, tipo)}</span><span class="vs-barra"><i style="width:${w(ma)}"></i></span></div>
       <div class="vs-lado vs-b${gana === 'b' ? ' gana' : ''}"><span class="vs-barra"><i style="width:${w(mb)}"></i></span><span class="vs-val">${conIntervalo(mb, tipo)}</span></div>
-      <span class="vs-veredicto">${separan ? '<span class="tag win">se separan</span>' : '<span class="tag">se pisan</span>'}</span>
+      <span class="vs-veredicto">${separan ? '<span class="tag win">se separan</span>' : '<span class="tag">no se puede decir</span>'}</span>
     </div>`;
 }
 
@@ -81,7 +81,7 @@ async function render() {
       <div class="vs-cab dim"><span></span><span>${fa ? `${fa.n} partidas` : '—'}</span><span>${fb ? `${fb.n} partidas` : '—'}</span><span></span></div>
       <div class="vs">${METRICAS.map(([k, n, t]) => fila(n, t, fa?.[k], fb?.[k])).join('')}</div>
       ${(fa?.muestra_chica || fb?.muestra_chica) ? '<p class="nota">Alguno tiene menos de 10 partidas en este filtro: muestra chica, sin conclusiones.</p>' : ''}
-      <p class="nota">"Se separan" solo cuando los dos intervalos no se tocan; si se pisan, con estas partidas no se puede decir quién rinde más. Es la misma cola y el mismo rol para los dos.</p>
+      <p class="nota">"Se separan" cuando el intervalo del 95 % de la diferencia no toca el cero (aproximado desde el intervalo de cada uno); si no, con estas partidas no se puede decir quién rinde más. Es la misma cola y el mismo rol para los dos.</p>
       <div id="cmp-radar"></div>`}`;
     const cambiar = () => go('comparar', `${sel.a}/${sel.b}`);
     cont.querySelector('#cmp-a').addEventListener('change', e => { sel.a = e.target.value; cambiar(); });

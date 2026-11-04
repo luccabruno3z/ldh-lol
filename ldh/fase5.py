@@ -647,8 +647,10 @@ def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: 
     if m["validacion"]["aprobado"]:  # sin un modelo validado no se publica nada que dependa de él
         ms, partidas = muertes_y_partidas(db, m)
         por, mediana = muertes(ms, filas_por)
-        nota = ("Costo de una muerte: cuánta probabilidad de ganar pierde tu equipo por ella, medida un minuto "
-                "después: la kill, su oro y lo que el rival tomó en ese minuto. En puntos de 0 a 100.")
+        nota = ("Caída estimada por una muerte: el modelo compara a tu equipo un minuto después, con y sin la kill, "
+                "su oro y lo que el rival tomó en ese minuto. En puntos de 0 a 100. Es una estimación, no la causa "
+                "demostrada: parte de esos objetivos el rival quizás los tomaba igual. No se recortan valores; nunca da "
+                "negativa porque en el modelo más oro, kills y objetivos siempre suman, así que eso no prueba nada.")
         for pid, d in por.items():
             escribir(f"muertes/{pid}.json", {"modos": d, "mediana_grupo": mediana, "zonas": ZONAS, "nota": nota})
         for mid, d in partidas.items():

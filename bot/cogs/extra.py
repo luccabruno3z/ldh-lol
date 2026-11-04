@@ -58,10 +58,10 @@ AYUDA = {
                 "`-grafico [jugador] evolucion [modo]` ¿venís mejor o peor? Tu winrate de las últimas 20 contra tu temporada\n"
                 "`-grafico [jugador] radar [rol] [modo]` la rosa de tus 7 componentes contra tu franja\n"
                 "`-grafico [jugador] franjas [rol] [modo]` tus números al lado de la mediana de cada franja de elo\n"
-                "`-grafico [jugador] muertes [modo]` dónde morís y cuánto te cuesta cada muerte, sobre el minimapa\n"
+                "`-grafico [jugador] muertes [modo]` dónde morís y cuánto bajan tus chances con cada muerte, sobre el minimapa\n"
                 "`-partida [jugador] [n]` la probabilidad de ganar minuto a minuto de tu última partida, con ◀ ▶\n"
                 "`-grafico [jugador] curva [rol] [modo]` cuánto te lleva aprender un campeón, con tus 3 más jugados\n"
-                "`-rachas [jugador] [modo]` ¿te conviene seguir después de 2 derrotas? Tu winrate según cómo venías\n"
+                "`-rachas [jugador] [modo]` ¿cómo te va después de perder? Tu winrate según cómo venías\n"
                 "-# Todos traen menús para cambiar de gráfico, rol y modo sin volver a escribir el comando.\n"
                 "-# En `-menu`, **Mis gráficos** manda los tres.",
     "Equipos y mapa": "`-ideal` el 5 ideal del grupo: una persona por rol con 10+ partidas ahí\n"
@@ -101,7 +101,7 @@ def _rango(m: dict | None, tipo) -> str:
 
 
 async def tarjeta_comparar(bot, a: str, b: str, cola: str | None, rol: str | None) -> discord.ui.LayoutView:
-    """Dos jugadores en la misma cola y el mismo rol. 'Se separan' solo si los intervalos no se tocan."""
+    """Dos jugadores en la misma cola y el mismo rol. 'Se separan' si el intervalo de la diferencia no toca el cero."""
     datos = bot.datos
     pa, pb = await datos.perfil(a), await datos.perfil(b)
     nc = (await datos.ajustes()).get("nombres_cola", {})
@@ -124,16 +124,17 @@ async def tarjeta_comparar(bot, a: str, b: str, cola: str | None, rol: str | Non
         ma, mb = fa.get(k), fb.get(k)
         if not ma or not mb or ma.get("v") is None or mb.get("v") is None:
             continue
-        separan = ma.get("lo") is not None and mb.get("lo") is not None and (ma["lo"] > mb["hi"] or mb["lo"] > ma["hi"])
+        separan = F.se_separan(ma, mb)
         quien = (na if ma["v"] > mb["v"] else nb) if separan else None
         lineas += [f"**{nombre}**: {_tipo_num(ma, tipo)} contra {_tipo_num(mb, tipo)}"
-                   + (f" → **{quien}** se separa" if quien else " → se pisan"),
+                   + (f" → **{quien}** se separa" if quien else " → no se puede decir"),
                    f"-# {_rango(ma, tipo)} · {_rango(mb, tipo)}"]
     if rol == "Todos":
         lineas.append("-# \"Todos\" mezcla los roles de cada uno: para comparar a igualdad, pasá un rol (`-comparar a b solo jungla`).")
     if fa["muestra_chica"] or fb["muestra_chica"]:
         lineas.append("-# Alguno tiene menos de 10 partidas acá: muestra chica, sin conclusiones.")
-    lineas.append("-# \"Se separa\" solo cuando los dos intervalos no se tocan; si se pisan, no se puede decir quién rinde más.")
+    lineas.append("-# \"Se separa\" cuando el intervalo del 95 % de la diferencia no toca el cero (aproximado desde el intervalo "
+                  "de cada uno); si no, no se puede decir quién rinde más.")
     return tarjeta_simple(lineas, url)
 
 
@@ -178,7 +179,8 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
                  f"De **{F.num(t['inicio'], 0)}** a **{F.num(t['ahora'], 0)}** → **{t['veredicto']}** "
                  f"({signo(t['pendiente'])} puntos cada 100 partidas, {signo(t['lo'])} a {signo(t['hi'])})\n"
                  f"-# Índice de 0 a 100 por partida: tus percentiles en {', '.join(t['metricas']).lower()} contra "
-                 f"{d['franja']} en {rol_n}. Mide cómo jugás, no si ganaste. 50 = la mitad de tu franja.")
+                 f"{d['franja']} en {rol_n}. Mide cómo jugás, no si ganaste. 50 = la mitad de tu franja. "
+                 "El rol está fijo, el campeón no: si cambiaste de campeones, parte de la tendencia puede ser eso.")
     elif tipo.lower().startswith("cur"):
         modo_c = modo or "todo"
         c = ((await bot.datos.curvas(p["id"]) or {}).get("modos") or {}).get(modo_c) or {}
@@ -214,21 +216,21 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
         t = ((m or {}).get("roles") or {}).get("Todos")
         if not m or not t or not t.get("n"):
             return f"{nombre} no tiene muertes con timeline en {EN_MODO.get(modo_r, modo_r)}.", None
-        png = graficos.mapa_muertes(m["puntos"], await bot.datos.mapa(), f"{nombre} · tus muertes y lo que costaron · {EN_MODO.get(modo_r)}")
+        png = graficos.mapa_muertes(m["puntos"], await bot.datos.mapa(), f"{nombre} · tus muertes y cuánto bajaron tus chances · {EN_MODO.get(modo_r)}")
         med = (r.get("mediana_grupo") or {}).get(f"{modo_r}|Todos")
         caras = "\n".join(f"**−{F.num(c['costo'] * 100, 0)} pts** · min {F.num(c['min'], 0)} · {c.get('zona_nombre') or ''}"
                           + (f" · el rival tomó {', '.join(OBJ.get(x, x) for x in dict.fromkeys(c['perdidos']))}" if c["perdidos"] else "")
                           for c in m["caras"])
-        texto = (f"## {discord.utils.escape_markdown(nombre)} · lo que te cuestan las muertes\n"
-                 f"Cada muerte le cuesta a tu equipo **{F.num(t['por_muerte']['v'] * 100, 1)} pts** de probabilidad de ganar "
+        texto = (f"## {discord.utils.escape_markdown(nombre)} · cuánto bajan tus chances al morir\n"
+                 f"Según el modelo, cada muerte le baja a tu equipo **{F.num(t['por_muerte']['v'] * 100, 1)} pts** de probabilidad de ganar "
                  f"({F.num(t['por_muerte']['lo'] * 100, 1)} a {F.num(t['por_muerte']['hi'] * 100, 1)}, {t['n']} muertes). "
                  f"Por partida suman **{F.num(t['por_partida'] * 100, 0)} pts**"
                  + (f" (mediana del grupo: {F.num(med * 100, 0)})" if med is not None else "") + ". "
-                 f"El **{F.num(t['con_objetivo'] * 100, 0)} %** le regalan un objetivo al rival."
-                 + (f"\n### Las más caras de tus últimas 20\n{caras}" if caras else "")
+                 f"En el **{F.num(t['con_objetivo'] * 100, 0)} %** el rival toma un objetivo en el minuto siguiente."
+                 + (f"\n### Las que más bajaron en tus últimas 20\n{caras}" if caras else "")
                  + "\n-# Todo visto desde tu base abajo a la izquierda (las del lado rojo, espejadas). "
-                   "El tamaño es lo que costó; el color, el momento. Costo = probabilidad de ganar que pierde tu equipo "
-                   "por la muerte y lo que el rival tomó en el minuto siguiente.")
+                   "El tamaño es cuánto bajó; el color, el momento. Es lo que estima el modelo con y sin la muerte y lo que el rival "
+                   "tomó en el minuto siguiente: una estimación, no la causa demostrada.")
     elif tipo.lower().startswith("rac"):
         r = await bot.datos.rachas(p["id"]) or {}
         modo_r = modo or "todo"
@@ -236,11 +238,11 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
         if not m:
             return f"{nombre} no tiene partidas en {EN_MODO.get(modo_r, modo_r)}.", None
         g = ((await bot.datos.rachas_grupo() or {}).get("modos") or {}).get(modo_r) or {}
-        png = graficos.rachas(m, r["estados"], f"{nombre} · ¿te conviene seguir? · {EN_MODO.get(modo_r)}")
+        png = graficos.rachas(m, r["estados"], f"{nombre} · ¿cómo te va después de perder? · {EN_MODO.get(modo_r)}")
         c, s2, k2 = m["comparaciones"]["corta_vs_sigue"], m["estados"]["tras_2_sigue"], m["estados"]["tras_2_corta"]
         if s2["n"] and k2["n"]:
             ver = ("con tan pocas partidas no se puede decir nada" if c["muestra_chica"]
-                   else ("**te conviene cortar**" if c["dif"]["v"] > 0 else "**cortar no te ayuda**") if c["senal"]
+                   else ("**cortar se asocia con ganar más**" if c["dif"]["v"] > 0 else "**cortar se asocia con ganar menos**") if c["senal"]
                    else "la diferencia es **ruido**")
             lectura = (f"Después de 2 derrotas, seguido ganás **{F.pct(s2['v'])}** ({s2['n']}); cortando "
                        f"{r['corte_min']}+ min, **{F.pct(k2['v'])}** ({k2['n']}) → {ver}.")
@@ -251,7 +253,8 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
                  f"{F.num((gv.get('v') or 0) * 100, 1, True)} pts contra después de ganar "
                  f"({F.num((gv.get('lo') or 0) * 100, 1, True)} a {F.num((gv.get('hi') or 0) * 100, 1, True)}"
                  f"{', ruido' if gv.get('ruido') else ', señal'}).") if gv.get("v") is not None else ""
-        texto = f"## {discord.utils.escape_markdown(nombre)} · ¿te conviene seguir?\n{lectura}{grupo}"
+        texto = (f"## {discord.utils.escape_markdown(nombre)} · ¿cómo te va después de perder?\n{lectura}{grupo}"
+                 "\n-# Es una asociación: no mide tilt ni asegura que una pausa lo arregle.")
     elif tipo.lower().startswith("fra"):
         d = await bot.datos.coaching_auto(p["id"], modo)
         en = EN_MODO.get((d or {}).get("modo") or "solo")

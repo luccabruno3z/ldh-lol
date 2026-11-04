@@ -21,8 +21,8 @@ VISTAS = {
     "grad": ("Gráfico: radar", "Tus 7 componentes con la mediana de cada franja"),
     "gten": ("Gráfico: ¿estás mejorando?", "Tu índice por partida y su tendencia"),
     "gevo": ("Gráfico: winrate en el tiempo", "Tus últimas 20 contra tu temporada"),
-    "grac": ("Gráfico: ¿te conviene seguir?", "Tu winrate según cómo venías: rachas y pausas"),
-    "gmue": ("Gráfico: lo que te cuestan las muertes", "Dónde morís y cuánta probabilidad de ganar perdés"),
+    "grac": ("Gráfico: ¿cómo te va después de perder?", "Tu winrate según cómo venías: rachas y pausas"),
+    "gmue": ("Gráfico: tus chances al morir", "Dónde morís y cuánto estima el modelo que bajan tus chances"),
     "gcur": ("Gráfico: curva de aprendizaje", "Cuánto te lleva aprender un campeón, con tus más jugados del rol"),
 }
 GRAFICO = {"gfra": "franjas", "grad": "radar", "gten": "tendencia", "gevo": "evolucion", "grac": "rachas",

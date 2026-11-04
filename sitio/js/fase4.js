@@ -103,7 +103,7 @@ async function jungla(p, cont) {
           <p class="dim">Arrancando en el ${x.buff_habitual}: ${conIntervalo(wrA, 'pct')} (${wrA.n}) · en el ${otro}: ${conIntervalo(wrB, 'pct')} (${wrB.n})
             ${x.p != null ? `· Fisher p = ${num(x.p, 2)}` : ''}</p></div>`;
       }).join('')}</div>
-      <p class="nota">Con todas tus partidas de la Grieta, sin importar el modo. Dónde estás en el minuto 1, esperando el primer campamento. "Predecible" quiere decir que hasta el borde de abajo del intervalo pasa el ${num(d.umbral * 100, 0)} %: el jungla rival puede jugar tu ruta sin verte. Mezclar un poco tiene sentido si el winrate no cambia entre un arranque y el otro. Va por lado porque desde cada base el mapa es distinto.</p></section>`;
+      <p class="nota">Con todas tus partidas de la Grieta, sin importar el modo. El arranque es <strong>inferido</strong> por dónde estás en el minuto 1, esperando el primer campamento: Riot no dice qué campamento hiciste primero (se validó contra los casos conocidos de Coach AI). "Predecible" quiere decir que hasta el borde de abajo del intervalo pasa el ${num(d.umbral * 100, 0)} %: el jungla rival puede jugar tu ruta sin verte. Mezclar un poco tiene sentido si el winrate no cambia entre un arranque y el otro. Va por lado porque desde cada base el mapa es distinto.</p></section>`;
 }
 
 /** Los tres bloques, cada uno aislado. En la vista de una sola cuenta no se muestran. */

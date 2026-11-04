@@ -54,6 +54,15 @@ export function hace(ms) {
 const num = (v, dec) => (v == null ? '—' : Number(v).toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec })
     .replace(/^-(?=.*[1-9])/, '−').replace(/^-/, ''));
 
+/** ¿El intervalo del 95 % de la diferencia a − b deja afuera al cero? Aproximado desde el intervalo de cada uno
+    (se = ancho / 3,92). Igual que se_separan en bot/services/formato.py. */
+export function seSeparan(a, b) {
+    if (!a || !b || [a.v, a.lo, a.hi, b.v, b.lo, b.hi].some(x => x == null)) return false;
+    if (a.lo > b.hi || b.lo > a.hi) return true;  // si ni se tocan, se separan (cubre los intervalos asimétricos)
+    const se = Math.hypot((a.hi - a.lo) / 3.92, (b.hi - b.lo) / 3.92);
+    return se > 0 && Math.abs(a.v - b.v) > 1.96 * se;
+}
+
 /** Valor con su intervalo y n. tipo: 'pct' (0–1), 'pct100' (0–100) o decimales. Rangos como "x a y", el % una sola vez. */
 export function conIntervalo(m, tipo = 1) {
     if (!m || m.v == null) return '<span class="dim">—</span>';

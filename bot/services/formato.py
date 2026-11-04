@@ -49,6 +49,18 @@ def rango_pts(m: dict | None) -> str:
     return rango(m, 0, True, 100, " pts")
 
 
+def se_separan(a: dict | None, b: dict | None) -> bool:
+    """¿El intervalo del 95 % de la diferencia a − b deja afuera al cero? Aproximado desde el intervalo de cada uno
+    (se = ancho / 3,92). Es menos exigente que pedir que los dos intervalos no se toquen, que se perdía diferencias
+    reales. La misma cuenta que seSeparan en sitio/js/utils.js."""
+    if not a or not b or None in (a.get("v"), a.get("lo"), a.get("hi"), b.get("v"), b.get("lo"), b.get("hi")):
+        return False
+    if a["lo"] > b["hi"] or b["lo"] > a["hi"]:  # si ni se tocan, se separan (cubre los intervalos asimétricos)
+        return True
+    se = (((a["hi"] - a["lo"]) / 3.92) ** 2 + ((b["hi"] - b["lo"]) / 3.92) ** 2) ** 0.5
+    return se > 0 and abs(a["v"] - b["v"]) > 1.96 * se
+
+
 def chica(items: list[str]) -> str | None:
     """'-# Muestra chica: Mid (2), ADC (6)' o None."""
     return f"-# Muestra chica, sin conclusiones: {', '.join(items)}" if items else None

@@ -187,7 +187,7 @@ class Coaching(commands.Cog):
         else:
             await ctx.reply(view=view)
 
-    @commands.hybrid_command(name="rachas", description="¿Te conviene seguir después de 2 derrotas? Tu winrate según cómo venías")
+    @commands.hybrid_command(name="rachas", description="¿Cómo te va después de perder? Tu winrate según cómo venías")
     async def rachas(self, ctx: commands.Context, *, jugador_y_modo: str | None = None):
         await self._abrir(ctx, jugador_y_modo, "rachas", "grac")
 
