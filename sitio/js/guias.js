@@ -58,7 +58,23 @@ async function modeloVictoria() {
           <h3 class="h4">Cuánto vale cada cosa, a mitad de partida</h3>
           <div class="table-wrap"><table class="data-table"><tbody>${eq}</tbody></table></div>
           <p class="nota">Lo que suma además del oro que ya da (ese está en la diferencia de oro). Por ejemplo, tener el Barón pesa como ir ${num(d.equivalencias.find(e => e.clave === 'baron')?.oro ?? 0, 0)} de oro arriba.</p></div></div>
+      ${valorObjetivos(d.objetivos)}
     </section>`;
+}
+
+/** Cuánto mueve cada objetivo la probabilidad de ganar en una partida pareja, por minuto (fase 6, etapa 4). */
+function valorObjetivos(o) {
+    if (!o?.filas?.length) return '';
+    const por = {};
+    for (const f of o.filas) (por[f.clave] ??= { nombre: f.nombre, min: {} }).min[f.min] = f;
+    const celda = (f) => (!f ? '<td class="num dim">—</td>'
+        : `<td class="num"><span class="v">${f.dp.v > 0 ? '+' : ''}${num(f.dp.v * 100, 1)} pts</span><span class="ic">${num(f.dp.lo * 100, 1)} a ${num(f.dp.hi * 100, 1)}</span><span class="dim small obj-oro">≈ ${num(f.oro.v, 0)} de oro</span></td>`);
+    const filas = Object.values(por).sort((a, b) => Math.max(...Object.values(b.min).map(f => f.dp.v)) - Math.max(...Object.values(a.min).map(f => f.dp.v)))
+        .map(r => `<tr><td>${escapeHtml(r.nombre)}</td>${o.minutos.map(m => celda(r.min[m])).join('')}</tr>`).join('');
+    return `<h3 class="h4">Cuánto vale cada objetivo en una partida pareja</h3>
+      <div class="table-wrap"><table class="data-table obj-tabla"><thead><tr><th>Objetivo</th>${o.minutos.map(m => `<th class="num">Minuto ${m}</th>`).join('')}</tr></thead>
+        <tbody>${filas}</tbody></table></div>
+      <p class="nota">${escapeHtml(o.nota)} Dragones, Heraldo, inhibidores y Barón tienen un solo peso en el modelo, así que los puntos no cambian con el minuto: lo que cambia es cuánto oro equivale. "—" es un minuto en que ese objetivo no suele estar. Intervalo de ${o.reps} reentrenamientos sobre ${num(o.partidas, 0)} partidas.</p>`;
 }
 
 /** Qué acompaña a ganar en el rol: cada componente por separado (fase 5). No cambia el Performance. */

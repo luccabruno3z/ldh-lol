@@ -731,6 +731,157 @@ NOTA_POOL = ("Tu pool objetivo la armás en el Pool Designer de Machine LoLing y
              "de tu franja). 'Muestra chica' si algún lado tiene menos de 10 partidas.")
 
 
+# ---------------------------------------------------------------- F. conversión de ventajas
+
+MIN_P15 = 15  # la probabilidad se mide al minuto 15; hace falta que la partida llegue al 16
+TRAMOS_P15 = {"ventaja": (0.6, 1.01), "pareja": (0.4, 0.6), "desventaja": (-0.01, 0.4)}
+MIN_CONVERSION = 15
+
+
+def _p15(partidas: dict, filas_por: dict) -> dict[str, list[tuple[str, str, float, int]]]:
+    """Por persona: (match, cola, p15 de su equipo, ganó) en las partidas publicadas con timeline de 16+ min."""
+    out = defaultdict(list)
+    for pid, filas in filas_por.items():
+        for f in filas:
+            d = partidas.get(f["match_id"])
+            if not d or len(d["curva"]) <= MIN_P15 + 1 or pid not in d["lados"]:
+                continue
+            azul = d["lados"][pid] == "azul"
+            p = d["curva"][MIN_P15] if azul else 1 - d["curva"][MIN_P15]
+            out[pid].append((f["match_id"], f["cola"], p, int(d["ganador"] == (100 if azul else 200))))
+    return out
+
+
+def _residuo(xs: list[tuple[float, int]], reps: int, rng) -> dict:
+    """Victorias reales menos esperadas por partida, con IC bootstrap (cada partida es independiente)."""
+    import numpy as np
+    if not xs:
+        return {"n": 0}
+    p = np.array([a for a, _ in xs])
+    y = np.array([b for _, b in xs])
+    r = y - p
+    medias = r[rng.integers(0, len(r), (reps, len(r)))].mean(axis=1)
+    return {"n": len(r), "ganadas": int(y.sum()), "esperadas": round(float(p.sum()), 1),
+            "v": round(float(r.mean()), 4), "lo": round(float(np.percentile(medias, 2.5)), 4),
+            "hi": round(float(np.percentile(medias, 97.5)), 4), "var": float((p * (1 - p)).sum())}
+
+
+def conversion(partidas: dict, filas_por: dict) -> tuple[dict, dict]:
+    """(por persona, grupo) por modo y tramo de p15. El modelo se entrenó con estas partidas, así que el residuo
+    del grupo sale cerca de cero por construcción: lo que se mira es cada persona contra el grupo, con una prueba
+    normal (varianza de la suma de Bernoulli) y BH entre personas dentro de cada modo y tramo."""
+    import numpy as np
+    reps = AJUSTES["bootstrap_reps"] // 4
+    rng = np.random.default_rng(AJUSTES["bootstrap_semilla"])
+    p15 = _p15(partidas, filas_por)
+    por, grupo = defaultdict(dict), {}
+    for modo, colas in MODOS.items():
+        grupo[modo] = {}
+        for tramo, (a, b) in TRAMOS_P15.items():
+            filas = {pid: [(p, y) for _, c, p, y in xs if c in colas and a <= p < b] for pid, xs in p15.items()}
+            # El grupo: cada partida una vez por equipo (dos del grupo en el mismo equipo no cuentan doble).
+            vistos, todas = set(), []
+            for pid, xs in p15.items():
+                for mid, c, p, y in xs:
+                    if c in colas and a <= p < b and (mid, y) not in vistos:
+                        vistos.add((mid, y))
+                        todas.append((p, y))
+            g = _residuo(todas, reps, rng)
+            g.pop("var", None)
+            grupo[modo][tramo] = g
+            pruebas = []
+            for pid, xs in filas.items():
+                r = _residuo(xs, reps, rng)
+                var = r.pop("var", None)
+                if r["n"]:
+                    r["muestra_chica"] = r["n"] < MIN_CONVERSION
+                    if var and g.get("v") is not None and not r["muestra_chica"]:  # con pocas, ni se prueba
+                        z = (r["v"] - g["v"]) * r["n"] / math.sqrt(var)
+                        r["p"] = round(math.erfc(abs(z) / math.sqrt(2)), 4)
+                        pruebas.append((pid, r))
+                    r["contra_grupo"] = round(r["v"] - g["v"], 4) if g.get("v") is not None else None
+                por[pid].setdefault(modo, {})[tramo] = r
+            for (pid, r), q in zip(pruebas, est.benjamini_hochberg([r["p"] for _, r in pruebas])):
+                r["p_bh"] = round(q, 4)
+                r["senal"] = q < 0.05 and not r["muestra_chica"]
+    return dict(por), grupo
+
+
+NOTA_CONVERSION = ("Con la probabilidad de ganar que da el modelo al minuto 15 (partidas de 16 minutos o más): en las que "
+                   "tu equipo iba arriba (60 % o más), ¿se ganaron más o menos de lo que se esperaba? Y en las que iba "
+                   "abajo (40 % o menos), ¿se remontaron? Es victorias reales menos esperadas por partida, en puntos. El "
+                   "modelo se entrenó con estas mismas partidas, así que el grupo da cerca de cero por construcción: lo "
+                   "que importa es cada uno contra el grupo (prueba con corrección BH entre personas). Es del equipo, no "
+                   "solo tuyo, y es una asociación.")
+
+
+# ---------------------------------------------------------------- G. valor de los objetivos
+
+MINUTOS_OBJ = (10, 15, 20, 25)
+# (clave del estado, nombre, cuánto suma, minutos en que tiene sentido)
+OBJETIVOS_VALOR = (("dragones", "Un dragón", 1, MINUTOS_OBJ), ("larvas", "Una larva", 1, (10,)),
+                   ("heraldo", "El Heraldo", 1, (15, 20)), ("torres", "Una torre", 1, MINUTOS_OBJ),
+                   ("inhib", "Un inhibidor caído", 1, (20, 25)), ("baron", "El Barón activo", 1, (20, 25)))
+REPS_OBJ = 50
+
+
+def _valores(coef: dict) -> list[dict]:
+    """En un estado parejo (todo igual, sin el término de lado): cuánto sube la probabilidad cada objetivo y su
+    equivalente en oro. Incluye el oro que da al equipo (Barón y torre), que el modelo ve en la diferencia de oro."""
+    out = []
+    for clave, nombre, val, minutos in OBJETIVOS_VALOR:
+        for t in minutos:
+            tramo = max(a for a in V.TRAMOS if t >= a)
+            k = f"{clave}_{tramo}" if clave in V.POR_TRAMO else clave
+            oro_c = coef[f"oro_{tramo}"] / 1000
+            z = coef[k] * val + ORO_OBJETIVO.get({"torres": "torre"}.get(clave, clave), 0) * oro_c
+            out.append({"clave": clave, "nombre": nombre, "min": t, "dp": 1 / (1 + math.exp(-z)) - 0.5,
+                        "oro": z / oro_c})
+    return out
+
+
+def valor_objetivos(db: sqlite3.Connection, m: dict) -> dict:
+    """Valor de cada objetivo con IC de bootstrap por partida (se reentrena el modelo REPS_OBJ veces). Se cachea."""
+    import numpy as np
+    from sklearn.linear_model import LogisticRegression
+    from .ajustes import CACHE
+    ruta = CACHE / "fase5_objetivos.json"
+    clave = f"v{V.VERSION}:{m['partidas']}:{REPS_OBJ}"
+    if ruta.exists():
+        c = json.loads(ruta.read_text(encoding="utf-8"))
+        if c.get("clave") == clave:
+            return c["datos"]
+    base = _valores(dict(zip(m["variables"], m["coef"])))
+    X, y, mids, _, _ = V._filas(db)
+    unicas = np.unique(mids)
+    idx = {g: np.where(mids == g)[0] for g in unicas}
+    rng = np.random.default_rng(AJUSTES["bootstrap_semilla"])
+    reps = []
+    for _ in range(REPS_OBJ):
+        ii = np.concatenate([idx[g] for g in rng.choice(unicas, size=len(unicas))])
+        fit = LogisticRegression(C=1.0, max_iter=2000, fit_intercept=False).fit(*V._simetrico(X[ii], y[ii]))
+        reps.append(_valores(dict(zip(m["variables"], fit.coef_[0]))))
+    filas = []
+    for i, b in enumerate(base):
+        dps, oros = [r[i]["dp"] for r in reps], [r[i]["oro"] for r in reps]
+        filas.append({"clave": b["clave"], "nombre": b["nombre"], "min": b["min"],
+                      "dp": {"v": round(b["dp"], 4), "lo": round(float(np.percentile(dps, 2.5)), 4),
+                             "hi": round(float(np.percentile(dps, 97.5)), 4)},
+                      "oro": {"v": round(b["oro"]), "lo": round(float(np.percentile(oros, 2.5))),
+                              "hi": round(float(np.percentile(oros, 97.5)))}})
+    datos = {"filas": filas, "minutos": list(MINUTOS_OBJ), "reps": REPS_OBJ, "partidas": m["partidas"]}
+    CACHE.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(json.dumps({"clave": clave, "datos": datos}, ensure_ascii=False), encoding="utf-8")
+    return datos
+
+
+NOTA_OBJETIVOS = ("Cuánto sube la probabilidad de ganar de tu equipo cada objetivo, según el modelo, en una partida pareja "
+                  "(mismo oro, XP, kills y torres). Incluye el oro que da al equipo (Barón y torres). El equivalente en "
+                  "oro es la diferencia de oro que pesaría lo mismo en ese minuto. Es nuestro elo (LAS, de Hierro a "
+                  "Esmeralda) y una estimación del modelo, no un experimento: si el rival te da un objetivo es porque "
+                  "algo más pasaba. El intervalo sale de reentrenar el modelo con partidas remuestreadas.")
+
+
 # ---------------------------------------------------------------- generar
 
 def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: Callable, indices: dict | None = None) -> None:
@@ -757,7 +908,9 @@ def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: 
                 "de la franja contra la mitad de abajo. Acompaña a ganar, no lo causa: el que gana mata más y muere menos. "
                 "Tu Performance sigue con los pesos fijos."})
     m = modelo(db)
-    escribir("modelo_victoria.json", {**m, "equivalencias": _equivalencias(m)})
+    objetivos = valor_objetivos(db, m) if m["validacion"]["aprobado"] else None
+    escribir("modelo_victoria.json", {**m, "equivalencias": _equivalencias(m),
+                                      **({"objetivos": {**objetivos, "nota": NOTA_OBJETIVOS}} if objetivos else {})})
     if m["validacion"]["aprobado"]:  # sin un modelo validado no se publica nada que dependa de él
         ms, partidas = muertes_y_partidas(db, m)
         por, mediana = muertes(ms, filas_por)
@@ -769,6 +922,9 @@ def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: 
             escribir(f"muertes/{pid}.json", {"modos": d, "mediana_grupo": mediana, "zonas": ZONAS, "nota": nota})
         for mid, d in partidas.items():
             escribir(f"partida/{mid}.json", d)
+        cpor, cgrupo = conversion(partidas, filas_por)
+        for pid, d in cpor.items():
+            escribir(f"conversion/{pid}.json", {"modos": d, "grupo": cgrupo, "tramos": TRAMOS_P15, "nota": NOTA_CONVERSION})
     por, grupo = rachas(db, list(filas_por))
     textos = {"estados": ESTADOS, "sesion_min": CFG["sesion_min"], "corte_min": CFG["corte_min"],
               "largas_desde": CFG["largas_desde"]}

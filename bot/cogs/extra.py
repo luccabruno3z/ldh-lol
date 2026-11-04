@@ -55,6 +55,7 @@ AYUDA = {
                 "`-performance [jugador] [rol] [solo|normal|todo]` tu índice y sus 7 componentes contra tu franja\n"
                 "`-mejora [jugador] [rol] [solo|normal|todo]` las 3 brechas más grandes como metas en números\n"
                 "`-temprano [jugador] [rol] [solo|normal|todo]` CS, oro y XP a los 10 y 15 contra tu rival directo\n"
+                "`-cierre [jugador] [solo|normal|todo]` ¿Cerrás las que ibas ganando? Ganadas contra esperadas al minuto 15\n"
                 "-# Sin modo: solo/dúo si te alcanza, si no `todo` (solo/dúo, flex y normales juntas).\n"
                 "`-tips <rol>` consejos del rol",
     "Gráficos": "`-grafico [jugador] tendencia [rol] [modo]` ¿estás mejorando? Tu índice por partida contra tu franja y su tendencia\n"

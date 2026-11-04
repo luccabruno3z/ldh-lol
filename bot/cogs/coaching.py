@@ -171,6 +171,10 @@ class Coaching(commands.Cog):
     async def temprano(self, ctx: commands.Context, *, jugador_rol_y_modo: str | None = None):
         await self._abrir(ctx, jugador_rol_y_modo, "temprano", "temp")
 
+    @commands.hybrid_command(name="cierre", description="¿Cerrás las que ibas ganando y remontás? Ganadas contra esperadas al minuto 15")
+    async def cierre(self, ctx: commands.Context, *, jugador_y_modo: str | None = None):
+        await self._abrir(ctx, jugador_y_modo, "cierre", "conv")
+
     @commands.hybrid_command(name="partida", description="Tu probabilidad de ganar minuto a minuto en tu última partida (con ◀ ▶)")
     async def partida(self, ctx: commands.Context, *, jugador_y_numero: str | None = None):
         """-partida, -partida 3 (la tercera más reciente), -partida glarrex 2."""

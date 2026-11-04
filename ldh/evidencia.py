@@ -159,6 +159,22 @@ def _muertes(pk: Paquete, d: dict | None) -> None:
                       "fases_fmt": {f: f"{_n(v.get('costo'), 1, k=100)} pts, n = {v['n']}" for f, v in r["fases"].items()}})
 
 
+def _conversion(pk: Paquete, d: dict | None) -> None:
+    m = ((d or {}).get("modos") or {}).get(pk.modo) or {}
+    nombres = {"ventaja": "Con ventaja al minuto 15 (60 % o más): victorias reales menos esperadas por partida",
+               "desventaja": "Con desventaja al minuto 15 (40 % o menos): victorias reales menos esperadas por partida"}
+    for tramo, que in nombres.items():
+        x = m.get(tramo) or {}
+        if not x.get("n") or x.get("muestra_chica"):
+            continue
+        pk.add(f"conversion.{tramo}", "estimacion_modelo", que, None, x["v"], x["lo"], x["hi"], x["n"],
+               dec=1, k=100, signo=True, suf=" pts",
+               prueba=("señal" if x.get("senal") else "ruido") + f" contra el grupo, p BH = {x.get('p_bh')}",
+               limitaciones=["El modelo se entrenó con estas partidas: el grupo da cerca de cero por construcción.",
+                             "Es del equipo, no solo de la persona; es una asociación."],
+               extra={"ganadas": x["ganadas"], "esperadas": x["esperadas"], "contra_grupo": x.get("contra_grupo")})
+
+
 def _curvas(pk: Paquete, d: dict | None, nombres: dict) -> None:
     m = ((d or {}).get("modos") or {}).get(pk.modo) or {}
     for c in (m.get("campeones") or [])[:6]:
@@ -184,6 +200,7 @@ def armar(persona: str, modo: str = "solo") -> dict:
     _pool(pk, _leer(f"campeones/{persona}.json"))
     _rachas(pk, _leer(f"rachas/{persona}.json"))
     _muertes(pk, _leer(f"muertes/{persona}.json"))
+    _conversion(pk, _leer(f"conversion/{persona}.json"))
     champs = {k: v.get("nombre", k) for k, v in ((_leer("campeones.json") or {}).get("campeones") or {}).items()}
     _curvas(pk, _leer(f"curvas/{persona}.json"), champs)
     return pk.json()

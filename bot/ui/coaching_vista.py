@@ -17,6 +17,7 @@ VISTAS = {
     "perf": ("Performance", "Tu índice y sus 7 componentes contra tu franja"),
     "mejora": ("Plan de mejora", "Las brechas más grandes como metas en números"),
     "temp": ("Primeros 15 minutos", "CS, oro y XP a los 10 y 15 contra tu rival"),
+    "conv": ("¿Cerrás las que ibas ganando?", "Ganadas contra esperadas según cómo iba tu equipo al 15"),
     "gfra": ("Gráfico: contra cada franja", "Tus números al lado de la mediana de cada elo"),
     "grad": ("Gráfico: radar", "Tus 7 componentes con la mediana de cada franja"),
     "gten": ("Gráfico: ¿estás mejorando?", "Tu índice por partida y su tendencia"),
@@ -27,9 +28,42 @@ VISTAS = {
 }
 GRAFICO = {"gfra": "franjas", "grad": "radar", "gten": "tendencia", "gevo": "evolucion", "grac": "rachas",
            "gmue": "muertes", "gcur": "curva"}
-SIN_ROL = ("gevo", "grac", "gmue")  # no dependen del rol
+SIN_ROL = ("gevo", "grac", "gmue", "conv")  # no dependen del rol
 MODOS = {"solo": "Solo/Dúo", "normal": "Normales", "todo": "Todo (solo, flex y normales)"}
 ROLES = ("Top", "Jungla", "Mid", "ADC", "Support")
+
+
+CONV = {"ventaja": "Ibas arriba al 15 (60 % o más)", "pareja": "Pareja al 15", "desventaja": "Ibas abajo al 15 (40 % o menos)"}
+EN_MODO = {"solo": "solo/dúo", "normal": "normales", "todo": "todas las colas"}
+
+
+def texto_conversion(p: dict, d: dict | None, modo: str) -> str:
+    """Ganadas contra esperadas por el modelo al minuto 15, contra el grupo."""
+    nombre = discord.utils.escape_markdown(p.get("nombre", p.get("id", "")))
+    m = ((d or {}).get("modos") or {}).get(modo)
+    lin = [f"## {nombre} · ¿cerrás las que ibas ganando? · {EN_MODO.get(modo, modo)}"]
+    if not m or not any(x.get("n") for x in m.values()):
+        return "\n".join(lin + ["Todavía no hay partidas de 16 minutos o más con timeline en este modo."])
+    pts = lambda v: f"{v * 100:+.1f}".replace(".", ",")  # noqa: E731
+    for k, nombre_t in CONV.items():
+        x = m.get(k) or {}
+        if not x.get("n"):
+            lin.append(f"**{nombre_t}:** sin partidas")
+            continue
+        if x.get("muestra_chica"):
+            lin.append(f"**{nombre_t}:** {x['ganadas']} ganadas en {x['n']} · muestra chica")
+            continue
+        if x.get("senal"):
+            lectura = ("más" if x["contra_grupo"] > 0 else "menos") + " que el grupo"
+        else:
+            lectura = "como el grupo (ruido)"
+        p_bh = f" · p = {x['p_bh']:.2f}".replace(".", ",") if x.get("p_bh") is not None else ""
+        lin.append(f"**{nombre_t}:** {x['ganadas']} ganadas de {x['esperadas']:.0f} esperadas en {x['n']} · "
+                   f"{pts(x['v'])} pts por partida ({pts(x['lo'])} a {pts(x['hi'])}) · {lectura}{p_bh}")
+    lin.append("-# Probabilidad del modelo al minuto 15. El modelo se entrenó con estas partidas: el grupo da cerca de "
+               "cero por construcción, por eso se compara cada uno contra el grupo (BH entre personas). Es del equipo, "
+               "no solo tuyo, y es una asociación.")
+    return "\n".join(lin)
 
 
 def _texto(view) -> str:
@@ -88,6 +122,8 @@ async def vista_coaching(bot, vista: str, pid: str, rol: str | None, modo: str |
     if vista in GRAFICO:
         res, png = await armar_grafico(bot, p, GRAFICO[vista], rol, modo)
         texto = res if png is None else _texto(res)
+    elif vista == "conv":
+        texto = texto_conversion(p, await datos.conversion(pid), modo)
     elif not d:
         texto = "Todavía no hay coaching publicado para este jugador."
     else:

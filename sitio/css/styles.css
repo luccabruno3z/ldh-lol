@@ -99,6 +99,7 @@ html.js .view:not(.is-active) { display: none; }
 .data-table tr.chica td { color: var(--text-dim); } /* antes con opacidad: bajaba el contraste de todo, también de los tags */
 .data-table .v { display: block; }
 .data-table .ic { display: block; font-size: .75rem; color: var(--text-dim); font-family: var(--font-mono); }
+.obj-tabla .obj-oro { display: block; }
 /* La celda sigue siendo celda: con display:flex se salía de la fila y quedaba corrida. */
 .data-table td.champ { white-space: nowrap; }
 .data-table td.champ .champ-icon { margin-right: 8px; }
