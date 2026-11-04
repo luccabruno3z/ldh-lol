@@ -149,6 +149,9 @@ class Datos:
     async def informe(self, persona_id: str) -> dict | None:
         return await self._json(f"informes/{quote(persona_id)}.json")
 
+    async def pool_objetivo(self, persona_id: str) -> dict | None:
+        return await self._json(f"pool_objetivo/{quote(persona_id)}.json")
+
     async def rachas_grupo(self) -> dict | None:
         return await self._json("rachas/grupo.json")
 

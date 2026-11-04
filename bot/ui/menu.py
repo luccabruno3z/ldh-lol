@@ -8,7 +8,7 @@ import discord
 
 from bot.cogs.perfil import AVISO_RIOT
 
-ACCIONES = {"perfil": "Mi perfil", "coaching": "Mi coaching", "rachas": "Mis rachas", "informe": "Mi informe", "partida": "Mi última partida", "grafico": "Mis gráficos", "buscar": "Buscar jugador", "top": "Rankings",
+ACCIONES = {"perfil": "Mi perfil", "coaching": "Mi coaching", "rachas": "Mis rachas", "informe": "Mi informe", "pool": "Mi pool objetivo", "partida": "Mi última partida", "grafico": "Mis gráficos", "buscar": "Buscar jugador", "top": "Rankings",
             "toprol": "Top por rol", "competencia": "Competencia del mes", "comparar": "Comparar",
             "tips": "Tips de mi rol", "glosario": "Glosario", "ayuda": "Ayuda", "inhouse": "Armar inhouse"}
 
@@ -144,6 +144,16 @@ class MenuBoton(discord.ui.DynamicItem[discord.ui.Button], template=r"lm:(?P<acc
             else:
                 await interaction.followup.send(view=view)
             return
+        if self.accion == "pool":
+            pid = bot.get_cog("Perfil").vinculos.get(str(self.owner))
+            if not pid or not getattr(bot, "metas", None):
+                await interaction.response.send_message(
+                    "Primero vinculate con `-vincular <tu nombre o Riot ID>`, o usá `-pool <jugador>`.", ephemeral=True)
+                return
+            from bot.ui.pool_vista import rol_por_defecto, tarjeta_pool
+            await interaction.response.defer(thinking=True)
+            await interaction.followup.send(view=await tarjeta_pool(bot, pid, await rol_por_defecto(bot, pid), self.owner))
+            return
         if self.accion == "informe":
             pid = bot.get_cog("Perfil").vinculos.get(str(self.owner))
             if not pid:
@@ -180,6 +190,7 @@ def menu(owner: int) -> discord.ui.LayoutView:
         discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("perfil", "coaching", "partida", "grafico", "buscar")]),
         discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("rachas", "top", "toprol", "competencia", "comparar")]),
         discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("informe", "inhouse", "tips", "glosario", "ayuda")]),
-        discord.ui.ActionRow(discord.ui.Button(label="Abrir la web", url="https://luccabruno3z.github.io/ldh-lol/")),
+        discord.ui.ActionRow(MenuBoton("pool", owner),
+                             discord.ui.Button(label="Abrir la web", url="https://luccabruno3z.github.io/ldh-lol/")),
         accent_colour=0x00CCCC))
     return view

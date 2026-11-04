@@ -619,6 +619,118 @@ def companeros(filas_por: dict[str, list[dict]]) -> dict:
     return out
 
 
+# ---------------------------------------------------------------- F. pool objetivo (Machine LoLing)
+
+ULTIMAS_POOL = 20
+
+
+def cargar_pools() -> dict:
+    """Las pools que declaró cada uno con -pool (repo ldh-lol-metas, montado en ./metas). Sin el repo, nada."""
+    import os
+    from pathlib import Path
+    from .ajustes import RAIZ
+    ruta = Path(os.environ.get("LDH_METAS", RAIZ / "metas")) / "pools.json"
+    try:
+        d = json.loads(ruta.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def _iso_ms(iso: str) -> int | None:
+    from datetime import datetime
+    try:
+        return int(datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp() * 1000)
+    except (AttributeError, ValueError):
+        return None
+
+
+def _media_idx(xs: list[float], reps: int, rng) -> dict:
+    v, lo, hi = _boot_media([[x] for x in xs], reps, rng)
+    return {"v": v, "lo": lo, "hi": hi, "n": len(xs)}
+
+
+def pool_objetivo(pools: dict, filas_por: dict[str, list[dict]], indices: dict, curvas_por: dict) -> dict:
+    """Por persona, rol y modo: cuánto se juega con la pool declarada y cómo va dentro y fuera de ella.
+    Las partidas son de Grieta; el índice es el de la tendencia (contra la franja y el rol)."""
+    import numpy as np
+    reps = AJUSTES["bootstrap_reps"] // 4
+    rng = np.random.default_rng(AJUSTES["bootstrap_semilla"])
+    minimo = AJUSTES["min_partidas"]
+    out = {}
+    for pid, por_rol in pools.items():
+        if pid not in filas_por or not isinstance(por_rol, dict):
+            continue  # solo se publican las personas vinculadas
+        idx_de = {(i, rol, ch): x for i, _, rol, ch, x, _ in indices.get(pid, [])}
+        roles = {}
+        for rol, decl in por_rol.items():
+            campeones = [int(c) for c in (decl or {}).get("campeones") or [] if str(c).isdigit()]
+            desde = _iso_ms((decl or {}).get("desde", ""))
+            if not campeones or desde is None:
+                continue
+            modos = {}
+            for modo, colas in MODOS.items():
+                g = sorted((f for f in filas_por[pid] if f["cola"] in colas and f["rol_ldh"] == rol),
+                           key=lambda f: f["inicio_ms"])
+                if not g:
+                    continue
+                dentro = lambda f: f["champion_id"] in campeones  # noqa: E731
+                idx = lambda f: idx_de.get((f["inicio_ms"], rol, f["champion_id"]))  # noqa: E731
+                ult = g[-ULTIMAS_POOL:]
+                antes = [f for f in g if f["inicio_ms"] < desde]
+                despues = [f for f in g if f["inicio_ms"] >= desde]
+                d_in = [f for f in despues if dentro(f)]
+                d_out = [f for f in despues if not dentro(f)]
+                wi, wo = sum(f["win"] for f in d_in), sum(f["win"] for f in d_out)
+                ia = [x for f in d_in if (x := idx(f)) is not None]
+                io_ = [x for f in d_out if (x := idx(f)) is not None]
+                cmp_dentro = {
+                    "dentro": est.wilson(wi, len(d_in)), "fuera": est.wilson(wo, len(d_out)),
+                    "dif": est.diferencia([float(f["win"]) for f in d_in], [float(f["win"]) for f in d_out]),
+                    "p": est._r(est.fisher(wi, len(d_in) - wi, wo, len(d_out) - wo), 4) if d_in and d_out else None,
+                    "indice_dentro": _media_idx(ia, reps, rng), "indice_fuera": _media_idx(io_, reps, rng),
+                    "dif_indice": est.diferencia(ia, io_) if ia and io_ else None,
+                    "muestra_chica": min(len(d_in), len(d_out)) < minimo,
+                }
+                ia_ = [x for f in antes if (x := idx(f)) is not None]
+                id_ = [x for f in despues if (x := idx(f)) is not None]
+                pa, pd = sum(map(dentro, antes)), sum(map(dentro, despues))
+                cmp_antes = {
+                    "prop_antes": est.wilson(pa, len(antes)), "prop_despues": est.wilson(pd, len(despues)),
+                    "dif_prop": est.diferencia([float(dentro(f)) for f in despues], [float(dentro(f)) for f in antes]),
+                    "indice_antes": _media_idx(ia_, reps, rng), "indice_despues": _media_idx(id_, reps, rng),
+                    "dif_indice": est.diferencia(id_, ia_) if ia_ and id_ else None,
+                    "muestra_chica": min(len(antes), len(despues)) < minimo,
+                }
+                curva = {c["champ"]: c for c in (curvas_por.get(pid, {}).get(modo) or {}).get("campeones", [])
+                         if c["rol"] == rol}
+                por_champ = []
+                for ch in campeones:
+                    gc = [f for f in g if f["champion_id"] == ch]
+                    xs = [x for f in gc if (x := idx(f)) is not None]
+                    c = curva.get(ch)
+                    por_champ.append({
+                        "champ": ch, "n": len(gc), "winrate": est.wilson(sum(f["win"] for f in gc), len(gc)),
+                        "indice": _media_idx(xs, reps, rng),
+                        "estado": c["estado"] if c else "pocas partidas", "ahora": c["ahora"] if c else None})
+                modos[modo] = {
+                    "cumplimiento": {**est.wilson(sum(map(dentro, ult)), len(ult)), "ultimas": len(ult)},
+                    "desde_que_la_declaraste": cmp_dentro, "antes_y_despues": cmp_antes,
+                    "campeones": por_champ, "n_despues": len(despues),
+                }
+            roles[rol] = {"campeones": campeones, "desde": decl["desde"], "modos": modos}
+        if roles:
+            out[pid] = roles
+    return out
+
+
+NOTA_POOL = ("Tu pool objetivo la armás en el Pool Designer de Machine LoLing y la traés con -pool en el bot. "
+             "Cumplimiento: qué parte de tus últimas 20 partidas del rol fueron con la pool. Dentro contra fuera: "
+             "desde que la declaraste. Antes y después: cuánto jugabas esos campeones y tu índice. Son asociaciones: "
+             "también cambian el parche, tus rivales y tu práctica. El índice es el de la tendencia (50 = la mediana "
+             "de tu franja). 'Muestra chica' si algún lado tiene menos de 10 partidas.")
+
+
 # ---------------------------------------------------------------- generar
 
 def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: Callable, indices: dict | None = None) -> None:
@@ -632,6 +744,8 @@ def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: 
                                                      "(el historial arranca el 8/1: antes no se sabe si eran nuevos)."})
         for pid, d in cp.items():
             escribir(f"curvas/{pid}.json", {"modos": d, "tramos": tramos, "nota": nota})
+        for pid, d in pool_objetivo(cargar_pools(), filas_por, indices, cp).items():
+            escribir(f"pool_objetivo/{pid}.json", {"roles": d, "ultimas": ULTIMAS_POOL, "nota": NOTA_POOL})
     escribir("rankings/companeros.json", {
         "modos": companeros(filas_por),
         "nota": "Cuántos puntos de winrate les suma cada uno a sus compañeros del grupo: el winrate de cada compañero "

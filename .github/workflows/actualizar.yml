@@ -34,6 +34,15 @@ jobs:
           ref: datos
           path: datos
 
+      - name: Pools objetivo (repo ldh-lol-metas)
+        # Repo público aparte, donde el bot escribe con su propio token (solo ese repo). Acá se lee sin
+        # token. Si falla, la corrida sigue: solo falta el seguimiento de la pool (ldh/fase5.py).
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          repository: luccabruno3z/ldh-lol-metas
+          path: metas
+
       - name: Timelines (release "timelines")
         # No van a git: se bajan del release, un .tar por mes. Si falla, se corta acá; sin
         # timelines la base saldría sin los datos de los 10 y 15 minutos (ldh/timelines.py).

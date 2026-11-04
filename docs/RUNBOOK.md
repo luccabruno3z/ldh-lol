@@ -127,3 +127,15 @@ Si cambia `extract_match_stats`, subir `EXTRACTOR_VERSION` en `ldh/base.py`.
 - Reglas, tipos de evidencia y lo que controla el validador: `docs/REGLAS_EVIDENCIA.md`.
 - Si los datos cambian, el hash del paquete cambia y el validador pide revisar el informe.
 - El workflow hace `git pull --rebase` antes de empujar a `datos`, por si entró un informe mientras corría.
+
+## Pool objetivo (Machine LoLing)
+
+- Cada uno arma su pool en el Pool Designer de Machine LoLing y la elige en el bot con `-pool`, hasta 6 campeones por rol. No copiamos nada de su sitio: solo se pone el link.
+- La copia del bot vive en el volumen (`pools.json`). Cada cambio se sube a `pools.json` del repo público `luccabruno3z/ldh-lol-metas` por la API de contenidos.
+  - Si GitHub falla o falta el token, queda marcado como pendiente (`pools_pendientes.json`) y se sube con el siguiente cambio de cualquiera.
+- El token es `GITHUB_TOKEN_METAS` en Railway. Es fine-grained, solo tiene acceso a `ldh-lol-metas` (Contents: lectura y escritura) y vence a los 90 días.
+  - Para renovarlo: crear uno nuevo con el mismo alcance y reemplazar la variable. El bot lo lee en cada guardado, pero Railway redeploya al cambiar variables.
+- El workflow clona `ldh-lol-metas` en `metas/` sin token. Si falla, la corrida sigue sin el seguimiento.
+  - En local se usa `LDH_METAS=<carpeta con pools.json>`.
+- La salida es `api/pool_objetivo/<pid>.json`, con cumplimiento (últimas 20 del rol, Wilson), dentro contra fuera desde que se declaró (Fisher), antes y después, y el estado de la curva por campeón.
+  - Cambiar la pool reinicia "desde".

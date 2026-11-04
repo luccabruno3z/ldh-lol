@@ -2,7 +2,7 @@
    solo. Cada persona se compara consigo misma: si no, el que juega peor aparece más en las rachas. */
 
 import { cachedFetch, EN_MODO } from './data.js';
-import { escapeHtml, num, campeon } from './utils.js';
+import { escapeHtml, num, campeon, conIntervalo } from './utils.js';
 
 const pct = (v) => (v == null ? '—' : `${num(v * 100, 0)} %`);
 const pts = (v) => `${v > 0 ? '+' : ''}${num(v * 100, 1)}`;
@@ -268,4 +268,50 @@ export async function bloqueInforme(p, cont) {
       ${d.proxima_revision ? `<p class="dim">Próxima revisión: ${escapeHtml(d.proxima_revision)}</p>` : ''}
       <p class="nota">Informe escrito por ${escapeHtml(d.autor || 'Claude')} con los datos al ${escapeHtml((d.datos_al || '').slice(0, 10))}. Cada cifra sale de una evidencia del sitio con su intervalo y n; el texto interpreta, y lo que dice "puede ser" es una hipótesis para revisar en tus partidas, no un diagnóstico.</p>
     </section>`;
+}
+
+/* ---------------------------------------------------------------- Pool objetivo (Machine LoLing) */
+
+const POOL_DESIGNER = 'https://pooldesigner.machineloling.com/';
+const ESTADO_POOL = { 'por encima': 'win', 'por debajo': 'loss', 'a tu nivel': '', 'pocas partidas': '' };
+
+/** "Tu pool objetivo": la que declaraste con -pool en el bot y cómo la venís cumpliendo. Sin pool, solo el link. */
+export async function bloquePool(p, cont, modo) {
+    if (p._cuenta || !cont) return;
+    const d = await cachedFetch(`pool_objetivo/${encodeURIComponent(p.id)}.json`, { silent: true });
+    const roles = Object.entries(d?.roles || {});
+    const link = `<a href="${POOL_DESIGNER}" target="_blank" rel="noopener">Pool Designer de Machine LoLing</a>`;
+    if (!roles.length) {
+        cont.innerHTML = `<section class="section"><h3>Tu pool objetivo</h3>
+          <p>Armá tu pool en el ${link} y traela con <code>-pool</code> en el bot de Discord: elegís esos campeones en el menú y acá vas a ver qué parte de tus partidas jugás con ella y cómo te va dentro y fuera.</p></section>`;
+        return;
+    }
+    const ic = (x) => conIntervalo(x, 'pct');
+    const dif = (x, tipo) => (x?.v == null ? '<span class="dim">—</span>'
+        : `${conIntervalo(x, tipo).replace('<span class="v">', `<span class="v">${x.v > 0 ? '+' : ''}`)} ${x.ruido ? '<span class="tag">ruido</span>' : ''}`);
+    const tarjetas = roles.map(([rol, r]) => {
+        const x = r.modos?.[modo];
+        const desde = new Date(r.desde).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+        const nombres = r.campeones.map(c => escapeHtml(campeon(c))).join(', ');
+        if (!x) return `<article class="card"><h4>${escapeHtml(rol)}</h4><p>${nombres} <span class="dim">· desde el ${escapeHtml(desde)}</span></p><p class="dim">Sin partidas de ${escapeHtml(rol)} en ${escapeHtml(EN_MODO[modo])}.</p></article>`;
+        const dd = x.desde_que_la_declaraste, ad = x.antes_y_despues;
+        return `<article class="card">
+          <h4>${escapeHtml(rol)} <span class="dim">· ${nombres} · desde el ${escapeHtml(desde)}</span></h4>
+          <p><strong>Cumplimiento:</strong> ${pct(x.cumplimiento.v)}${x.cumplimiento.lo != null ? ` <span class="dim">(${num(x.cumplimiento.lo * 100, 0)} a ${num(x.cumplimiento.hi * 100, 0)} %)</span>` : ''} de tus últimas ${x.cumplimiento.n} partidas del rol</p>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th></th><th>Con la pool</th><th>Fuera</th><th>Diferencia</th></tr></thead><tbody>
+            <tr><th>Winrate desde que la declaraste</th><td>${ic(dd.dentro)} <span class="ic">n = ${dd.dentro.n}</span></td><td>${ic(dd.fuera)} <span class="ic">n = ${dd.fuera.n}</span></td><td>${dif(dd.dif, 'pct')}${dd.p != null ? ` <span class="dim">p = ${num(dd.p, 3)}</span>` : ''}</td></tr>
+            <tr><th>Índice desde que la declaraste</th><td>${conIntervalo(dd.indice_dentro, 1)}</td><td>${conIntervalo(dd.indice_fuera, 1)}</td><td>${dif(dd.dif_indice, 1)}</td></tr>
+          </tbody></table></div>
+          ${dd.muestra_chica ? '<p class="dim">Muestra chica: algún lado tiene menos de 10 partidas.</p>' : ''}
+          <div class="table-wrap"><table class="data-table"><thead><tr><th></th><th>Antes</th><th>Después</th><th>Diferencia</th></tr></thead><tbody>
+            <tr><th>Partidas con la pool</th><td>${ic(ad.prop_antes)} <span class="ic">n = ${ad.prop_antes.n}</span></td><td>${ic(ad.prop_despues)} <span class="ic">n = ${ad.prop_despues.n}</span></td><td>${dif(ad.dif_prop, 'pct')}</td></tr>
+            <tr><th>Tu índice en el rol</th><td>${conIntervalo(ad.indice_antes, 1)}</td><td>${conIntervalo(ad.indice_despues, 1)}</td><td>${dif(ad.dif_indice, 1)}</td></tr>
+          </tbody></table></div>
+          ${ad.muestra_chica ? '<p class="dim">Muestra chica: algún lado tiene menos de 10 partidas.</p>' : ''}
+          <div class="cv-chips">${x.campeones.map(c => `<span class="chip-cola">${escapeHtml(campeon(c.champ))} · ${c.n} partidas${c.winrate?.v != null ? ` · ${pct(c.winrate.v)}` : ''} <span class="tag ${ESTADO_POOL[c.estado] ?? ''}">${escapeHtml(c.estado)}</span></span>`).join('')}</div>
+        </article>`;
+    }).join('');
+    cont.innerHTML = `<section class="section"><h3>Tu pool objetivo <span class="dim">· ${escapeHtml(EN_MODO[modo])}</span></h3>
+      ${tarjetas}
+      <p class="nota">${escapeHtml(d.nota)} Por campeón: partidas y winrate en todo el historial del rol, y el estado de la curva de aprendizaje. Se cambia con <code>-pool</code> en el bot; la armás en el ${link}.</p></section>`;
 }

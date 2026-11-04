@@ -14,7 +14,7 @@ from bot.services.datos import DATA_URL, Datos
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("ldh-lol")
 
-COGS = ["bot.cogs.perfil", "bot.cogs.rankings", "bot.cogs.coaching", "bot.cogs.extra", "bot.cogs.feed", "bot.cogs.fase4"]
+COGS = ["bot.cogs.perfil", "bot.cogs.rankings", "bot.cogs.coaching", "bot.cogs.extra", "bot.cogs.feed", "bot.cogs.fase4", "bot.cogs.pool"]
 
 
 class Bot(commands.Bot):
@@ -41,7 +41,9 @@ class Bot(commands.Bot):
         from bot.ui.coaching_vista import SelectorCoaching
         from bot.ui.partida_vista import PartidaBoton
         from bot.ui.informe_vista import InformeBoton
-        self.add_dynamic_items(PerfilBoton, MenuBoton, SelectorRanking, SelectorCoaching, PartidaBoton, InformeBoton)
+        from bot.ui.pool_vista import BorrarPool, SelectorPool
+        self.add_dynamic_items(PerfilBoton, MenuBoton, SelectorRanking, SelectorCoaching, PartidaBoton, InformeBoton,
+                               SelectorPool, BorrarPool)
         await self._sincronizar()
 
     async def _sincronizar(self):
