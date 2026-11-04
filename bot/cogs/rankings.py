@@ -103,7 +103,7 @@ def tarjeta_mejora(d: dict, nombres: dict, modo: str = "solo") -> discord.ui.Lay
     for i, x in enumerate(tabla[:10], 1):
         tag = {"mejorando": "**mejorando**", "empeorando": "empeorando"}.get(x["veredicto"], "sin tendencia clara")
         lineas += [f"`{i}.` **{nombres.get(x['persona'], x['persona'])}** · {x['rol']} · {F.num(x['inicio'], 0)} → {F.num(x['ahora'], 0)} · {tag}",
-                   f"-# {F.num(x['cambio']['v'], 1, True)} puntos ({F.num(x['cambio']['lo'], 1, True)} a {F.num(x['cambio']['hi'], 1, True)}) en {x['n']} partidas"]
+                   f"-# {F.num(F.cambio(x)['v'], 1, True)} puntos ({F.num(F.cambio(x)['lo'], 1, True)} a {F.num(F.cambio(x)['hi'], 1, True)}) en {x['n']} partidas"]
     if not tabla:
         lineas.append(f"Nadie tiene 30+ partidas de {en} en un rol con referencia.")
     lineas.append("-# Mejorando solo si todo el intervalo está arriba de cero. Cada uno contra su franja: se puede comparar entre rangos.")

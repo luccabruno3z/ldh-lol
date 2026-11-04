@@ -182,7 +182,7 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
         signo = lambda v: f"{'+' if v > 0 else ''}{F.num(v, 1)}"
         texto = (f"## {discord.utils.escape_markdown(nombre)} · ¿estás mejorando?\n"
                  f"De **{F.num(t['inicio'], 0)}** a **{F.num(t['ahora'], 0)}** → **{t['veredicto']}** "
-                 f"({signo(t['cambio']['v'])} puntos en tus {t['n']} partidas, {signo(t['cambio']['lo'])} a {signo(t['cambio']['hi'])})\n"
+                 f"({signo(F.cambio(t)['v'])} puntos en tus {t['n']} partidas, {signo(F.cambio(t)['lo'])} a {signo(F.cambio(t)['hi'])})\n"
                  f"-# Índice de 0 a 100 por partida: tus percentiles en {', '.join(t['metricas']).lower()} contra "
                  f"{d['franja']} en {rol_n}. Mide cómo jugás, no si ganaste. 50 = la mitad de tu franja. "
                  "El rol está fijo, el campeón no: si cambiaste de campeones, parte de la tendencia puede ser eso.")

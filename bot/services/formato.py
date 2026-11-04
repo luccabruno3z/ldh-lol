@@ -64,3 +64,13 @@ def se_separan(a: dict | None, b: dict | None) -> bool:
 def chica(items: list[str]) -> str | None:
     """'-# Muestra chica: Mid (2), ADC (6)' o None."""
     return f"-# Muestra chica, sin conclusiones: {', '.join(items)}" if items else None
+
+
+def cambio(t: dict) -> dict:
+    """El cambio de la tendencia a lo largo de las partidas jugadas. Si el JSON publicado es anterior a ese campo,
+    se calcula desde la pendiente (puntos cada 100 partidas), así el bot no falla mientras se actualizan los datos."""
+    if t.get("cambio"):
+        return t["cambio"]
+    k = (t.get("n", 1) - 1) / 100
+    return {c: (t[c] * k if t.get(c) is not None else None) for c in ("v", "lo", "hi")} | (
+        {"v": t["pendiente"] * k} if t.get("pendiente") is not None else {})

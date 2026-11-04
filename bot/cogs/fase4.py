@@ -127,9 +127,17 @@ class Fase4(commands.Cog):
             if not x:
                 continue
             tag = "**predecible**" if x["predecible"] else "variás"
+            # El intervalo es el del arranque habitual: "arriba" viene de la mitad de arriba del mapa, y si lo habitual
+            # es abajo había que darlo vuelta (decía "92 %" con un intervalo de 3 a 18 %).
+            a = x["arriba"]
+            ic = a if x["lado_habitual"] == "arriba" else {"v": 1 - a["v"], "lo": 1 - a["hi"], "hi": 1 - a["lo"]}
+            otro = "rojo" if x["buff_habitual"] == "azul" else "azul"
+            wr_h, wr_o = ((x["wr_arriba"], x["wr_abajo"]) if x["lado_habitual"] == "arriba" else (x["wr_abajo"], x["wr_arriba"]))
+            gana = (f"arrancando en el {x['buff_habitual']} ganás {F.pct(wr_h['v'])} ({wr_h['n']})"
+                    + (f", en el {otro} {F.pct(wr_o['v'])} ({wr_o['n']})" if wr_o.get("n") else ""))
             lineas += [f"**Lado {lado}** ({x['n']} partidas): arrancás en el buff {x['buff_habitual']} el "
-                       f"{F.pct(x['pct_habitual'])} → {tag}",
-                       f"-# arriba {F.rango_pct(x['arriba'])} · Fisher p sobre el winrate = {F.num(x['p'], 2) if x['p'] is not None else '—'}"]
+                       f"{F.pct(x['pct_habitual'])} de las veces → {tag}",
+                       f"-# de {F.rango_pct(ic)} de las veces · {gana}"]
         lineas.append(f"-# Arranque inferido por la posición en el minuto 1 (Riot no dice qué campamento hiciste primero). "
                       f"Predecible si todo el intervalo pasa el {F.pct(d['umbral'])}.")
         await ctx.reply(view=tarjeta_simple(lineas, f"{WEB}#/jugadores/{p['id']}"))
