@@ -39,6 +39,7 @@ CONFIG = RAIZ / "config" / "rosters.json"
 COLAS = ("flex", "normal")
 MIN_JUNTOS = 4  # del plantel en el mismo lado
 MIN_PARTIDAS = 10  # para publicar un roster
+SUMAR_CON = 3  # se suma al plantel quien jugó MIN_PARTIDAS o más con 3+ del plantel (un jugador puede estar en varios)
 MIN_COMPARAR = AJUSTES["min_partidas"]  # el umbral único de «muestra chica»
 ALFA = AJUSTES["ajuste_muestra"]["alfa"]
 DIA_MS = 86_400_000
@@ -100,6 +101,15 @@ def detectar(db: sqlite3.Connection, nombres: dict[str, str]) -> list[dict]:
         if planteles:
             planteles.remove(max(planteles, key=lambda c: len(c & p)))
         planteles.append(p)
+    # Louvain pone a cada jugador en una sola comunidad: el que juega con varios grupos queda afuera de todos.
+    # Se suma a quien jugó 10+ partidas con 3+ del plantel (una sola pasada, sin arrastrar a otros). Los planteles
+    # fijados a mano no se tocan.
+    manuales = [set(r["plantel"]) for r in fijos]
+    for plantel in planteles:
+        if plantel in manuales:
+            continue
+        con = Counter(q for s in lados.values() if len(s & plantel) >= SUMAR_CON for q in s - plantel)
+        plantel |= {q for q, n in con.items() if n >= MIN_PARTIDAS}
     nombres_cfg = {r["id"]: r["nombre"] for r in cfg.get("rosters", []) if r.get("id") and r.get("nombre")}
     out = []
     for plantel in planteles:
