@@ -9,7 +9,7 @@ from bot.cogs.perfil import WEB, tarjeta_simple
 from bot.services import formato as F
 
 PERIODOS = {"semana": "últimos 7 días", "mes": "últimos 30 días", "temporada": "temporada"}
-COLAS = {"solo": "solo", "soloq": "solo", "flex": "flex", "normal": "normal", "normales": "normal", "todo": "todo", "todas": "todo"}
+COLAS = F.COLAS  # el mismo diccionario en todos los comandos ("ranked", "todas"…)
 ROLES = {"top": "Top", "jungla": "Jungla", "jg": "Jungla", "mid": "Mid", "adc": "ADC", "bot": "ADC",
          "support": "Support", "supp": "Support", "sup": "Support"}
 MEDALLAS = ["🥇", "🥈", "🥉"]
@@ -69,12 +69,15 @@ def tarjeta_companeros(d: dict, nombres: dict, modo: str = "todo") -> discord.ui
     return tarjeta_simple(lineas, f"{WEB}#/rankings/companeros")
 
 
-def tarjeta_duos(d: dict, nombres: dict, modo: str = "todo") -> discord.ui.LayoutView:
-    """Dúos normalizados: juntos contra lo que daría cada uno por separado en el mismo período."""
+def tarjeta_duos(d: dict, nombres: dict, modo: str = "todo", pid: str | None = None) -> discord.ui.LayoutView:
+    """Dúos normalizados: juntos contra lo que daría cada uno por separado en el mismo período.
+    Con pid, solo las parejas de esa persona."""
     from bot.cogs.coaching import EN_MODO
     todas = (d.get("modos") or {}).get(modo, [])
+    if pid:
+        todas = [r for r in todas if pid in (r["a"], r["b"])]
     tabla = [r for r in todas if not r["muestra_chica"]]
-    lineas = ["## ¿Rinden juntos más que por separado?",
+    lineas = ["## ¿Rinden juntos más que por separado?" + (f" · {nombres.get(pid, pid)}" if pid else ""),
               f"-# Dúos con {d.get('min_juntos', 15) * 2}+ partidas juntos en {EN_MODO.get(modo, modo)} · contra el winrate de "
               "cada uno sin el otro en el mismo período"]
     pct = lambda v: f"{F.num(v * 100, 0)} %"  # noqa: E731
@@ -124,7 +127,7 @@ class Rankings(commands.Cog):
 
     @commands.hybrid_command(name="top", description="Ranking del grupo por período y cola (winrate ajustado)")
     async def top(self, ctx: commands.Context, periodo: str = "mes", cola: str = "solo"):
-        periodo, cola = periodo.lower(), COLAS.get(cola.lower())
+        periodo, cola = F.periodo(periodo), F.cola(cola)
         if periodo not in PERIODOS or not cola:
             await ctx.reply("Uso: `-top [semana|mes|temporada] [solo|flex|normal|todo]`", ephemeral=True)
             return
@@ -136,7 +139,7 @@ class Rankings(commands.Cog):
 
     @commands.hybrid_command(name="top_rol", description="Ranking por rol con la métrica de cada rol contra el rival directo")
     async def top_rol(self, ctx: commands.Context, rol: str = "top", cola: str = "solo", ventana: str = "temporada"):
-        rol, cola = ROLES.get(rol.lower()), COLAS.get(cola.lower())
+        rol, cola = ROLES.get(rol.lower()), F.cola(cola)
         if not rol or not cola:
             await ctx.reply("Uso: `-top_rol <top|jungla|mid|adc|support> [solo|flex|normal|todo] [temporada|reciente]`", ephemeral=True)
             return
@@ -149,8 +152,7 @@ class Rankings(commands.Cog):
 
     @commands.hybrid_command(name="companeros", description="Mejores compañeros: quién hace ganar más a los demás")
     async def companeros(self, ctx: commands.Context, modo: str = "todo"):
-        from bot.cogs.coaching import MODOS
-        if (m := MODOS.get(modo.lower())) is None:
+        if (m := F.cola(modo, ("solo", "normal", "todo"))) is None:
             await ctx.reply("Uso: `-companeros [solo|normal|todo]`", ephemeral=True)
             return
         await ctx.defer()
@@ -158,19 +160,29 @@ class Rankings(commands.Cog):
         await ctx.reply(view=tarjeta_companeros(await self.datos.ranking("companeros") or {}, nombres, m))
 
     @commands.hybrid_command(name="duos", description="Dúos: si rinden juntos más que lo que da cada uno por separado")
-    async def duos(self, ctx: commands.Context, modo: str = "todo"):
-        from bot.cogs.coaching import MODOS
-        if (m := MODOS.get(modo.lower())) is None:
-            await ctx.reply("Uso: `-duos [solo|normal|todo]`", ephemeral=True)
+    async def duos(self, ctx: commands.Context, *, texto: str | None = None):
+        # -duos, -duos normal, -duos lucca, -duos lucca solo: el modo al final y opcional.
+        partes = (texto or "").split()
+        m = "todo"
+        if partes and F.cola(partes[-1], ("solo", "normal", "todo")):
+            m = F.cola(partes.pop(), ("solo", "normal", "todo"))
+        elif partes and F.cola(partes[-1]):  # flex: los dúos no se separan por flex
+            await ctx.reply("Uso: `-duos [jugador] [solo|normal|todo]` (Flex va dentro de \"todo\").", ephemeral=True)
             return
+        pid = None
+        if partes:
+            p = await self.datos.buscar(" ".join(partes))
+            if not p:
+                await ctx.reply(await self.datos.no_encontre(" ".join(partes)), ephemeral=True)
+                return
+            pid = p["id"]
         await ctx.defer()
         nombres, _ = await self._contexto()
-        await ctx.reply(view=tarjeta_duos(await self.datos.ranking("duos") or {}, nombres, m))
+        await ctx.reply(view=tarjeta_duos(await self.datos.ranking("duos") or {}, nombres, m, pid))
 
     @commands.hybrid_command(name="mejoraron", description="Quién más mejoró: la tendencia de cada uno contra su franja")
     async def mejoraron(self, ctx: commands.Context, modo: str = "solo"):
-        from bot.cogs.coaching import MODOS
-        if (m := MODOS.get(modo.lower())) is None:
+        if (m := F.cola(modo, ("solo", "normal", "todo"))) is None:
             await ctx.reply("Uso: `-mejoraron [solo|normal|todo]`", ephemeral=True)
             return
         await ctx.defer()

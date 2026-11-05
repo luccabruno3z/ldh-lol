@@ -74,3 +74,41 @@ def cambio(t: dict) -> dict:
     k = (t.get("n", 1) - 1) / 100
     return {c: (t[c] * k if t.get(c) is not None else None) for c in ("v", "lo", "hi")} | (
         {"v": t["pendiente"] * k} if t.get("pendiente") is not None else {})
+
+
+# ---- Palabras que escribe la gente: un solo diccionario para todos los comandos ----
+# Antes había cuatro mapas distintos y "ranked" o "todas" andaban en unos comandos y en otros no.
+COLAS = {"solo": "solo", "soloq": "solo", "solodúo": "solo", "soloduo": "solo", "ranked": "solo", "rankeds": "solo",
+         "flex": "flex", "normal": "normal", "normales": "normal", "todo": "todo", "todas": "todo", "todos": "todo"}
+PERIODOS = {"semana": "semana", "semanal": "semana", "mes": "mes", "mensual": "mes", "temporada": "temporada",
+            "season": "temporada", "todo": "temporada"}
+MESES = {m: i for i, m in enumerate(("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+                                      "septiembre", "octubre", "noviembre", "diciembre"), 1)}
+MESES["setiembre"] = 9
+
+
+def normalizar(t: str) -> str:
+    """Sin tildes, sin mayúsculas y sin signos: "Glárrex#LAS" → "glarrexlas"."""
+    import re
+    import unicodedata
+    t = unicodedata.normalize("NFKD", t or "").encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]", "", t)
+
+
+def cola(texto: str | None, permitidas: tuple[str, ...] = ("solo", "flex", "normal", "todo")) -> str | None:
+    """'ranked' → 'solo', 'todas' → 'todo'. None si no es una cola de las permitidas para ese comando."""
+    c = COLAS.get(normalizar(texto or ""))
+    return c if c in permitidas else None
+
+
+def periodo(texto: str | None) -> str | None:
+    return PERIODOS.get(normalizar(texto or ""))
+
+
+def plural(n: int, uno: str, varios: str | None = None) -> str:
+    """plural(1, 'partida') → '1 partida'; plural(3, 'partida') → '3 partidas'."""
+    return f"{n} {uno if n == 1 else (varios or uno + 's')}"
+
+
+def partidas(n: int) -> str:
+    return plural(n, "partida")

@@ -20,7 +20,7 @@ class BuscarModal(discord.ui.Modal, title="Buscar jugador"):
         from bot.ui.perfil_vista import render
         p = await interaction.client.datos.buscar(str(self.jugador))
         if not p:
-            await interaction.response.send_message("No encontré a nadie con ese nombre en el grupo.", ephemeral=True)
+            await interaction.response.send_message(await interaction.client.datos.no_encontre(str(self.jugador)), ephemeral=True)
             return
         await interaction.response.defer(thinking=True)
         await interaction.followup.send(view=await render(interaction.client, p["id"], "resumen", "t", interaction.user.id))
@@ -35,7 +35,7 @@ class CompararModal(discord.ui.Modal, title="Comparar dos jugadores"):
         datos = interaction.client.datos
         pa, pb = await datos.buscar(str(self.a)), await datos.buscar(str(self.b))
         if not pa or not pb:
-            await interaction.response.send_message("No encontré a alguno de los dos en el grupo.", ephemeral=True)
+            await interaction.response.send_message(await datos.no_encontre(str(self.a if not pa else self.b)), ephemeral=True)
             return
         await interaction.response.defer(thinking=True)
         await interaction.followup.send(view=await tarjeta_comparar(interaction.client, pa["id"], pb["id"], None, None))

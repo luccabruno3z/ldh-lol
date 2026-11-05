@@ -20,7 +20,9 @@ def _val(m: dict, x: float | None) -> str:
     return _num(x, m.get("dec", 2), signo=m.get("clave", "").startswith("dif")) + (f" {m['unidad']}" if m.get("unidad") else "")
 
 
-MODOS = {"solo": "solo", "soloq": "solo", "normal": "normal", "normales": "normal", "todo": "todo", "todas": "todo"}
+from bot.services.formato import COLAS as _COLAS
+# Coaching tiene solo/dúo, normales y todo (Flex no tiene referencia propia): el resto de las palabras, del diccionario único.
+MODOS = {k: v for k, v in _COLAS.items() if v in ("solo", "normal", "todo")}
 EN_MODO = {"solo": "solo/dúo", "normal": "normales", "todo": "todas las colas"}
 
 

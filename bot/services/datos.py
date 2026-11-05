@@ -169,15 +169,56 @@ class Datos:
         return await self._json("ajustes.json") or {}
 
     async def buscar(self, texto: str) -> dict | None:
-        """Por id, nombre o Riot ID (con o sin #TAG). Solo personas vinculadas."""
-        t = texto.strip().lower()
+        """Por id, nombre o Riot ID (con o sin #TAG), sin importar tildes ni mayúsculas. Solo personas vinculadas.
+        Si el texto parcial coincide con más de una persona, no se elige al azar: devuelve None."""
+        from bot.services.formato import normalizar as N
+        t = N(texto)
+        if not t:
+            return None
         personas = await self.personas()
         for criterio in (
-            lambda p: p["id"] == t or p["nombre"].lower() == t,
-            lambda p: any(c.lower() == t or c.lower().split("#")[0] == t for c in p["cuentas"]),
-            lambda p: t in p["nombre"].lower() or any(t in c.lower() for c in p["cuentas"]),
+            lambda p: N(p["id"]) == t or N(p["nombre"]) == t,
+            lambda p: any(N(c) == t or N(c.split("#")[0]) == t for c in p["cuentas"]),
+            lambda p: N(p["nombre"]).startswith(t) or any(N(c).startswith(t) for c in p["cuentas"]),
+            lambda p: t in N(p["nombre"]) or any(t in N(c) for c in p["cuentas"]),
         ):
-            hallado = next((p for p in personas if criterio(p)), None)
-            if hallado:
-                return hallado
+            hallados = [p for p in personas if criterio(p)]
+            if len(hallados) == 1:
+                return hallados[0]
+            if len(hallados) > 1:
+                return None
         return None
+
+    async def sugerir(self, texto: str, n: int = 3) -> list[str]:
+        """Nombres parecidos para "¿Quisiste decir…?": los que contienen el texto y, si no hay, los más parecidos."""
+        import difflib
+
+        from bot.services.formato import normalizar as N
+        t = N(texto)
+        personas = await self.personas()
+        if not t:
+            return []
+        contienen = [p["nombre"] for p in personas
+                     if t in N(p["nombre"]) or any(t in N(c) for c in p["cuentas"])]
+        if contienen:
+            return contienen[:n]
+        claves = {N(p["nombre"]): p["nombre"] for p in personas}
+        claves.update({N(c.split("#")[0]): p["nombre"] for p in personas for c in p["cuentas"]})
+        vistos = []
+        for k in difflib.get_close_matches(t, list(claves), n=n * 2, cutoff=0.6):
+            if claves[k] not in vistos:
+                vistos.append(claves[k])
+        return vistos[:n]
+
+    async def no_encontre(self, texto: str) -> str:
+        """El mensaje de "no encontré" con sugerencias, igual en todos los comandos."""
+        import discord
+        nombre = discord.utils.escape_markdown(texto.strip())
+        sug = await self.sugerir(texto)
+        if len(sug) > 1 and all(len(s) for s in sug):
+            extra = " ¿Cuál de estos? " + ", ".join(f"**{discord.utils.escape_markdown(s)}**" for s in sug) + "."
+        elif sug:
+            extra = f" ¿Quisiste decir **{discord.utils.escape_markdown(sug[0])}**?"
+        else:
+            extra = " Solo aparecen las cuentas que se vincularon."
+        return f"No encontré a **{nombre}** en el grupo.{extra}"

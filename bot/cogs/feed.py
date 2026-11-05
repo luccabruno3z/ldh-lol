@@ -25,7 +25,9 @@ logger = logging.getLogger(__name__)
 ARG = timezone(timedelta(hours=-3))
 ORDEN_TIER = ["IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"]
 ORDEN_DIV = {"IV": 0, "III": 1, "II": 2, "I": 3}
-COLAS = {"solo": "solo", "soloq": "solo", "flex": "flex", "normal": "normal", "normales": "normal", "todas": None}
+# -competencia: None = todas las colas. Las palabras salen del diccionario único ("ranked", "todo"/"todas"…).
+from bot.services import formato as _F
+COLAS = {k: (None if v == "todo" else v) for k, v in _F.COLAS.items()}
 
 
 def _valor(r: dict | None) -> int | None:
@@ -40,7 +42,14 @@ def _rango(r: dict) -> str:
 
 
 def _fecha(texto: str, hoy: datetime) -> datetime | None:
-    """'1/11', '01/11' o '1/11/2026' (hora argentina)."""
+    """'1/11', '01/11', '1/11/2026', 'hoy', 'ayer' o un mes ('noviembre' = el 1.º de ese mes), en hora argentina."""
+    t = _F.normalizar(texto)
+    if t in ("hoy", "ayer"):
+        d = hoy - timedelta(days=1 if t == "ayer" else 0)
+        return datetime(d.year, d.month, d.day, tzinfo=ARG)
+    if t in _F.MESES:
+        m = _F.MESES[t]
+        return datetime(hoy.year - (1 if m > hoy.month else 0), m, 1, tzinfo=ARG)
     try:
         partes = [int(x) for x in texto.replace("-", "/").split("/")]
         anio = partes[2] if len(partes) > 2 else hoy.year
@@ -110,9 +119,16 @@ class Feed(commands.Cog):
     async def competencia(self, ctx: commands.Context, desde: str, hasta: str | None = None, cola: str = "solo"):
         hoy = datetime.now(ARG)
         d = _fecha(desde, hoy)
-        h = (_fecha(hasta, hoy) + timedelta(days=1)) if hasta else hoy + timedelta(days=1)
+        if hasta and _F.cola(hasta) and not _fecha(hasta, hoy):  # -competencia noviembre flex
+            hasta, cola = None, hasta
+        if not hasta and _F.normalizar(desde) in _F.MESES and d:  # un mes solo: hasta fin de ese mes
+            fin = (d.replace(day=28) + timedelta(days=4)).replace(day=1)
+            h = min(fin, hoy + timedelta(days=1))
+        else:
+            h = (_fecha(hasta, hoy) + timedelta(days=1)) if hasta and _fecha(hasta, hoy) else (None if hasta else hoy + timedelta(days=1))
         if not d or not h or h <= d or cola.lower() not in COLAS:
-            await ctx.reply("Uso: `-competencia <desde dd/mm> [hasta dd/mm] [solo|flex|normal|todas]`", ephemeral=True)
+            await ctx.reply("Uso: `-competencia <desde> [hasta] [solo|flex|normal|todas]`\n"
+                            "-# Fechas como `1/11`, `hoy`, `ayer` o un mes (`-competencia noviembre`).", ephemeral=True)
             return
         await ctx.defer()
         nombres = {p["id"]: p["nombre"] for p in await self.datos.personas()}

@@ -375,7 +375,7 @@ class Extra(commands.Cog):
         from bot.ui.menu import menu
         await ctx.reply(view=menu(ctx.author.id))
 
-    @commands.hybrid_command(name="ayuda", description="Qué hace el bot, por tema")
+    @commands.hybrid_command(name="ayuda", aliases=["help", "comandos"], description="Qué hace el bot, por tema")
     async def ayuda(self, ctx: commands.Context):
         await ctx.reply(view=AyudaVista())
 
@@ -385,8 +385,17 @@ class Extra(commands.Cog):
         await ctx.reply(view=_VistaTexto(GLOSARIO, "Glosario", inicial))
 
     @commands.hybrid_command(name="tips", description="Consejos de juego para un rol")
-    async def tips(self, ctx: commands.Context, rol: str = "top"):
-        rol_n = ROLES.get(rol.lower())
+    async def tips(self, ctx: commands.Context, rol: str | None = None):
+        if rol is None:  # sin rol: el principal del vinculado, como el botón del menú
+            pid = self.bot.get_cog("Perfil").vinculos.get(str(ctx.author.id))
+            d = await self.bot.datos.coaching_auto(pid) if pid else None
+            rol_n = (d or {}).get("rol_principal") or (d or {}).get("rol_con_referencia")
+            if not rol_n:
+                await ctx.reply("Uso: `-tips <top|jungla|mid|adc|support>`\n-# Sin rol uso el tuyo principal, "
+                                "pero para eso tenés que estar vinculado (`-vincular`).", ephemeral=True)
+                return
+        else:
+            rol_n = ROLES.get(rol.lower())
         if not rol_n:
             await ctx.reply("Uso: `-tips <top|jungla|mid|adc|support>`", ephemeral=True)
             return
@@ -397,11 +406,22 @@ class Extra(commands.Cog):
     async def comparar(self, ctx: commands.Context, jugador: str, otro: str, cola: str | None = None, rol: str | None = None):
         pa, pb = await self.datos.buscar(jugador), await self.datos.buscar(otro)
         if not pa or not pb:
-            await ctx.reply("No encontré a alguno de los dos. Uso: `-comparar <jugador> <otro> [solo|flex|normal|todo] [rol]`", ephemeral=True)
+            await ctx.reply(await self.datos.no_encontre(jugador if not pa else otro)
+                            + "\n-# Uso: `-comparar <jugador> <otro> [solo|flex|normal|todo] [rol]`", ephemeral=True)
+            return
+        if cola and not ROLES.get(cola.lower()) and not F.cola(cola):
+            await ctx.reply(f"No conozco la cola **{discord.utils.escape_markdown(cola)}**. Uso: "
+                            "`-comparar <jugador> <otro> [solo|flex|normal|todo] [rol]`", ephemeral=True)
+            return
+        if cola and ROLES.get(cola.lower()) and not rol:  # -comparar a b jungla
+            cola, rol = None, cola
+        if rol and not ROLES.get(rol.lower()):
+            await ctx.reply(f"No conozco el rol **{discord.utils.escape_markdown(rol)}**: top, jungla, mid, adc o support.",
+                            ephemeral=True)
             return
         await ctx.defer()
         await ctx.reply(view=await tarjeta_comparar(self.bot, pa["id"], pb["id"],
-                                                    COLAS.get((cola or "").lower()), ROLES.get((rol or "").lower())))
+                                                    F.cola(cola), ROLES.get((rol or "").lower())))
 
     @commands.hybrid_command(name="grafico", description="Evolución del winrate, tendencia de mejora o radar de tus componentes")
     @app_commands.autocomplete(jugador=autocompletar_jugador, tipo=autocompletar_opciones("tendencia", "evolucion", "radar", "franjas", "rachas", "muertes", "curva"),
@@ -418,6 +438,10 @@ class Extra(commands.Cog):
         from bot.ui.coaching_vista import responder
         if rol and rol.lower() in MODOS and not modo:  # -grafico lucca radar todo
             rol, modo = None, rol
+        if (rol and not ROLES.get(rol.lower())) or (modo and modo.lower() not in MODOS):
+            await ctx.reply("Uso: `-grafico [jugador] [tendencia|evolucion|radar|franjas|rachas|muertes|curva] [rol] "
+                            "[solo|normal|todo]`", ephemeral=True)
+            return
         vista = {"ten": "gten", "rad": "grad", "fra": "gfra", "rac": "grac", "mue": "gmue", "cur": "gcur"}.get(tipo.lower()[:3], "gevo")
         # Con menús para cambiar de gráfico, rol y modo sin volver a escribir el comando.
         await responder(ctx, self.bot, vista, p["id"], ROLES.get((rol or "").lower()), MODOS.get((modo or "").lower()))

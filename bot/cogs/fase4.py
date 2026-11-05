@@ -99,6 +99,10 @@ class Fase4(commands.Cog):
     async def matchups(self, ctx: commands.Context, jugador: str | None = None, cola: str = "solo"):
         if not (p := await self._persona(ctx, jugador, "matchups")):
             return
+        if not (c := F.cola(cola, ("solo", "flex", "normal"))):
+            await ctx.reply("Uso: `-matchups [jugador] [solo|flex|normal]`", ephemeral=True)
+            return
+        cola = c
         d = await self.datos.matchups(p["id"]) or {"tabla": []}
         champs = await self.datos.campeones()
         nc = (await self.datos.ajustes()).get("nombres_cola", {})
@@ -209,17 +213,31 @@ class Fase4(commands.Cog):
 
 async def tarjeta_inhouse(bot, texto: str) -> discord.ui.LayoutView:
     """Compartida por -inhouse y el botón del menú."""
-    partes = [x.strip() for x in re.split(r"[,\n;]+", texto) if x.strip()]
-    if len(partes) != 10:
-        partes = [x for x in texto.split() if x]
-    pids, faltan = [], []
+    # Por coma, punto y coma o renglón. Sin ninguno de esos, por espacios (los nombres con espacio necesitan coma).
+    sep = r"[,\n;]+" if re.search(r"[,\n;]", texto) else r"\s+"
+    partes = [x.strip() for x in re.split(sep, texto) if x.strip()]
+    pids, nombres, faltan, repetidos = [], [], [], []
     for x in partes:
         p = await bot.datos.buscar(x)
-        (pids.append(p["id"]) if p and p["id"] not in pids else faltan.append(x))
+        if not p:
+            faltan.append(x)
+        elif p["id"] in pids:
+            repetidos.append(p["nombre"])
+        else:
+            pids.append(p["id"])
+            nombres.append(p["nombre"])
     if len(pids) != 10:
-        return tarjeta_simple(["## Inhouse", f"Necesito 10 jugadores distintos del grupo; encontré {len(pids)}.",
-                               f"-# No encontré o repetidos: {', '.join(faltan) or '—'}. Separalos con coma: "
-                               "`-inhouse lucca, glarrex, mac55, …`"], f"{WEB}#/equipos")
+        esc = discord.utils.escape_markdown
+        lineas = ["## Inhouse", f"Necesito 10 jugadores distintos del grupo y reconocí {len(pids)}."]
+        if nombres:
+            lineas.append(f"**Reconocí:** {', '.join(esc(n) for n in nombres)}")
+        for x in faltan:
+            lineas.append(f"**No encontré:** {esc(x)}"
+                          + (f" (¿{', '.join(esc(s) for s in sug)}?)" if (sug := await bot.datos.sugerir(x)) else ""))
+        if repetidos:
+            lineas.append(f"**Repetidos:** {', '.join(esc(n) for n in repetidos)}")
+        lineas.append("-# Separalos con coma: `-inhouse lucca, glarrex, mac55, …`")
+        return tarjeta_simple(lineas, f"{WEB}#/equipos")
     eq = await bot.datos.equipos()
     champs_nombre = await bot.datos.campeones()
     r = balancear(eq, pids)

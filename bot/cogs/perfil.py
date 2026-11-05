@@ -156,6 +156,25 @@ def tarjeta_sinergia(p: dict, d: dict, nombres: dict, nombre_cola: dict) -> disc
     return tarjeta_simple(lineas, f"{WEB}#/jugadores/{p['id']}")
 
 
+class ConfirmarVinculo(discord.ui.View):
+    """Confirmación cuando el vínculo pisa otro: no es persistente (dura 2 minutos) porque es de un solo uso."""
+
+    def __init__(self, cog, discord_id: str, p: dict):
+        super().__init__(timeout=120)
+        self.cog, self.discord_id, self.p = cog, discord_id, p
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return str(interaction.user.id) == self.discord_id
+
+    @discord.ui.button(label="Sí, vincularme", style=discord.ButtonStyle.danger)
+    async def si(self, interaction: discord.Interaction, _b: discord.ui.Button):
+        await interaction.response.edit_message(content=self.cog._vincular(self.discord_id, self.p), view=None)
+
+    @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.secondary)
+    async def no(self, interaction: discord.Interaction, _b: discord.ui.Button):
+        await interaction.response.edit_message(content="Listo, no cambié nada.", view=None)
+
+
 class Perfil(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -169,14 +188,35 @@ class Perfil(commands.Cog):
     async def vincular(self, ctx: commands.Context, *, jugador: str):
         p = await self.datos.buscar(jugador)
         if not p:
-            await ctx.reply(f"No encontré a **{discord.utils.escape_markdown(jugador)}** entre los jugadores publicados. "
-                            "Solo aparecen las cuentas que se vincularon: pedile a Lucca que te sume.", ephemeral=True)
+            await ctx.reply(await self.datos.no_encontre(jugador) + " Si no estás en el grupo, pedile a Lucca que te sume.",
+                            ephemeral=True)
             return
-        self.vinculos.set(str(ctx.author.id), p["id"])
-        await ctx.reply(f"Listo: quedaste vinculado a **{discord.utils.escape_markdown(p['nombre'])}**. "
-                        "Ahora `-perfil` sin nombre muestra el tuyo.\n"
-                        "-# Tus estadísticas son públicas en la web y en el bot porque te sumaste al grupo. "
-                        "Si querés dejar de aparecer, pedíselo a Lucca y se saca tu cuenta.")
+        yo = str(ctx.author.id)
+        otros = [d for d, pid in self.vinculos.all().items() if pid == p["id"] and d != yo]
+        antes = self.vinculos.get(yo)
+        nombre = discord.utils.escape_markdown(p["nombre"])
+        if antes == p["id"]:
+            await ctx.reply(f"Ya estabas vinculado a **{nombre}**.", ephemeral=True)
+            return
+        avisos = []
+        if otros:
+            avisos.append(f"**{nombre}** ya está vinculado a otro usuario de Discord. Si no sos vos, no sigas: "
+                          "vincularte a la cuenta de otro muestra sus datos como si fueran tuyos.")
+        if antes:
+            antes_p = await self.datos.perfil(antes)
+            avisos.append(f"Ahora estás vinculado a **{discord.utils.escape_markdown((antes_p or {}).get('nombre', antes))}**; "
+                          "lo cambiarías.")
+        if avisos:
+            await ctx.reply("\n".join(avisos), view=ConfirmarVinculo(self, yo, p), ephemeral=True)
+            return
+        await ctx.reply(self._vincular(yo, p))
+
+    def _vincular(self, discord_id: str, p: dict) -> str:
+        self.vinculos.set(discord_id, p["id"])
+        return (f"Listo: quedaste vinculado a **{discord.utils.escape_markdown(p['nombre'])}**. "
+                "Ahora `-perfil` sin nombre muestra el tuyo.\n"
+                "-# Tus estadísticas son públicas en la web y en el bot porque te sumaste al grupo. "
+                "Si querés dejar de aparecer, pedíselo a Lucca y se saca tu cuenta.")
 
     @commands.hybrid_command(name="desvincular", description="Borra tu vínculo")
     async def desvincular(self, ctx: commands.Context):
@@ -195,7 +235,7 @@ class Perfil(commands.Cog):
             p = {"id": pid}
         perfil = await self.datos.perfil(p["id"]) if p else None
         if not perfil:
-            await ctx.reply("No encontré ese jugador. Solo aparecen las cuentas que se vincularon.", ephemeral=True)
+            await ctx.reply(await self.datos.no_encontre(jugador or ""), ephemeral=True)
         return perfil
 
     async def _abrir(self, ctx: commands.Context, jugador: str | None, comando: str, tab: str):

@@ -234,12 +234,19 @@ async def main():
         elif a.comando:
             ctx = _ctx_falso(bot, cap, a.comando)
             if ctx.command is None:
-                cap.bloques.append(f"=== el bot no tiene el comando «{ctx.invoked_with}» (no contesta nada) ===")
+                from discord.ext import commands as _c
+                await bot.on_command_error(ctx, _c.CommandNotFound(f'Command "{ctx.invoked_with}" is not found'))
+                if not cap.bloques:
+                    cap.bloques.append(f"=== el bot no tiene el comando «{ctx.invoked_with}» (no contesta nada) ===")
             else:
                 try:
                     await ctx.command.invoke(ctx)
                 except Exception as e:  # lo que en Discord sería un error del comando
-                    cap.bloques.append(f"=== error del comando: {type(e).__name__}: {e} ===")
+                    from discord.ext import commands as _c
+                    if isinstance(e, _c.UserInputError):
+                        await bot.on_command_error(ctx, e)  # el bot contesta el modo de uso
+                    else:
+                        cap.bloques.append(f"=== error del comando: {type(e).__name__}: {e} ===")
         else:
             ap.error("pasá un comando o --tocar")
     finally:

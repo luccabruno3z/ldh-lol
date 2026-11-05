@@ -84,8 +84,28 @@ class Bot(commands.Bot):
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
         # Otro bot del servidor usa el mismo prefijo "-" (-work, -bj…): un comando que no es nuestro no es un error.
         if isinstance(error, commands.CommandNotFound):
+            if (ctx.invoked_with or "").lower() in ("help", "comandos", "commands"):
+                await ctx.reply("Probá `-ayuda` (o `-menu` para los botones).")
             return
-        await super().on_command_error(ctx, error)
+        if isinstance(error, (commands.MissingRequiredArgument, commands.BadArgument, commands.TooManyArguments,
+                              commands.BadUnionArgument, commands.ArgumentParsingError)) and ctx.command:
+            nombre = ctx.command.qualified_name
+            firma = ctx.command.signature.replace("=None", "").replace("_", " ")
+            que = (f"Falta **{error.param.name}**." if isinstance(error, commands.MissingRequiredArgument)
+                   else "No entendí los datos del comando.")
+            uso = f"-{nombre} {firma}".strip()
+            await ctx.reply(f"{que} Uso: `{uso}`" +
+                            "\n-# `<…>` es obligatorio y `[…]` opcional. Más en `-ayuda`.", ephemeral=True)
+            return
+        if isinstance(error, commands.CheckFailure):
+            if not (ctx.cog and ctx.cog.has_error_handler()):  # Extra y Feed ya contestan los permisos
+                await ctx.reply("Ese comando no se puede usar acá o te falta permiso.", ephemeral=True)
+            return
+        logger.error("Error en -%s", ctx.command, exc_info=error)
+        try:
+            await ctx.reply("Algo falló con ese comando. Ya quedó anotado; probá de nuevo en un rato.", ephemeral=True)
+        except discord.HTTPException:
+            pass
 
 
 async def main():
