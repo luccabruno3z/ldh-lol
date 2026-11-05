@@ -41,6 +41,44 @@ class PartidaBoton(discord.ui.DynamicItem[discord.ui.Button],
         await interaction.edit_original_response(view=view, attachments=[discord.File(png, "partida.png")] if png else [])
 
 
+def mmss(t: int) -> str:
+    return f"{t // 60000}:{t // 1000 % 60:02d}"
+
+
+def linea_momento(x: dict, pid: str, eq: int, nombres: dict) -> str:
+    """Un momento para el VOD en una línea, desde el lado de quien mira (igual que la web)."""
+    nom = lambda i: "vos" if i == pid else nombres.get(i, i)  # noqa: E731
+    if x["tipo"] == "muerte":
+        u = list(dict.fromkeys(x.get("perdidos") or []))
+        quien = "Moriste" if x["persona"] == pid else f"Murió {nombres.get(x['persona'], x['persona'])}"
+        return (f"{quien}: −{F.num(x['costo'] * 100, 0)} pts para su equipo"
+                + (f" (después el rival tomó {', '.join(OBJ.get(o, o) for o in u)})" if u else ""))
+    dv = x["delta"] if eq == 100 else -x["delta"]
+    nos, ellos = (x["kills"]["azul"], x["kills"]["rojo"]) if eq == 100 else (x["kills"]["rojo"], x["kills"]["azul"])
+    que = []
+    if nos:
+        que.append(f"tu equipo hizo {F.plural(nos, 'kill', 'kills')}")
+    if ellos:
+        que.append(f"el rival hizo {F.plural(ellos, 'kill', 'kills')}")
+    que += [f"{'tu equipo tomó' if o['equipo'] == eq else 'el rival tomó'} {OBJ.get(o['tipo'], o['tipo'])}"
+            for o in x.get("objetivos") or []]
+    if x.get("muertes"):
+        ms = [nom(m["persona"]) for m in x["muertes"]]
+        que.append(f"murieron {' y '.join(ms)}" if len(ms) > 1 else "moriste" if ms == ["vos"] else f"murió {ms[0]}")
+    return (f"La chance de tu equipo {'subió' if dv > 0 else 'bajó'} {F.num(abs(dv) * 100, 0)} pts entre el "
+            f"{mmss(x['desde'])} y el {mmss(x['hasta'])}: {', '.join(que) or 'oro y oleadas, sin kills ni objetivos'}")
+
+
+def lista_vod(d: dict, pid: str, eq: int, nombres: dict) -> list[str]:
+    ms = d.get("momentos") or []
+    if not ms:
+        return []
+    return (["**Para revisar en el VOD**"]
+            + [f"`{i}` **{mmss(x['t'])}** · {linea_momento(x, pid, eq, nombres)}" for i, x in enumerate(ms, 1)]
+            + ["-# Donde más se movió la chance según el modelo y las muertes del grupo que más la bajaron. "
+               "El minuto es el del primer evento del tramo. Es una estimación, no la causa: sirve para elegir qué mirar."])
+
+
 def _perdidos(xs) -> str:
     u = list(dict.fromkeys(xs or []))
     return f", el rival tomó {', '.join(OBJ.get(x, x) for x in u)}" if u else ""
@@ -71,7 +109,7 @@ async def vista_partida(bot, pid: str, i: int, owner: int) -> tuple[discord.ui.L
             lado = d["lados"].get(pid, "azul")
             eq = 100 if lado == "azul" else 200
             lineas = [cab]
-            k = d.get("clave")
+            k = None if d.get("momentos") else d.get("clave")
             if k:
                 dv = k["delta"] if lado == "azul" else -k["delta"]
                 ev = [e for e in d["eventos"] if k["min"] - 1 < e["min"] <= k["min"] and (e["tipo"] in OBJ or e["tipo"] == "muerte")]
@@ -87,9 +125,11 @@ async def vista_partida(bot, pid: str, i: int, owner: int) -> tuple[discord.ui.L
                 lineas.append("**Tus muertes más caras:** " + " · ".join(
                     f"min {F.num(e['min'], 0)}: −{F.num(e['costo'] * 100, 0)} pts{_perdidos(e.get('perdidos'))}"
                     for e in muertes[:3]))
+            nombres = {p["id"]: p.get("nombre", p["id"]) for p in await datos.personas()}
+            lineas += lista_vod(d, pid, eq, nombres)
             lineas.append("-# Probabilidad de ganar de tu equipo minuto a minuto (modelo de la web, Guías). "
                           "Rojo: tus muertes; el tamaño es cuánto estima el modelo que bajó tus chances cada una, "
-                          "así que la más grande puede no ser la del minuto que más se movió.")
+                          "así que la más grande puede no ser la del minuto que más se movió. Los números son los de la lista.")
             texto = "\n".join(lineas)
             png = graficos.curva_partida(d, pid, f"{perfil['nombre']} · {champ} · {'victoria' if m['win'] else 'derrota'}")
     items: list[discord.ui.Item] = [discord.ui.TextDisplay(texto[:3900])]

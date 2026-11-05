@@ -207,6 +207,44 @@ def _costo(p: V.Partida, m: dict, k: int, equipo: int) -> tuple[float, list[str]
     return sin - real, perdidos
 
 
+GIROS_VOD = 3  # minutos que más movieron la chance
+MUERTES_VOD = 3  # muertes de vinculados que más la bajaron
+CLASES_VOD = ("baron", "ancestral", "dragon", "heraldo", "larva", "torre", "inhib")
+
+
+def momentos(p: V.Partida, m: dict, muertes_p: list[dict]) -> list[dict]:
+    """Para revisar en el VOD: los minutos donde más se movió la chance (con lo que pasó en ese minuto) y
+    las muertes de vinculados que más la bajaron, ordenados por tiempo. El signo del giro es el del azul
+    (como la curva); quien lo muestra lo da vuelta según el lado. Es una estimación del modelo, no la causa.
+    Los giros se miden entre frames (no en el minuto redondo, que cae unos ms antes del frame y deja el oro
+    de ese minuto afuera), así el oro y los eventos del tramo quedan juntos."""
+    tf = p.t_frames
+    q = [V.prob(m, p.estado(t)) for t in tf]
+    saltos = sorted(range(1, len(tf)), key=lambda k: -abs(q[k] - q[k - 1]))
+    out = []
+    for k in saltos[:GIROS_VOD]:
+        delta = round(q[k] - q[k - 1], 3)
+        if abs(delta) < 0.02:  # menos de 2 puntos no es un momento
+            continue
+        desde, hasta = tf[k - 1], tf[k]
+        ev = [(t, c, eq) for t, c, eq, _ in p.eventos if desde < t <= hasta and (c == "kill" or c in CLASES_VOD)]
+        kills = {100: sum(1 for _, c, eq in ev if c == "kill" and eq == 100),
+                 200: sum(1 for _, c, eq in ev if c == "kill" and eq == 200)}
+        out.append({"tipo": "giro", "t": ev[0][0] if ev else desde, "desde": desde, "hasta": hasta,
+                    "delta": delta, "kills": {"azul": kills[100], "rojo": kills[200]},
+                    "objetivos": [{"tipo": c, "equipo": eq} for _, c, eq in ev if c != "kill"]})
+    for d in sorted(muertes_p, key=lambda d: -d["costo"])[:MUERTES_VOD]:
+        if d["costo"] < 0.01:
+            continue
+        x = {"t": d["t"], "persona": d["persona"], "costo": d["costo"], "perdidos": d["perdidos"], "zona": d["zona"]}
+        giro = next((g for g in out if g["tipo"] == "giro" and g["desde"] < d["t"] <= g["hasta"]), None)
+        if giro:  # cae en un minuto que ya está en la lista: va adentro, no en otra fila
+            giro.setdefault("muertes", []).append(x)
+        else:
+            out.append({"tipo": "muerte", **x})
+    return sorted(out, key=lambda x: x["t"])
+
+
 def muertes_y_partidas(db: sqlite3.Connection, m: dict) -> tuple[dict, dict]:
     """(muertes por persona, curva de cada partida). Cada muerte: minuto, costo, zona, fase, lo que se perdió
     y si el equipo iba arriba. Cada partida: la probabilidad del azul por minuto y los momentos clave."""
@@ -221,8 +259,9 @@ def muertes_y_partidas(db: sqlite3.Connection, m: dict) -> tuple[dict, dict]:
         if mid not in amigos:
             continue
         p = V.Partida(json.loads(gzip.decompress(_ruta("timelines", mid, inicio).read_bytes())))
-        curva = [round(V.prob(m, p.estado(t)), 3) for t in range(0, p.fin + 1, MIN_MS)]
-        eventos = []
+        # En cada frame (no en el minuto redondo, que cae unos ms antes y deja afuera el oro de ese minuto).
+        curva = [round(V.prob(m, p.estado(t)), 3) for t in p.t_frames]
+        eventos, muertes_p = [], []
         for k, (t, clase, eq, e) in enumerate(p.eventos):
             if clase == "kill":
                 vic, mat = e.get("victimId"), e.get("killerId")
@@ -242,6 +281,7 @@ def muertes_y_partidas(db: sqlite3.Connection, m: dict) -> tuple[dict, dict]:
                          "perdidos": perdidos, "arriba": antes > 0.5, "x": vx, "y": vy,
                          "rol": rol, "cola": cola, "inicio": inicio}
                     muertes[pid].append(d)
+                    muertes_p.append({**d, "persona": pid})
                     eventos.append({"min": d["min"], "tipo": "muerte", "persona": pid, "costo": d["costo"],
                                     "perdidos": perdidos})
                 if mat in amigos[mid]:
@@ -252,7 +292,8 @@ def muertes_y_partidas(db: sqlite3.Connection, m: dict) -> tuple[dict, dict]:
         clave = max(range(len(saltos)), key=saltos.__getitem__) + 1 if saltos else None
         partidas[mid] = {"curva": curva, "ganador": ganador, "cola": cola, "inicio": inicio,
                          "lados": {pid: lado for pid, lado, _ in amigos[mid].values()},
-                         "eventos": eventos, "clave": None if clave is None else
+                         "eventos": eventos, "momentos": momentos(p, m, muertes_p),
+                         "clave": None if clave is None else
                          {"min": clave, "delta": round(curva[clave] - curva[clave - 1], 3)}}
     return muertes, partidas
 

@@ -35,7 +35,7 @@ Las tarjetas con menús solo las maneja quien las abrió y siguen andando despu�
 | `-temprano` | CS, oro y XP a los 10 y 15 contra tu rival directo. |
 | `-cierre [jugador] [modo]` | ¿Cerrás las que ibas ganando? Ganadas contra esperadas según la probabilidad al minuto 15. |
 | `-rachas` | Tu winrate según cómo venías: rachas y pausas. |
-| `-partida [jugador] [n]` | Tu probabilidad de ganar minuto a minuto, con ◀ ▶ para recorrer partidas. |
+| `-partida [jugador] [n]` (o `-vod`) | Tu probabilidad de ganar minuto a minuto y la lista «Para revisar en el VOD» (hasta 6 momentos en mm:ss), con ◀ ▶ para recorrer partidas. |
 | `-informe [jugador]` | Tu informe de coaching: dos prioridades con su evidencia. |
 
 Desde el menú de coaching también están los gráficos: contra cada franja, radar, tendencia, winrate en el tiempo, rachas, chances al morir y curva de aprendizaje.

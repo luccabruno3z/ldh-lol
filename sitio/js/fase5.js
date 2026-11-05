@@ -1,7 +1,7 @@
 /* fase5.js — bloques del perfil que salen de la investigación: rachas y pausas (Deng 2024). Cada bloque falla
    solo. Cada persona se compara consigo misma: si no, el que juega peor aparece más en las rachas. */
 
-import { cachedFetch, EN_MODO, rolGuardado, elegirRol, alCambiarRol } from './data.js';
+import { state, cachedFetch, EN_MODO, rolGuardado, elegirRol, alCambiarRol } from './data.js';
 import { escapeHtml, num, campeon, conIntervalo, pistaDif, como } from './utils.js';
 
 const pct = (v) => (v == null ? '—' : `${num(v * 100, 0)} %`);
@@ -226,6 +226,54 @@ function conclusionConversion(m) {
 
 const ICONO = { baron: 'B', ancestral: 'A', dragon: 'D', heraldo: 'H', inhib: 'I' };
 
+const mmss = (t) => `${Math.floor(t / 60000)}:${String(Math.floor(t / 1000) % 60).padStart(2, '0')}`;
+const nombreDe = (id) => state.personas.find(p => p.id === id)?.nombre || id;
+const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+
+/** Una línea por momento, en texto plano (para la lista y para copiar). eq: el equipo de quien mira. */
+function lineaMomento(x, pid, eq) {
+    const quien = (id) => (id === pid ? 'vos' : nombreDe(id));
+    if (x.tipo === 'muerte') {
+        const u = [...new Set(x.perdidos || [])].map(o => OBJ[o] || o);
+        return `${x.persona === pid ? 'Moriste' : `Murió ${nombreDe(x.persona)}`}: −${P(x.costo, 0)} pts para su equipo${u.length ? ` (después el rival tomó ${u.join(', ')})` : ''}`;
+    }
+    const dv = eq === 100 ? x.delta : -x.delta;
+    const nos = eq === 100 ? x.kills.azul : x.kills.rojo, ellos = eq === 100 ? x.kills.rojo : x.kills.azul;
+    const que = [];
+    if (nos) que.push(`tu equipo hizo ${plural(nos, 'kill', 'kills')}`);
+    if (ellos) que.push(`el rival hizo ${plural(ellos, 'kill', 'kills')}`);
+    for (const o of x.objetivos || []) que.push(`${o.equipo === eq ? 'tu equipo tomó' : 'el rival tomó'} ${OBJ[o.tipo] || o.tipo}`);
+    if (x.muertes?.length) {
+        const ms = x.muertes.map(m => quien(m.persona));
+        que.push(ms.length > 1 ? `murieron ${ms.join(' y ')}` : ms[0] === 'vos' ? 'moriste' : `murió ${ms[0]}`);
+    }
+    return `La chance de tu equipo ${dv > 0 ? 'subió' : 'bajó'} ${P(Math.abs(dv), 0)} pts entre el ${mmss(x.desde)} y el ${mmss(x.hasta)}: ${que.length ? que.join(', ') : 'oro y oleadas, sin kills ni objetivos'}`;
+}
+
+/** «Para revisar en el VOD»: hasta 6 momentos con su minuto exacto, para buscar en la repetición. */
+function listaVod(d, pid, eq) {
+    const ms = d.momentos || [];
+    if (!ms.length) return '';
+    const lineas = ms.map(x => `${mmss(x.t)} · ${lineaMomento(x, pid, eq)}`);
+    const texto = lineas.join('\n');
+    return `<div class="vod"><div class="vod-cab"><h4>Para revisar en el VOD</h4>
+        <button type="button" class="chip-cola vod-copiar" data-texto="${escapeHtml(texto)}">Copiar la lista</button></div>
+      <ol class="vod-lista">${ms.map((x, i) => `<li><span class="vod-n">${i + 1}</span> <strong class="mono">${mmss(x.t)}</strong> ${escapeHtml(lineaMomento(x, pid, eq))}</li>`).join('')}</ol>
+      <p class="nota">Los minutos donde más se movió la chance de ganar según el modelo, y las muertes del grupo que más la bajaron. El minuto es el del primer evento del tramo, para buscarlo en la repetición. Es lo que estima el modelo, no la causa: sirve para elegir qué mirar.</p></div>`;
+}
+
+document.addEventListener('click', async (e) => {
+    const b = e.target.closest('.vod-copiar');
+    if (!b) return;
+    try {
+        await navigator.clipboard.writeText(b.dataset.texto);
+        b.textContent = 'Copiada';
+    } catch {
+        b.textContent = 'No se pudo copiar';
+    }
+    setTimeout(() => { b.textContent = 'Copiar la lista'; }, 2000);
+});
+
 export function curvaPartida(d, pid) {
     const lado = d.lados?.[pid] === 'rojo' ? 'rojo' : 'azul';
     const eq = lado === 'azul' ? 100 : 200;
@@ -242,7 +290,7 @@ export function curvaPartida(d, pid) {
         const nuestro = e.equipo === eq;
         return `<text x="${x(i)}" y="${nuestro ? H - m.b - 4 : m.t + 9}" class="cp-obj ${nuestro ? 'cp-obj--nuestro' : 'cp-obj--rival'}" text-anchor="middle">${ICONO[e.tipo]}<title>${nuestro ? 'Tu equipo' : 'El rival'} tomó ${OBJ[e.tipo] || e.tipo} en el ${num(e.min, 1)}</title></text>`;
     }).join('');
-    const k = d.clave;
+    const k = d.momentos ? null : d.clave;  // con momentos, la lista del VOD reemplaza al minuto clave
     let lect = '';
     if (k) {
         const dv = lado === 'azul' ? k.delta : -k.delta;
@@ -255,16 +303,21 @@ export function curvaPartida(d, pid) {
     // y puede no ser la del minuto que más se movió. Se dice aparte para que el titular no contradiga al gráfico.
     const peor = d.eventos.filter(e => e.persona === pid && e.tipo === 'muerte').sort((a, b) => b.costo - a.costo)[0];
     const lectPeor = peor ? `Tu muerte que más bajó tus chances: minuto ${num(peor.min, 0)}, <strong>−${P(peor.costo, 0)} puntos</strong> (${escapeHtml(perdidos(peor.perdidos))}). Es la bolita roja más grande.` : '';
-    const banda = k ? `<rect x="${x(k.min - 1)}" width="${x(k.min) - x(k.min - 1)}" y="${m.t}" height="${H - m.t - m.b}" class="cp-clave"/>` : '';
+    let banda = k ? `<rect x="${x(k.min - 1)}" width="${x(k.min) - x(k.min - 1)}" y="${m.t}" height="${H - m.t - m.b}" class="cp-clave"/>` : '';
+    (d.momentos || []).forEach((mo, i) => {
+        const a = Math.min(n, (mo.desde ?? mo.t) / 60000), b = Math.min(n, (mo.hasta ?? mo.t) / 60000);
+        if (mo.tipo === 'giro') banda += `<rect x="${x(a)}" width="${Math.max(2, x(b) - x(a))}" y="${m.t}" height="${H - m.t - m.b}" class="cp-clave"/>`;
+        banda += `<text x="${x(mo.tipo === 'giro' ? (a + b) / 2 : a)}" y="${m.t + 20}" class="cp-vod-n" text-anchor="middle">${i + 1}</text>`;
+    });
     const marcasY = [0, 0.5, 1].map(v => `<text x="${m.l - 5}" y="${y(v) + 4}" class="g-eje" text-anchor="end">${v * 100}</text>`).join('');
     const marcasX = [...Array(Math.floor(n / 5) + 1).keys()].map(i => i * 5).map(t => `<text x="${x(t)}" y="${H - 6}" class="g-eje" text-anchor="middle">${t}</text>`).join('');
     return `<div class="cp">
-      <p class="cp-lectura">${lect}</p>${lectPeor ? `<p class="cp-lectura">${lectPeor}</p>` : ''}
+      ${lect ? `<p class="cp-lectura">${lect}</p>` : ''}${lectPeor ? `<p class="cp-lectura">${lectPeor}</p>` : ''}
       <svg class="cp-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Probabilidad de ganar de tu equipo minuto a minuto; terminó en ${d.ganador === eq ? 'victoria' : 'derrota'}">
         ${banda}<polygon points="${area}" class="cp-area"/>
         <line x1="${m.l}" x2="${W - m.r}" y1="${y(0.5)}" y2="${y(0.5)}" class="g-medio"/>
         <polyline points="${linea}" class="g-linea"/>${marcas}${marcasY}${marcasX}</svg>
-      <p class="fr-leyenda"><span class="dim">Eje vertical: chance de ganar de tu equipo, de 0 a 100 %. Horizontal: minuto.</span> <span class="fr-item"><span class="fr-sw cp-sw-muerte"></span>tus muertes (el tamaño es cuánto estima el modelo que bajó tus chances esa muerte)</span> <span class="fr-item"><span class="fr-sw cp-sw-kill"></span>tus kills</span> <span class="fr-item"><span class="fr-sw cp-sw-clave"></span>el minuto que más se movió</span> <span class="dim">· Objetivos: B Barón, A Ancestral, D dragón, H Heraldo, I inhibidor; abajo y en verde los de tu equipo, arriba y en rojo los del rival. Pasá el mouse por una marca para ver el detalle.</span></p></div>`;
+      <p class="fr-leyenda"><span class="dim">Eje vertical: chance de ganar de tu equipo, de 0 a 100 %. Horizontal: minuto.</span> <span class="fr-item"><span class="fr-sw cp-sw-muerte"></span>tus muertes (el tamaño es cuánto estima el modelo que bajó tus chances esa muerte)</span> <span class="fr-item"><span class="fr-sw cp-sw-kill"></span>tus kills</span> <span class="fr-item"><span class="fr-sw cp-sw-clave"></span>${d.momentos ? 'los tramos de la lista del VOD (con su número)' : 'el minuto que más se movió'}</span> <span class="dim">· Objetivos: B Barón, A Ancestral, D dragón, H Heraldo, I inhibidor; abajo y en verde los de tu equipo, arriba y en rojo los del rival. Pasá el mouse por una marca para ver el detalle.</span></p>${listaVod(d, pid, eq)}</div>`;
 }
 
 // ---- Curva de aprendizaje: cuánto rendís con un campeón según cuántas partidas llevás con él ----
@@ -378,7 +431,8 @@ export async function bloqueInforme(p, cont) {
         <p><strong>Puede ser porque</strong> ${escapeHtml(x.posible_explicacion)}</p>
         <p class="dim"><strong>Falta ver:</strong> ${escapeHtml(x.falta_verificar)}</p>
         <p class="inf-ej"><strong>Para practicar:</strong> ${escapeHtml(x.ejercicio)}</p>
-        <p class="dim"><strong>Cómo revisarlo:</strong> ${escapeHtml(x.como_revisar)}</p></article>`).join('')}</div>
+        <p class="dim"><strong>Cómo revisarlo:</strong> ${escapeHtml(x.como_revisar)}</p>
+        ${x.momentos?.length ? `<ul class="inf-vod">${x.momentos.map(i => ev[i]).filter(Boolean).map(e => `<li><span class="tag">VOD</span> ${escapeHtml(e.que)}</li>`).join('')}</ul>` : ''}</article>`).join('')}</div>
       ${d.mantener?.length ? `<h4>Lo que conviene mantener</h4><ul>${d.mantener.map(t => `<li>${escapeHtml(t.texto)}${t.evidencias?.length ? `<details><summary>evidencia</summary>${lista(t.evidencias)}</details>` : ''}</li>`).join('')}</ul>` : ''}
       ${d.proxima_revision ? `<p class="dim">Próxima revisión: ${escapeHtml(d.proxima_revision)}</p>` : ''}
       <p class="nota">Informe escrito por ${escapeHtml(d.autor || 'Claude')} con los datos al ${escapeHtml((d.datos_al || '').slice(0, 10))}. Cada cifra sale de una evidencia del sitio con su intervalo y n; el texto interpreta, y lo que dice "puede ser" es una hipótesis para revisar en tus partidas, no un diagnóstico.</p>

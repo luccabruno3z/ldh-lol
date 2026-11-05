@@ -440,6 +440,13 @@ section.section { scroll-margin-top: calc(var(--header-h) + 56px); }
 .cp-obj--nuestro { fill: var(--success); } .cp-obj--rival { fill: var(--danger); }
 .cp-sw-muerte { background: var(--danger); border-radius: 50%; } .cp-sw-kill { background: var(--success); border-radius: 50%; }
 .cp-lectura { margin: 0 0 6px; font-size: .92rem; }
+.cp-vod-n { font-size: 11px; font-weight: 700; fill: var(--accent); }
+.vod { margin-top: 12px; }
+.vod-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.vod-cab h4 { margin: 0; }
+.vod-lista { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; }
+.vod-lista li { font-size: .92rem; line-height: 1.45; }
+.vod-n { display: inline-grid; place-items: center; min-width: 1.4em; height: 1.4em; border-radius: 50%; background: var(--accent-dim); color: var(--accent); font-size: .78rem; font-weight: 700; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* Curva de aprendizaje */

@@ -298,6 +298,12 @@ def curva_partida(d: dict, pid: str, titulo: str) -> io.BytesIO:
             nuestro = e.get("equipo") == eq
             ax.annotate(letras[e["tipo"]], (i, 4 if nuestro else 96), ha="center", va="center", fontsize=9.5,
                         fontweight="bold", color=BIEN if nuestro else MAL)
+    for n, mo in enumerate(d.get("momentos") or [], 1):  # los momentos de la lista del VOD, con su número
+        a, b = mo.get("desde", mo["t"]) / 60000, mo.get("hasta", mo["t"]) / 60000
+        if mo["tipo"] == "giro":
+            ax.axvspan(a, b, color=ACENTO, alpha=0.12, lw=0)
+        ax.annotate(str(n), ((a + b) / 2 if mo["tipo"] == "giro" else a, 88), ha="center", va="center",
+                    fontsize=9, fontweight="bold", color=ACENTO)
     ax.set_ylim(0, 100)
     ax.set_xlim(0, max(len(ys) - 1, 1))
     ax.set_yticks([0, 25, 50, 75, 100])

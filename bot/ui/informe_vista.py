@@ -68,6 +68,8 @@ def tarjeta_informe(p: dict, d: dict | None) -> discord.ui.LayoutView:
                    f"-# Falta ver: {x['falta_verificar']}",
                    f"**Para practicar:** {x['ejercicio']}",
                    f"-# Cómo revisarlo: {x['como_revisar']}"]
+        ev = {e["id"]: e for e in d.get("evidencias") or []}
+        lineas += [f"-# 🎬 {ev[m]['que']}" for m in x.get("momentos") or [] if m in ev]
     if d.get("mantener"):
         lineas.append("### Mantené\n" + "\n".join(f"• {t['texto']}" for t in d["mantener"]))
     if d.get("proxima_revision"):

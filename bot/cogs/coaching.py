@@ -184,9 +184,10 @@ class Coaching(commands.Cog):
     async def cierre(self, ctx: commands.Context, *, jugador_y_modo: str | None = None):
         await self._abrir(ctx, jugador_y_modo, "cierre", "conv")
 
-    @commands.hybrid_command(name="partida", description="Tu probabilidad de ganar minuto a minuto en tu última partida (con ◀ ▶)")
+    @commands.hybrid_command(name="partida", aliases=["vod"],
+                             description="Tu última partida minuto a minuto y qué revisar en el VOD (con ◀ ▶)")
     async def partida(self, ctx: commands.Context, *, jugador_y_numero: str | None = None):
-        """-partida, -partida 3 (la tercera más reciente), -partida glarrex 2."""
+        """-partida, -partida 3 (la tercera más reciente), -partida glarrex 2. -vod es lo mismo."""
         from bot.ui.partida_vista import vista_partida
         partes = (jugador_y_numero or "").split()
         n = int(partes.pop()) if partes and partes[-1].isdigit() else 1

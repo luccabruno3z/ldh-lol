@@ -57,6 +57,11 @@ def validar(inf: dict, paquete: dict, nombres_vinculados: set[str]) -> list[str]
                 errores.append(f"prioridades[{i}] cita {e!r}, que no está en el paquete.")
             elif ids[e]["tipo"] == "contexto":
                 errores.append(f"prioridades[{i}] se apoya en {e!r}, que es contexto (sin intervalo).")
+        for e in p.get("momentos") or []:  # minutos del VOD para «cómo revisarlo»: opcionales, del paquete
+            if not str(e).startswith("vod.") or e not in ids:
+                errores.append(f"prioridades[{i}] cita el momento {e!r}, que no es un momento del VOD del paquete.")
+        if len(p.get("momentos") or []) > 3:
+            errores.append(f"prioridades[{i}] cita más de 3 momentos del VOD.")
     for i, t in enumerate(inf.get("mantener") or []):
         for e in t.get("evidencias") or []:
             if e not in ids:

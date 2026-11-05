@@ -89,6 +89,17 @@ datos están en [RUNBOOK.md](RUNBOOK.md); las reglas de los informes, en [REGLAS
 - Con menos de 30 partidas juntos es "muestra chica" y no puede dar señal.
 - Es una asociación: también pesan la cola, el horario y contra quién juegan cuando van juntos.
 
+## Fase 7
+
+### Momentos para el VOD (`fase5.momentos`)
+- Cada partida con timeline suma hasta 6 momentos en `api/partida/<id>.json`, ordenados por tiempo:
+  - los 3 tramos entre frames donde más se movió la chance del modelo (2 puntos o más), con las kills de cada lado y los objetivos del tramo;
+  - las 3 muertes de vinculados con mayor caída estimada (1 punto o más). Si una cae dentro de un tramo de la lista, va adentro de ese tramo.
+- El minuto (mm:ss) es el del primer evento del tramo, para buscarlo en la repetición.
+- Los tramos se miden entre frames y no en el minuto redondo: el minuto k·60 000 ms cae unos ms antes del frame k, y el oro de ese minuto quedaría afuera. La curva publicada también se evalúa en cada frame desde la fase 7 (antes el oro entraba con un minuto de atraso y el gráfico no coincidía con la lista). El modelo se sigue entrenando en el minuto redondo; pasarlo a frames pide reentrenarlo.
+- Es lo que estima el modelo, no la causa. Sirve para elegir qué mirar.
+- El paquete de evidencia suma como `contexto` los momentos de las últimas 5 partidas con timeline de la persona (`vod.<partida>.<n>`). El informe los puede citar en `momentos`.
+
 ## Cómo verificar un cambio de cálculo
 
 1. `python -m ldh publicar` en local y leer los JSON nuevos.

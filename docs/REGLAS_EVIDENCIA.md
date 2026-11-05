@@ -28,7 +28,8 @@ Este documento dice qué puede afirmar un informe y con qué palabras. El valida
   "resumen": "Una o dos frases, sin cifras.",
   "prioridades": [
     {"titulo": "…", "observacion": "…", "evidencias": ["met.Support.muertes_min", "muertes.Support"],
-     "posible_explicacion": "…", "falta_verificar": "…", "ejercicio": "…", "como_revisar": "…"}
+     "posible_explicacion": "…", "falta_verificar": "…", "ejercicio": "…", "como_revisar": "…",
+     "momentos": ["vod.LA2_1633906575.2"]}
   ],
   "mantener": [{"texto": "…", "evidencias": ["comp.Support.economia"]}],
   "proxima_revision": "Cuando tengas unas 20 partidas más."
@@ -38,6 +39,7 @@ Este documento dice qué puede afirmar un informe y con qué palabras. El valida
 ## Lo que controla el validador
 - Entre 1 y 2 prioridades, cada una con todos sus campos.
 - Cada id citado existe en el paquete. Las prioridades no se apoyan en `contexto`.
+- `momentos` es opcional: hasta 3 ids `vod.<partida>.<n>` del paquete (los momentos para el VOD de las últimas 5 partidas con timeline), para que «cómo revisarlo» apunte a un minuto concreto. Son contexto: no sostienen la prioridad.
 - El hash coincide con el paquete actual. Si cambiaron los datos, el informe se revisa.
 - Sin cifras en el texto: ni porcentajes, ni decimales. Solo se aceptan cuentas de partidas (hasta 50) en el ejercicio, en cómo revisarlo y en la próxima revisión. Las cifras las pinta la web desde las evidencias.
 - Sin lenguaje causal ni de diagnóstico: "causó", "por culpa", "tilt", "rendís como" (estimar elo está prohibido por Riot), "MMR", apuestas.

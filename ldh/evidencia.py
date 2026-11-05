@@ -187,6 +187,51 @@ def _curvas(pk: Paquete, d: dict | None, nombres: dict) -> None:
                extra={"partidas_total": c.get("n")})
 
 
+VOD_PARTIDAS = 5
+OBJ_VOD = {"baron": "el Barón", "ancestral": "el Ancestral", "dragon": "un dragón", "heraldo": "el Heraldo",
+           "larva": "larvas", "torre": "una torre", "inhib": "un inhibidor"}
+
+
+def _mmss(t: int) -> str:
+    return f"{t // 60000}:{t // 1000 % 60:02d}"
+
+
+def _vod(pk: Paquete, historial: dict | None) -> None:
+    """Los momentos para el VOD de las últimas partidas con timeline, como contexto (no como prioridad):
+    sirven para que el «cómo revisar» del informe cite un minuto concreto."""
+    hechas = 0
+    for h in (historial or {}).get("partidas") or []:
+        if hechas >= VOD_PARTIDAS:
+            break
+        if pk.modo != "todo" and h.get("cola") != pk.modo:
+            continue
+        d = _leer(f"partida/{h['id']}.json")
+        if not d or not d.get("momentos") or pk.persona not in d.get("lados", {}):
+            continue
+        hechas += 1
+        eq = 100 if d["lados"][pk.persona] == "azul" else 200
+        for i, x in enumerate(d["momentos"], 1):
+            if x["tipo"] == "muerte":
+                if x["persona"] != pk.persona:
+                    continue
+                u = list(dict.fromkeys(x.get("perdidos") or []))
+                que = f"{_mmss(x['t'])}: muerte propia" + (f", después el rival tomó {', '.join(OBJ_VOD.get(o, o) for o in u)}" if u else "")
+                v = -x["costo"]
+            else:
+                v = x["delta"] if eq == 100 else -x["delta"]
+                k = x["kills"]
+                nos, ellos = (k["azul"], k["rojo"]) if eq == 100 else (k["rojo"], k["azul"])
+                obj = [f"{'propio' if o['equipo'] == eq else 'rival'}: {OBJ_VOD.get(o['tipo'], o['tipo'])}" for o in x.get("objetivos") or []]
+                propia = any(m["persona"] == pk.persona for m in x.get("muertes") or [])
+                que = (f"{_mmss(x['desde'])} a {_mmss(x['hasta'])}: la chance del equipo {'sube' if v > 0 else 'baja'}; "
+                       f"kills {nos} a {ellos}" + (f"; objetivos {', '.join(obj)}" if obj else "")
+                       + ("; incluye una muerte propia" if propia else ""))
+            pk.add(f"vod.{h['id']}.{i}", "contexto", f"Momento para el VOD ({'victoria' if h.get('win') else 'derrota'}, "
+                   f"{h.get('cola', '')}) · {que}", h.get("rol"), v, dec=0, signo=True, k=100, suf=" pts",
+                   limitaciones=["Estimación del modelo; sirve para elegir qué mirar, no es la causa."],
+                   extra={"match": h["id"], "t": x["t"]})
+
+
 def armar(persona: str, modo: str = "solo") -> dict:
     personas = {p["id"]: p for p in (_leer("personas.json") or [])}
     if persona not in personas:
@@ -203,6 +248,7 @@ def armar(persona: str, modo: str = "solo") -> dict:
     _conversion(pk, _leer(f"conversion/{persona}.json"))
     champs = {k: v.get("nombre", k) for k, v in ((_leer("campeones.json") or {}).get("campeones") or {}).items()}
     _curvas(pk, _leer(f"curvas/{persona}.json"), champs)
+    _vod(pk, _leer(f"historial/{persona}/1.json"))
     return pk.json()
 
 

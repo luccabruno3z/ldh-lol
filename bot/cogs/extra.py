@@ -74,7 +74,7 @@ AYUDA = {
                 "`-grafico [jugador] radar [rol] [modo]` la rosa de tus 7 componentes contra tu franja\n"
                 "`-grafico [jugador] franjas [rol] [modo]` tus números al lado de la mediana de cada franja de elo\n"
                 "`-grafico [jugador] muertes [modo]` dónde morís y cuánto bajan tus chances con cada muerte, sobre el minimapa\n"
-                "`-partida [jugador] [n]` la probabilidad de ganar minuto a minuto de tu última partida, con ◀ ▶\n"
+                "`-partida [jugador] [n]` o `-vod`: tu última partida minuto a minuto y qué revisar en el VOD, con ◀ ▶\n"
                 "`-grafico [jugador] curva [rol] [modo]` cuánto te lleva aprender un campeón, con tus 3 más jugados\n"
                 "`-rachas [jugador] [modo]` ¿cómo te va después de perder? Tu winrate según cómo venías\n"
                 "-# Todos traen menús para cambiar de gráfico, rol y modo sin volver a escribir el comando.\n"
