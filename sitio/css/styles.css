@@ -533,3 +533,37 @@ tr.chica .obj-barra { background: var(--text-dim); box-shadow: none; }
 /* Gráfico de una partida: el minuto que más movió la chance, para que el titular se vea en el gráfico. */
 .cp-clave { fill: var(--accent-dim); stroke: color-mix(in srgb, var(--accent) 45%, transparent); stroke-width: 1; }
 .cp-sw-clave { background: var(--accent-dim); box-shadow: inset 0 0 0 1px var(--accent); }
+
+/* ---- Celular (tanda 3) ---- */
+/* Menú y pestañas que siguen de costado: un degradé en el borde avisa que hay más. */
+.main-nav.sigue-der, .perfil-tabs.sigue-der { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
+.main-nav.sigue-izq.sigue-der, .perfil-tabs.sigue-izq.sigue-der {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
+.main-nav.sigue-izq:not(.sigue-der), .perfil-tabs.sigue-izq:not(.sigue-der) {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 36px); mask-image: linear-gradient(to right, transparent, #000 36px); }
+.corto { display: none; }
+@media (max-width: 600px) {
+    .largo { display: none; } .corto { display: inline; }
+    /* Cabecera del perfil: fuera de Resumen, solo el nombre (las cuentas y rangos ya están en Resumen). */
+    #perfil:not([data-tab="resumen"]) .perfil-head .cuentas,
+    #perfil:not([data-tab="resumen"]) .perfil-head > p.dim,
+    #perfil:not([data-tab="resumen"]) .resumen { display: none; }
+    #perfil:not([data-tab="resumen"]) .perfil-head { padding-top: 10px; padding-bottom: 10px; }
+    #perfil:not([data-tab="resumen"]) .perfil-nombre { margin: 0; font-size: 1.4rem; }
+    /* Área táctil de 44 px para abrir el gráfico de la partida. */
+    .cp-toggle { width: 44px; height: 44px; }
+    /* Historial apilado: el botón y la fecha en la primera línea; la fila del gráfico, entera. */
+    .hist.tabla-apilable td:first-child { display: flex; align-items: center; gap: 8px; }
+    .hist.tabla-apilable tr.cp-fila > td { display: block; padding: 0; }
+    .cp-cont { width: calc(100vw - 40px); }
+    .data-table.kpis.tabla-apilable td .v { margin-left: auto; }
+}
+@media (max-width: 600px) {
+    /* Ranking apilado: "1. Nombre" como título de la fila, en vez de un "1" suelto arriba. */
+    .rk-puesto.tabla-apilable td:first-child { display: inline-block; padding-right: 6px; }
+    .rk-puesto.tabla-apilable td:first-child::after { content: "."; }
+    .rk-puesto.tabla-apilable td:nth-child(2) { display: inline-block; font-weight: 600; }
+    .rk-puesto.tabla-apilable td:nth-child(2)::before { content: none; }
+}

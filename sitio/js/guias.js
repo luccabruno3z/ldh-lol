@@ -132,7 +132,7 @@ async function render() {
       <nav class="tabs guias-tabs">${ROLES.map(r => `<a href="#/guias/${r}" class="${r === rol ? 'is-active' : ''}">${r}</a>`).join('')}</nav>
       <section class="section"><h2 class="h3">Los números de cada franja · ${rol}</h2>
         <p class="dim">La mitad de los jugadores de cada franja está por encima de estos números y la mitad por debajo. Es lo que podés apuntar para tu rango y el de arriba.</p>
-        <div class="table-wrap"><table class="data-table">
+        <div class="table-wrap"><table class="data-table tabla-apilable">
           <thead><tr><th>Métrica</th>${FRANJAS.map(fr => `<th class="num">${fr}<span class="ic">${celda(fr)?.jugadores ?? 0} jugadores</span></th>`).join('')}</tr></thead>
           <tbody>${filas}</tbody></table></div>
         <p class="nota">Medianas por jugador de la muestra de referencia: jugadores al azar de LAS en solo/dúo, con 10+ partidas en ${rol}, bajados el ${escapeHtml(ref.bajada || '—')}. Las victorias y derrotas se ponderan al 50 % (los de Hierro–Bronce venían de bajar). Las diferencias son contra el rival directo de la misma partida.</p></section>
@@ -143,7 +143,7 @@ async function render() {
         }).join('')}</dl>
         <p class="nota">Tu perfil te dice cuáles te tocan a vos (Coaching → Cómo sumar), según tus números contra tu franja.</p></section>
       <section class="section"><h2 class="h3">Quién del grupo juega ${rol}</h2>
-        ${quienes.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Jugador</th><th class="num">Winrate ajustado</th><th>Sus campeones (5+ partidas)</th></tr></thead>
+        ${quienes.length ? `<div class="table-wrap"><table class="data-table tabla-apilable"><thead><tr><th>Jugador</th><th class="num">Winrate ajustado</th><th>Sus campeones (5+ partidas)</th></tr></thead>
           <tbody>${quienes.map(([pid, j]) => `<tr><td><a href="#/jugadores/${encodeURIComponent(pid)}">${escapeHtml(j.nombre)}</a></td>
             <td class="num mono">${num(j.roles[rol].wr_aj * 100, 0)} %<span class="ic">${j.roles[rol].n} partidas</span></td>
             <td>${j.roles[rol].campeones.slice(0, 4).map(c => `<span class="quien">${iconoCampeon(c.id, 22)} ${escapeHtml(campeon(c.id))} <span class="dim">${c.n}</span></span>`).join(' ') || '<span class="dim">—</span>'}</td></tr>`).join('')}</tbody></table></div>`

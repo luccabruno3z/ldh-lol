@@ -104,9 +104,9 @@ function tablaKpis(filas, cola) {
     if (!deCola.length) return '<p class="empty-state">Sin partidas en este modo.</p>';
     const grandes = deCola.filter(f => !f.muestra_chica), chicas = deCola.filter(f => f.muestra_chica);
     const cab = `<thead><tr><th>Rol</th><th class="num">n</th>${COLS.map(([, l]) => `<th class="num">${l}</th>`).join('')}</tr></thead>`;
-    return `<div class="table-wrap"><table class="data-table kpis">${cab}<tbody>${filasKpis(grandes)}</tbody></table></div>
+    return `<div class="table-wrap"><table class="data-table kpis tabla-apilable">${cab}<tbody>${filasKpis(grandes)}</tbody></table></div>
     ${chicas.length ? `<details class="plegable"><summary>${chicas.length} ${chicas.length === 1 ? 'rol' : 'roles'} con muestra chica (${chicas.map(f => `${escapeHtml(f.rol)} ${f.n}`).join(', ')})</summary>
-      <div class="table-wrap"><table class="data-table kpis">${cab}<tbody>${filasKpis(chicas)}</tbody></table></div></details>` : ''}
+      <div class="table-wrap"><table class="data-table kpis tabla-apilable">${cab}<tbody>${filasKpis(chicas)}</tbody></table></div></details>` : ''}
     <p class="nota">El número chico abajo de cada valor es su rango probable. Los roles con menos de ${state.ajustes?.min_partidas ?? 10} partidas no permiten sacar conclusiones.</p>
     ${como(`Cada rango es el intervalo del ${Math.round((state.ajustes?.confianza || 0.95) * 100)} %: Wilson para el winrate y bootstrap (remuestreo de tus partidas) para el resto.`)}`;
 }
@@ -141,7 +141,7 @@ function forma(f) {
     <section class="section">
       <h3>Forma reciente <span class="dim">· ${escapeHtml(nombreCola(f.cola))}</span></h3>
       ${grafForma(f.partidas)}
-      <div class="table-wrap"><table class="data-table">
+      <div class="table-wrap"><table class="data-table tabla-apilable">
         <thead><tr><th></th><th class="num">Últimas ${f.n_ultimas}</th><th class="num">Resto (${f.n_resto})</th><th class="num">Diferencia</th></tr></thead>
         <tbody>${FORMA.map(([k, l, t]) => `<tr><td>${l}</td>
           <td class="num">${conIntervalo(f.comparacion[k].ultimas, t)}</td>
@@ -176,7 +176,7 @@ function filaHistorial(m) {
 async function historial(p, cont) {
     let pagina = 0;
     cont.innerHTML = `<section class="section"><h3>Historial</h3>
-      <div class="table-wrap"><table class="data-table hist">
+      <div class="table-wrap"><table class="data-table hist tabla-apilable">
         <thead><tr><th><span class="sr-only">Gráfico</span></th><th>Fecha</th><th>Cola</th><th>Campeón</th><th>Rol</th><th>Lado</th><th>K/D/A</th><th class="num">CS/min</th>
           <th class="num">Oro</th><th class="num">Daño</th><th class="num">Visión</th><th>Resultado</th><th>Parche</th><th>LP</th><th>Cuenta</th></tr></thead>
         <tbody></tbody></table></div>
@@ -207,16 +207,23 @@ async function historial(p, cont) {
 // Pestañas del perfil: el perfil entero era muy largo para el celular. La pestaña y la cuenta van en
 // la URL (#/jugadores/<persona>/<pestaña>/<cuenta>), así se puede compartir el link exacto.
 const PESTANAS = { resumen: 'Resumen', coaching: 'Coaching', campeones: 'Roles y campeones', mapa: 'Mapa y jungla', partidas: 'Partidas' };
+// En el celular, el nombre corto (las pestañas largas se cortaban en "Roles y campeo").
+const CORTO = { campeones: 'Campeones', mapa: 'Mapa' };
+const etiquetaPestana = (k, l) => (CORTO[k] ? `<span class="largo">${l}</span><span class="corto">${CORTO[k]}</span>` : l);
 let vistaActual = null;
 // Cada carga del perfil lleva un turno: si mientras tanto se pidió otro jugador o cuenta, la respuesta vieja se descarta.
 let turno = 0;
 
 function mostrarPestana(tab) {
     const t = PESTANAS[tab] ? tab : 'resumen';
+    const perfil = document.getElementById('perfil');
+    if (perfil) perfil.dataset.tab = t;  // el CSS achica la cabecera fuera de Resumen
     document.querySelectorAll('#perfil [data-pestana]').forEach(el => { el.hidden = el.dataset.pestana !== t; });
     document.querySelectorAll('#perfil .perfil-tab').forEach(a => {
         a.classList.toggle('is-active', a.dataset.tab === t);
         a.setAttribute('aria-selected', a.dataset.tab === t);
+        // En el celular la pestaña activa puede quedar fuera de vista (las pestañas se deslizan): se trae.
+        if (a.dataset.tab === t) a.parentElement.scrollTo({ left: Math.max(0, a.offsetLeft - 16), behavior: 'auto' });
     });
 }
 
@@ -285,7 +292,7 @@ async function pintarPerfil(cont, base, vista, tabInicial = 'resumen', modoElegi
       ${barraModo(p, modo)}
       ${resumen(p, modo)}
       <nav class="perfil-tabs" role="tablist" aria-label="Secciones del perfil">${Object.entries(PESTANAS).map(([k, l]) =>
-        `<a class="perfil-tab" role="tab" data-tab="${k}" href="${ruta(k)}">${l}</a>`).join('')}</nav>
+        `<a class="perfil-tab" role="tab" data-tab="${k}" href="${ruta(k)}">${etiquetaPestana(k, l)}</a>`).join('')}</nav>
       <div data-pestana="resumen">${forma(p.forma)}${seccionEvolucion(p.evolucion, modo)}<div id="f5-rachas"></div></div>
       <div data-pestana="coaching"><div id="f5-informe"></div><div id="fase3"></div><div id="f5-muertes"></div><div id="f5-conversion"></div></div>
       <div data-pestana="campeones"><div id="fase2"></div><div id="f5-pool"></div><div id="f5-curvas"></div><div id="f4-matchups"></div></div>

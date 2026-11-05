@@ -33,8 +33,55 @@ function initTema() {
     });
 }
 
+/** Tablas apilables: cada celda sin data-label toma el texto de su encabezado (sin la línea chica .ic), así en el
+    celular cada fila se lee como "Etiqueta ··· valor" sin repetir las etiquetas en cada tabla. */
+function etiquetar(raiz) {
+    raiz.querySelectorAll('table.tabla-apilable').forEach(t => {
+        const ths = [...(t.tHead?.rows[t.tHead.rows.length - 1]?.cells || [])];
+        if (!ths.length || t.tHead.rows.length > 1) return;  // con encabezado de dos filas, cada td trae su data-label
+        const nombres = ths.map(th => {
+            const c = th.cloneNode(true);
+            c.querySelectorAll('.ic, .sr-only').forEach(x => x.remove());
+            return c.textContent.trim();
+        });
+        t.querySelectorAll('tbody tr').forEach(tr => [...tr.cells].forEach((td, i) => {
+            if (i && td.colSpan === 1 && !td.hasAttribute('data-label') && nombres[i]) td.dataset.label = nombres[i];
+        }));
+    });
+}
+
+/** Menús que se deslizan de costado: un degradé en el borde avisa que hay más (antes se cortaban en "Rankin"). */
+function marcarDesliza(el) {
+    const resto = el.scrollWidth - el.clientWidth - el.scrollLeft;
+    el.classList.toggle('sigue-der', resto > 4);
+    el.classList.toggle('sigue-izq', el.scrollLeft > 4);
+}
+
+function initCelular() {
+    const main = document.getElementById('main');
+    let pendiente = false;
+    const pasar = () => {
+        pendiente = false;
+        etiquetar(main);
+        document.querySelectorAll('.main-nav, .perfil-tabs').forEach(el => {
+            if (!el.dataset.desliza) {
+                el.dataset.desliza = '1';
+                el.addEventListener('scroll', () => marcarDesliza(el), { passive: true });
+                // Las pestañas del perfil se arman antes de tener su ancho final: se vuelve a medir al cambiar.
+                if (window.ResizeObserver) new ResizeObserver(() => marcarDesliza(el)).observe(el);
+            }
+            marcarDesliza(el);
+        });
+    };
+    new MutationObserver(() => { if (!pendiente) { pendiente = true; requestAnimationFrame(pasar); } })
+        .observe(main, { childList: true, subtree: true });
+    addEventListener('resize', pasar);
+    pasar();
+}
+
 async function boot() {
     safe('tema', initTema);
+    safe('celular', initCelular);
     try {
         await loadBase();
     } catch (err) {

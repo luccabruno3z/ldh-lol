@@ -31,7 +31,7 @@ function metrica(m, clave) {
 function tablaRoles(d, cola, co) {
     const filas = d.tabla.filter(t => t.cola === cola);
     if (!filas.length) return sinPartidas(cola);
-    return `<div class="table-wrap"><table class="data-table">
+    return `<div class="table-wrap"><table class="data-table tabla-apilable">
       <thead><tr><th>Rol</th><th class="num">n</th><th class="num">Winrate ajustado</th><th class="num">KDA ajustado</th>
         <th>Métrica del rol</th><th class="num">${co ? 'Contra tu franja' : 'Mediana del grupo'}</th><th>Confianza</th></tr></thead>
       <tbody>${filas.map(t => {
@@ -72,7 +72,7 @@ async function roles(p, cont, cola) {
 function tablaCampeones(filas, todos) {
     const vis = todos ? filas : filas.slice(0, 12);
     if (!vis.length) return '<p class="empty-state">Sin partidas en este modo.</p>';
-    return `<div class="table-wrap"><table class="data-table">
+    return `<div class="table-wrap"><table class="data-table tabla-apilable">
       <thead><tr><th>Campeón</th><th>Posición</th><th class="num">n</th><th class="num">Winrate ajustado</th>
         <th class="num">KDA ajustado</th><th class="num">De tus partidas</th><th>Último parche</th><th>Confianza</th></tr></thead>
       <tbody>${vis.map(t => `<tr class="${t.muestra_chica ? 'chica' : ''}">
@@ -169,7 +169,7 @@ async function sinergia(p, cont, modo) {
       <h3>Con quién rendís</h3>
       <p class="lead">${mc ? `Mejor compañero: <strong>${escapeHtml(nombrePersona(mc.companero))}</strong> en ${escapeHtml(nombreCola(mc.cola))} (${difWinrate(mc.dif)} jugando juntos, ${mc.juntos} partidas).`
         : 'Con ningún compañero rendís mejor más allá del ruido: ninguna mejora supera lo que explica el azar.'}</p>
-      <div class="table-wrap"><table class="data-table">
+      <div class="table-wrap"><table class="data-table tabla-apilable">
         <thead><tr><th>Compañero</th><th>Cola</th><th class="num">Juntos</th><th class="num">Juntos: winrate</th><th class="num">Sin esa persona</th>
           <th class="num">Sin esa persona, mismo período</th><th class="num">Diferencia<span class="ic">pts de winrate</span></th><th></th></tr></thead>
         <tbody>${filas.map(r => `<tr class="${r.muestra_chica ? 'chica' : ''}">

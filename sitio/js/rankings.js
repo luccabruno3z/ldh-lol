@@ -35,8 +35,8 @@ async function porPeriodo(cont) {
     cont.innerHTML = `
       <div class="section-head">${opciones('rk-periodo', PERIODOS, sel.periodo, 'Período')}${opciones('rk-cola', colas(), sel.cola, 'Cola')}</div>
       ${c.podio.length ? `<div class="podio">${podio}</div>` : '<p class="empty-state">Nadie llega a confianza media con 50 % ajustado o más en este período: no hay podio.</p>'}
-      ${c.tabla.length ? `<div class="table-wrap"><table class="data-table">
-        <thead><tr><th class="num">#</th><th>Jugador</th><th class="num">n</th><th class="num">Winrate ajustado</th><th class="num">KDA ajustado</th><th>Confianza</th></tr></thead>
+      ${c.tabla.length ? `<div class="table-wrap"><table class="data-table tabla-apilable rk-puesto">
+        <thead><tr><th class="num">#</th><th>Jugador</th><th class="num">Partidas</th><th class="num">Winrate ajustado</th><th class="num">KDA ajustado</th><th>Confianza</th></tr></thead>
         <tbody>${c.tabla.map(r => `<tr><td class="num mono">${r.puesto}</td><td>${persona(r.persona)}</td><td class="num mono">${r.n}</td>
           <td class="num">${winrateAj(r)}</td>
           <td class="num"><span class="v">${num(r.kda_aj, 2)}</span><span class="ic">real ${num(r.kda.v, 2)}</span></td>
@@ -138,7 +138,7 @@ async function mejora(cont) {
     const signo = (v) => `${v > 0 ? '+' : ''}${num(v, 1)}`;
     const mejoran = tabla.filter(x => x.veredicto === 'mejorando');
     const conc = `<p class="conclusion">${mejoran.length ? `${mejoran.map(x => `<strong>${escapeHtml(nombrePersona(x.persona))}</strong> (${escapeHtml(x.rol)})`).join(', ')} ${mejoran.length > 1 ? 'mejoraron' : 'mejoró'} de verdad: su nota de partida subió más de lo que explica el azar.` : 'Nadie mejoró más allá del ruido todavía: los cambios de la tabla pueden ser azar.'}</p>`;
-    cont.innerHTML = `<div class="section-head">${d.modos ? opciones('rk-modo', MODOS, sel.modo, 'Modo') : ''}</div>` + (tabla.length ? `${conc}<div class="table-wrap"><table class="data-table">
+    cont.innerHTML = `<div class="section-head">${d.modos ? opciones('rk-modo', MODOS, sel.modo, 'Modo') : ''}</div>` + (tabla.length ? `${conc}<div class="table-wrap"><table class="data-table tabla-apilable">
       <thead><tr><th>Jugador</th><th>Rol</th><th class="num">Partidas</th><th class="num">Nota de partida<span class="ic">de → a</span></th><th class="num">Cambio<span class="ic">pts de nota, en sus partidas</span></th><th></th></tr></thead>
       <tbody>${tabla.map(x => `<tr class="${x.veredicto === 'mejorando' ? '' : 'chica'}"><td>${persona(x.persona)}</td><td>${escapeHtml(x.rol)}</td>
         <td class="num mono">${x.n}</td><td class="num mono">${num(x.inicio, 0)} → ${num(x.ahora, 0)}</td>
@@ -166,7 +166,7 @@ async function companeros(cont) {
           <span class="cmp-num"><strong>${s.v > 0 ? '+' : ''}${num((s.v || 0) * 100, 1)} pts de winrate</strong>
             ${senal(r, s)}
             <span class="dim small">${r.companeros} compañeros · ${r.juntos} partidas</span></span></summary>
-          <div class="table-wrap"><table class="data-table"><thead><tr><th>Compañero</th><th class="num">Juntos</th><th class="num">Con ${escapeHtml(nombrePersona(r.persona))}</th><th class="num">Sin, mismo período</th></tr></thead>
+          <div class="table-wrap"><table class="data-table tabla-apilable"><thead><tr><th>Compañero</th><th class="num">Juntos</th><th class="num">Con ${escapeHtml(nombrePersona(r.persona))}</th><th class="num">Sin, mismo período</th></tr></thead>
             <tbody>${r.detalle.map(x => `<tr><td>${persona(x.companero)}</td><td class="num mono">${x.juntos}</td><td class="num">${conIntervalo(x.con, 'pct')}</td><td class="num">${conIntervalo(x.sin, 'pct')}</td></tr>`).join('')}</tbody></table></div>
         </details>`;
     };
