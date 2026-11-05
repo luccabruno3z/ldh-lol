@@ -56,15 +56,31 @@ def evolucion(evo: dict, cola: str, nombre_cola: str, titulo: str) -> io.BytesIO
         # El rótulo va a la izquierda: a la derecha se pisaba con el de "hoy".
         ax.annotate(f"tu temporada {round(temp)} %", (xs[0], temp), xytext=(2, 5), textcoords="offset points",
                     color=SEGUNDO, fontsize=9.5, ha="left")
+    # Rótulos sin pisarse: cada uno se corre para arriba o abajo si cae cerca (en el tiempo y en %) de otro.
+    t0, t1 = pts[0]["t"], pts[-1]["t"] or 1
+    puestos = [(pts[0]["t"], temp + 3)] if c.get("temporada") else []
+
+    def libre(t, y, dy):
+        for _ in range(4):
+            yy = y + dy * 0.18
+            if all(abs(t - pt) > (t1 - t0) * 0.18 or abs(yy - py) > 6 for pt, py in puestos):
+                break
+            dy += 12 if dy >= 0 else -12
+        puestos.append((t, y + dy * 0.18))
+        return dy
+    ult = pts[-1]
     for clave, rotulo, dy in (("mejor", "mejor tramo", 8), ("peor", "peor tramo", -14)):
         if c.get(clave):
             h = c[clave]
             ax.scatter([fecha(h["t"])], [h["v"] * 100], color=TENUE, s=14, zorder=3)
+            dy = libre(h["t"], h["v"] * 100, dy)
             ax.annotate(f"{rotulo} {round(h['v'] * 100)} %", (fecha(h["t"]), h["v"] * 100), xytext=(0, dy),
                         textcoords="offset points", color=TENUE, fontsize=9.5, ha="center")
-    ult = pts[-1]
     ax.scatter([xs[-1]], [ult["v"] * 100], color=ACENTO, zorder=4, s=36)
-    ax.annotate(f"hoy {round(ult['v'] * 100)} %", (xs[-1], ult["v"] * 100), xytext=(-8, 8),
+    # Si "hoy" cae sobre la línea de tu temporada, el rótulo va abajo para no tacharse con ella.
+    cerca = c.get("temporada") and abs(ult["v"] * 100 - c["temporada"]["v"] * 100) < 6
+    dy = libre(ult["t"], ult["v"] * 100, -16 if cerca and ult["v"] * 100 <= c["temporada"]["v"] * 100 else 8 if not cerca else 14)
+    ax.annotate(f"hoy {round(ult['v'] * 100)} %", (xs[-1], ult["v"] * 100), xytext=(-8, dy),
                 textcoords="offset points", color=ACENTO, fontsize=10, ha="right", fontweight="bold")
     ax.set_ylim(0, 100)
     ax.set_ylabel(f"winrate de las {evo['ventana']} anteriores (%)", color=TENUE)
@@ -108,18 +124,24 @@ def tendencia(t: dict, titulo: str, franja: str) -> io.BytesIO:
     ax.set_ylim(max(0, min(vs + [40]) - 8), min(100, max(vs + [60]) + 8))
     ax.set_xlim(0, t["n"] - 1)
     ax.set_ylabel(f"nota de partida (promedio de {t['ventana']})", color=TENUE)
-    ax.set_xlabel(f"partidas ({t['n']})", color=TENUE)
+    ax.set_xlabel("tus partidas, en orden →", color=TENUE)
+    ax.set_xticks([0, t["n"] - 1])
+    ax.set_xticklabels(["partida 1", f"partida {t['n']}"])
     marcas, ultimo = [], -1e9
     for mm in t.get("meses", []):
-        if mm["i"] - ultimo > t["n"] / 14:  # sin rótulos pegados
+        if mm["i"] - ultimo > t["n"] / 10:  # sin rótulos pegados
             marcas.append(mm)
             ultimo = mm["i"]
-    ax.set_xticks([mm["i"] for mm in marcas])
-    ax.set_xticklabels([MESES[mm["mes"] - 1] for mm in marcas])
+    arriba = ax.secondary_xaxis("top")
+    arriba.set_xticks([mm["i"] for mm in marcas])
+    arriba.set_xticklabels([MESES[mm["mes"] - 1] for mm in marcas], color=TENUE, fontsize=9)
+    arriba.tick_params(length=0, colors=TENUE)
+    for s in arriba.spines.values():
+        s.set_visible(False)
     ax.grid(color=GRILLA, lw=0.6)
     signo = lambda v: f"{'+' if v > 0 else ''}{v:.1f}".replace(".", ",")
     ax.set_title(f"{titulo}\nDe {t['inicio']:.0f} a {t['ahora']:.0f} → {t['veredicto']} "
-                 f"({signo(cambio(t)['v'])} en {t['n']} partidas)", color=TEXTO, fontsize=12, loc="left")
+                 f"({signo(cambio(t)['v'])} en {t['n']} partidas)", color=TEXTO, fontsize=12, loc="left", pad=22)
     return _png(fig)
 
 
@@ -208,9 +230,10 @@ def franjas(filas: list[dict], titulo: str, propia: str | None = None) -> io.Byt
         u = f" {f['unidad']}" if f["unidad"] else ""
         txt = f"vos {_fmt(f['v'], f['dec'], signo)}{u}   " + "   ".join(
             f"{ABREV.get(fr, fr)} {_fmt(m, f['dec'], signo)}" for fr, m in f["medianas"].items())
-        ax.annotate(txt, (1.03, i), xycoords=("axes fraction", "data"), va="center", color=TENUE, fontsize=9.5)
+        ax.annotate(txt, (1.03, i), xycoords=("axes fraction", "data"), va="center", color=TEXTO, fontsize=9.5)
     marcas = [plt.Line2D([], [], color=ACENTO, marker="o", ls="", ms=8, label="vos")] + [
-        plt.Line2D([], [], color=COLOR_FRANJA[j], marker="|", ls="", ms=14, mew=3, label=f"mediana {fr}")
+        plt.Line2D([], [], color=COLOR_FRANJA[j], marker="|", ls="", ms=14, mew=3,
+                   label=f"mediana {fr}" + (f" ({ABREV[fr]})" if fr in ABREV else ""))
         for j, fr in enumerate(nombres_fr)]
     if propia:
         marcas += [plt.Line2D([], [], color=BIEN, lw=6, alpha=0.55, label=f"arriba de {propia}"),
@@ -301,8 +324,16 @@ def mapa_muertes(puntos: list, mapa: bytes | None, titulo: str) -> io.BytesIO:
     ax.set_yticks([])
     marcas = [plt.Line2D([], [], color=c, marker="o", ls="", ms=8, label=l)
               for c, l in ((COLOR_FRANJA[1], "antes del 14"), (COLOR_FRANJA[0], "del 14 al 25"), (MAL, "después del 25"))]
-    ax.legend(handles=marcas, loc="upper center", bbox_to_anchor=(0.5, -0.01), ncol=3, frameon=False,
-              labelcolor=TEXTO, fontsize=9.5)
+    # El tamaño es cuánto bajó la chance: tres círculos de muestra (ms es el diámetro; s del scatter, el área).
+    tam = [plt.Line2D([], [], color=TENUE, marker="o", ls="", alpha=0.7, ms=(12 + c * 2600) ** 0.5, label=f"−{round(c * 100)} pts")
+           for c in (0.02, 0.05, 0.10)]
+    ley = ax.legend(handles=marcas, loc="upper center", bbox_to_anchor=(0.5, -0.01), ncol=3, frameon=False,
+                    labelcolor=TEXTO, fontsize=9.5, title="color: cuándo", title_fontsize=9)
+    ley.get_title().set_color(TENUE)
+    ax.add_artist(ley)
+    ley2 = ax.legend(handles=tam, loc="upper center", bbox_to_anchor=(0.5, -0.09), ncol=3, frameon=False,
+                     labelcolor=TEXTO, fontsize=9.5, title="tamaño: cuánto bajó tu chance", title_fontsize=9)
+    ley2.get_title().set_color(TENUE)
     ax.set_title(titulo, color=TEXTO, fontsize=12, loc="left")
     return _png(fig)
 

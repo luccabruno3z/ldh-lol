@@ -182,15 +182,20 @@ class MenuBoton(discord.ui.DynamicItem[discord.ui.Button], template=r"lm:(?P<acc
         await interaction.followup.send(view=vista)
 
 
-def menu(owner: int) -> discord.ui.LayoutView:
+def menu(owner: int, con_informe: bool = True) -> discord.ui.LayoutView:
+    """Tres temas: lo tuyo, el grupo y ayuda. «Mi informe» solo aparece si tenés uno publicado."""
+    yo = ["perfil", "coaching", "partida", "grafico", "rachas"]
+    mas_yo = ["pool", "tips"] + (["informe"] if con_informe else [])
     view = discord.ui.LayoutView(timeout=None)
     view.add_item(discord.ui.Container(
-        discord.ui.TextDisplay("## LDH Stats LoL\nElegí qué querés ver. Los números llevan su intervalo y su n; "
-                               "si algo dice **ruido**, con esas partidas no se puede sacar conclusiones.\n-# " + AVISO_RIOT),
-        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("perfil", "coaching", "partida", "grafico", "buscar")]),
-        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("rachas", "top", "toprol", "competencia", "comparar")]),
-        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("informe", "inhouse", "tips", "glosario", "ayuda")]),
-        discord.ui.ActionRow(MenuBoton("pool", owner),
+        discord.ui.TextDisplay("## LDH Stats LoL\nElegí qué querés ver.\n-# " + AVISO_RIOT),
+        discord.ui.TextDisplay("**Lo tuyo**"),
+        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in yo]),
+        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in mas_yo]),
+        discord.ui.TextDisplay("**El grupo**"),
+        discord.ui.ActionRow(*[MenuBoton(a, owner) for a in ("top", "toprol", "competencia", "comparar", "inhouse")]),
+        discord.ui.TextDisplay("**Buscar y ayuda**"),
+        discord.ui.ActionRow(MenuBoton("buscar", owner), MenuBoton("glosario", owner), MenuBoton("ayuda", owner),
                              discord.ui.Button(label="Abrir la web", url="https://luccabruno3z.github.io/ldh-lol/")),
         accent_colour=0x00CCCC))
     return view

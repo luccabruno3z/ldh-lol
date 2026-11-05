@@ -231,15 +231,23 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
         r = await bot.datos.muertes(p["id"]) or {}
         modo_r = modo or "solo"
         m = (r.get("modos") or {}).get(modo_r)
-        t = ((m or {}).get("roles") or {}).get("Todos")
+        rol_m = ROLES.get((rol or "").lower()) or rol
+        if rol_m not in ((m or {}).get("roles") or {}):
+            rol_m = "Todos"
+        t = ((m or {}).get("roles") or {}).get(rol_m)
         if not m or not t or not t.get("n"):
             return f"{nombre} no tiene muertes con timeline en {EN_MODO.get(modo_r, modo_r)}.", None
-        png = graficos.mapa_muertes(m["puntos"], await bot.datos.mapa(), f"{nombre} · tus muertes y cuánto bajaron tus chances · {EN_MODO.get(modo_r)}")
-        med = (r.get("mediana_grupo") or {}).get(f"{modo_r}|Todos")
+        # Puntos de ese rol (los JSON viejos no traen el rol en el punto: entonces van todos y se avisa).
+        con_rol = all(len(x) > 4 for x in m["puntos"])
+        puntos = [x for x in m["puntos"] if rol_m == "Todos" or not con_rol or x[4] == rol_m]
+        donde = "" if rol_m == "Todos" else f" · {rol_m}"
+        png = graficos.mapa_muertes(puntos, await bot.datos.mapa(),
+                                    f"{nombre} · tus muertes y cuánto bajaron tus chances · {EN_MODO.get(modo_r)}{donde}")
+        med = (r.get("mediana_grupo") or {}).get(f"{modo_r}|{rol_m}")
         caras = "\n".join(f"**−{F.num(c['costo'] * 100, 0)} pts** · min {F.num(c['min'], 0)} · {c.get('zona_nombre') or ''}"
                           + (f" · el rival tomó {', '.join(OBJ.get(x, x) for x in dict.fromkeys(c['perdidos']))}" if c["perdidos"] else "")
-                          for c in m["caras"])
-        texto = (f"## {discord.utils.escape_markdown(nombre)} · cuánto bajan tus chances al morir\n"
+                          for c in m["caras"] if rol_m == "Todos" or c.get("rol") in (None, rol_m))
+        texto = (f"## {discord.utils.escape_markdown(nombre)} · cuánto bajan tus chances al morir{donde}\n"
                  f"Según el modelo, cada muerte le baja a tu equipo **{F.num(t['por_muerte']['v'] * 100, 1)} pts** de probabilidad de ganar "
                  f"({F.num(t['por_muerte']['lo'] * 100, 1)} a {F.num(t['por_muerte']['hi'] * 100, 1)}, {t['n']} muertes). "
                  f"Por partida suman **{F.num(t['por_partida'] * 100, 0)} pts**"
@@ -333,23 +341,28 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
     return view, png
 
 
-class _SelectorTexto(discord.ui.Select):
-    def __init__(self, textos: dict, titulo: str):
-        self.textos, self.titulo = textos, titulo
-        super().__init__(placeholder="Elegí un tema", options=[discord.SelectOption(label=k) for k in textos])
+class SelectorTexto(discord.ui.DynamicItem[discord.ui.Select], template=r"lg:(?P<tipo>ayuda|glosario)"):
+    """Persistente: sigue andando después de un reinicio (antes, el menú de temas dejaba de responder)."""
+
+    def __init__(self, tipo: str):
+        textos = AYUDA if tipo == "ayuda" else GLOSARIO
+        self.tipo = tipo
+        super().__init__(discord.ui.Select(custom_id=f"lg:{tipo}", placeholder="Elegí un tema",
+                                           options=[discord.SelectOption(label=k[:100]) for k in textos]))
+
+    @classmethod
+    async def from_custom_id(cls, interaction, item, match):
+        return cls(match["tipo"])
 
     async def callback(self, interaction: discord.Interaction):
-        # La vista se guarda antes de rearmarla: mostrar() saca este selector y self.view pasa a None,
-        # y editar con view=None en un mensaje de Components V2 da "Cannot send an empty message".
-        vista = self.view
-        vista.mostrar(self.values[0])
-        await interaction.response.defer()
-        await interaction.edit_original_response(view=vista)
+        textos = AYUDA if self.tipo == "ayuda" else GLOSARIO
+        vista = _VistaTexto(textos, "Ayuda" if self.tipo == "ayuda" else "Glosario", self.item.values[0])
+        await interaction.response.edit_message(view=vista)
 
 
 class _VistaTexto(discord.ui.LayoutView):
     def __init__(self, textos: dict, titulo: str, inicial: str | None = None):
-        super().__init__(timeout=600)
+        super().__init__(timeout=None)
         self.textos, self.titulo = textos, titulo
         self.mostrar(inicial or next(iter(textos)))
 
@@ -357,7 +370,7 @@ class _VistaTexto(discord.ui.LayoutView):
         self.clear_items()
         self.add_item(discord.ui.Container(
             discord.ui.TextDisplay(f"## {self.titulo} · {k}\n{self.textos[k]}\n\n-# {AVISO_RIOT}"),
-            discord.ui.ActionRow(_SelectorTexto(self.textos, self.titulo)),
+            discord.ui.ActionRow(SelectorTexto("ayuda" if self.textos is AYUDA else "glosario")),
             discord.ui.ActionRow(discord.ui.Button(label="Abrir la web", url=WEB)),
             accent_colour=0x00CCCC))
 
@@ -387,7 +400,9 @@ class Extra(commands.Cog):
     @commands.hybrid_command(name="menu", description="Panel con botones: tu perfil, buscar, rankings, comparar y ayuda")
     async def menu(self, ctx: commands.Context):
         from bot.ui.menu import menu
-        await ctx.reply(view=menu(ctx.author.id))
+        pid = self.bot.get_cog("Perfil").vinculos.get(str(ctx.author.id))
+        tiene = bool(pid and await self.bot.datos.informe(pid))
+        await ctx.reply(view=menu(ctx.author.id, con_informe=tiene or not pid))
 
     @commands.hybrid_command(name="ayuda", aliases=["help", "comandos"], description="Qué hace el bot, por tema")
     async def ayuda(self, ctx: commands.Context):

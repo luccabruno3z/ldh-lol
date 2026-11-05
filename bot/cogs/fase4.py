@@ -107,10 +107,17 @@ class Fase4(commands.Cog):
         champs = await self.datos.campeones()
         nc = (await self.datos.ajustes()).get("nombres_cola", {})
         filas = [f for f in d["tabla"] if f["cola"] == cola and not f["muestra_chica"]]
+        roles_hay = {}
+        for f in filas:
+            roles_hay[f["rol"]] = roles_hay.get(f["rol"], 0) + f["n"]
+        rol_m = max(roles_hay, key=roles_hay.get) if roles_hay else None
+        otros = [r for r in roles_hay if r != rol_m]
+        filas = [f for f in filas if f["rol"] == rol_m]
         nombre_c = lambda c: (champs.get(str(c)) or {}).get("nombre", c)
-        lineas = [f"## {discord.utils.escape_markdown(p['nombre'])} · contra quién", f"-# {nc.get(cola, cola)} · rival directo · {d.get('min', 5)}+ partidas"]
+        lineas = [f"## {discord.utils.escape_markdown(p['nombre'])} · contra quién", f"-# {nc.get(cola, cola)} · {rol_m or 'sin rol'} · rival directo · {d.get('min', 5)}+ partidas"
+                  + (f" · también hay de {', '.join(otros)} en la web" if otros else "")]
         for f in sorted(filas, key=lambda f: -f["n"])[:10]:
-            lineas += [f"**{nombre_c(f['rival'])}** ({f['rol']}) · {F.pct(f['winrate']['v'])} en {f['n']}",
+            lineas += [f"**{nombre_c(f['rival'])}** · {F.pct(f['winrate']['v'])} en {f['n']}",
                        f"-# {F.rango_pct(f['winrate'])} · ajustado {F.pct(f['wr_aj'])}"]
         if not filas:
             lineas.append(f"Ningún rival se repite {d.get('min', 5)} veces o más en esta cola.")
@@ -161,10 +168,23 @@ class Fase4(commands.Cog):
     @commands.hybrid_command(name="mapa", description="Dónde morís o matás, sobre el minimapa (por lado)")
     @app_commands.autocomplete(jugador=autocompletar_jugador, tipo=autocompletar_opciones("muertes", "kills"),
                                lado=autocompletar_opciones("azul", "rojo"))
-    async def mapa(self, ctx: commands.Context, jugador: str | None = None, tipo: str = "muertes", lado: str = "azul"):
-        if jugador and jugador.lower() in ("muertes", "kills", "azul", "rojo"):
-            jugador, tipo, lado = None, jugador if jugador.lower() in ("muertes", "kills") else tipo, \
-                jugador if jugador.lower() in ("azul", "rojo") else lado
+    async def mapa(self, ctx: commands.Context, jugador: str | None = None, tipo: str = "muertes", lado: str = "azul",
+                   rol: str | None = None):
+        from bot.cogs.rankings import ROLES as _R
+        # Las palabras sueltas se reconocen en cualquier orden: -mapa kills rojo jungla, -mapa lucca jungla…
+        sueltas = [w for w in (jugador, tipo, lado, rol) if w]
+        jugador = tipo = lado = rol = None
+        for w in sueltas:
+            lw = w.lower()
+            if lw in ("muertes", "kills") and not tipo:
+                tipo = lw
+            elif lw in ("azul", "rojo") and not lado:
+                lado = lw
+            elif _R.get(lw) and not rol:
+                rol = _R[lw]
+            elif not jugador:
+                jugador = w
+        tipo, lado = tipo or "muertes", lado or "azul"
         if not (p := await self._persona(ctx, jugador, "mapa")):
             return
         await ctx.defer()
@@ -176,7 +196,7 @@ class Fase4(commands.Cog):
         d = await self.datos.heatmap(p["id"]) or {"puntos": []}
         t = "muerte" if tipo.lower().startswith("m") else "kill"
         lado = "rojo" if lado.lower().startswith("r") else "azul"
-        pts = [q for q in d["puntos"] if q[6] == t and q[3] == lado]
+        pts = [q for q in d["puntos"] if q[6] == t and q[3] == lado and (not rol or q[5] == rol)]
         if len(pts) < 10:
             await ctx.reply(f"Muy pocos puntos para {p['nombre']} del lado {lado} ({len(pts)}).")
             return
@@ -196,7 +216,8 @@ class Fase4(commands.Cog):
         ax.imshow(H.T, extent=(0, S, S, 0), cmap="Reds" if t == "muerte" else "Greens", alpha=0.8,
                   interpolation="nearest", vmin=umbral)
         ax.set_xlim(0, S); ax.set_ylim(S, 0); ax.axis("off")
-        ax.set_title(f"{p['nombre']} · {'muertes' if t == 'muerte' else 'kills'} · lado {lado} ({len(pts)})", color="#e8ecf4")
+        ax.set_title(f"{p['nombre']} · {'muertes' if t == 'muerte' else 'kills'} · lado {lado}"
+                     f"{f' · {rol}' if rol else ' · todos los roles'} ({len(pts)})", color="#e8ecf4")
         buf = io.BytesIO()
         fig.savefig(buf, format="png", facecolor=fig.get_facecolor(), bbox_inches="tight")
         plt.close(fig)

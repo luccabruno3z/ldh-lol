@@ -42,8 +42,9 @@ class Bot(commands.Bot):
         from bot.ui.partida_vista import PartidaBoton
         from bot.ui.informe_vista import InformeBoton
         from bot.ui.pool_vista import BorrarPool, SelectorPool
+        from bot.cogs.extra import SelectorTexto
         self.add_dynamic_items(PerfilBoton, MenuBoton, SelectorRanking, SelectorCoaching, PartidaBoton, InformeBoton,
-                               SelectorPool, BorrarPool)
+                               SelectorPool, BorrarPool, SelectorTexto)
         await self._sincronizar()
 
     async def _sincronizar(self):

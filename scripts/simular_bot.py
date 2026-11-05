@@ -220,8 +220,9 @@ async def main():
     from bot.ui.perfil_vista import PerfilBoton
     from bot.ui.pool_vista import BorrarPool, SelectorPool
     from bot.ui.rankings_vista import SelectorRanking
+    from bot.cogs.extra import SelectorTexto
     bot._simular_dinamicos = [PerfilBoton, MenuBoton, SelectorRanking, SelectorCoaching, PartidaBoton, InformeBoton,
-                              SelectorPool, BorrarPool]
+                              SelectorPool, BorrarPool, SelectorTexto]
     # Guardar una pool no sube nada: queda solo en el volumen temporal.
     if hasattr(bot, "metas"):
         async def _sin_subir(*_a, **_k):

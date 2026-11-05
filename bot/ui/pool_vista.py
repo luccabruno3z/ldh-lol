@@ -86,11 +86,11 @@ def _seguimiento(seg: dict | None, decl: dict, campeones: dict) -> list[str]:
 
 
 class SelectorPool(discord.ui.DynamicItem[discord.ui.Select],
-                   template=r"lp:(?P<pid>[A-Za-z0-9_-]+):(?P<rol>[A-Za-z]+):(?P<owner>\d+):(?P<clave>rol|champs)"):
+                   template=r"lpo:(?P<pid>[A-Za-z0-9_-]+):(?P<rol>[A-Za-z]+):(?P<owner>\d+):(?P<clave>rol|champs)"):
     def __init__(self, pid: str, rol: str, owner: int, clave: str, opciones: list[discord.SelectOption] | None = None,
                  maximo: int = 1, minimo: int = 1, placeholder: str | None = None):
         self.pid, self.rol, self.owner, self.clave = pid, rol, owner, clave
-        super().__init__(discord.ui.Select(custom_id=f"lp:{pid}:{rol}:{owner}:{clave}"[:100], placeholder=placeholder,
+        super().__init__(discord.ui.Select(custom_id=f"lpo:{pid}:{rol}:{owner}:{clave}"[:100], placeholder=placeholder,
                                            min_values=minimo, max_values=maximo,
                                            options=opciones or [discord.SelectOption(label="-")]))
 

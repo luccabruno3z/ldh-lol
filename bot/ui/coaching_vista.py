@@ -28,7 +28,7 @@ VISTAS = {
 }
 GRAFICO = {"gfra": "franjas", "grad": "radar", "gten": "tendencia", "gevo": "evolucion", "grac": "rachas",
            "gmue": "muertes", "gcur": "curva"}
-SIN_ROL = ("gevo", "grac", "gmue", "conv")  # no dependen del rol
+SIN_ROL = ("gevo", "grac", "conv")  # no se filtran por rol: la tarjeta lo dice
 MODOS = {"solo": "Solo/Dúo", "normal": "Normales", "todo": "Todo (solo, flex y normales)"}
 ROLES = ("Top", "Jungla", "Mid", "ADC", "Support")
 
@@ -129,6 +129,8 @@ async def vista_coaching(bot, vista: str, pid: str, rol: str | None, modo: str |
     else:
         fn = {"perf": co.tarjeta_performance, "mejora": co.tarjeta_mejora, "temp": co.tarjeta_temprano}[vista]
         texto = _texto(fn(p, d, rol))
+    if vista in SIN_ROL and (png is not None or vista == "conv"):
+        texto += "\n-# Usa todas tus partidas del modo, sin filtrar por rol."
     if len(texto) > 3500:
         texto = texto[:3490] + "\n…"
 
