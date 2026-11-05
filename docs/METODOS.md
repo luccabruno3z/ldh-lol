@@ -100,6 +100,14 @@ datos están en [RUNBOOK.md](RUNBOOK.md); las reglas de los informes, en [REGLAS
 - Es lo que estima el modelo, no la causa. Sirve para elegir qué mirar.
 - El paquete de evidencia suma como `contexto` los momentos de las últimas 5 partidas con timeline de la persona (`vod.<partida>.<n>`). El informe los puede citar en `momentos`.
 
+### Rosters premade (`ldh/roster.py`)
+- **Detección.** Grafo de quién juega con quién: cada lado de partida de Flex o Normales con 4+ vinculados suma 1 a cada par. Las comunidades (Louvain de networkx, semilla 1) son los planteles. Una partida es del roster con 4+ del plantel en el mismo lado; se publica con 10+ partidas. El id sale de los 3 con más partidas (el núcleo).
+- **`config/rosters.json` (opcional):** `{"rosters": [{"id": "r…", "nombre": "…"}, {"id": "srx", "nombre": "SRX", "plantel": ["pid", …]}]}`. Con `nombre` se renombra un roster detectado; con `plantel` se fija a mano (reemplaza a la comunidad que más se le parece).
+- **Métricas por partida**, desde la timeline: oro a los 14 del equipo, primer dragón, primer Heraldo, placas antes del 14 (tomadas − cedidas; en este parche hay placas en las 3 torres de cada línea y caen toda la partida, así que contarlas todas mediría quién ganó), visión del equipo por minuto, parte de los objetivos grandes (dragones, Heraldo, Barón, larvas, Ancestral) y cierre (ganadas de las que tenían 60 %+ al 15 según el modelo, evaluado en el frame).
+- **Intervalos:** Wilson para proporciones y bootstrap para medias, cada uno con su n. Ventanas: última semana, últimas 4 semanas y temporada, contadas desde la última partida guardada.
+- **Referencia:** los demás lados de Flex y Normales con algún vinculado que no son de un roster. Diferencia de medias con bootstrap y p bilateral del bootstrap; BH sobre todas las comparaciones de todos los rosters. Señal, a confirmar o ruido como en el resto del sitio; menos de 10 partidas es muestra chica y no se etiqueta.
+- Es descriptivo: el roster juega contra otros rivales y en otros horarios que la referencia. Sirve para elegir qué revisar, no prueba la causa. El winrate va solo como contexto.
+
 ## Cómo verificar un cambio de cálculo
 
 1. `python -m ldh publicar` en local y leer los JSON nuevos.

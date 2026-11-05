@@ -62,6 +62,7 @@ Cada uno solo cambia su propia pool. Cambiarla reinicia el seguimiento desde ese
 | `-competencia <desde> [hasta] [cola]` | Quién rindió mejor entre dos fechas. |
 | `-ideal` | El 5 ideal: una persona por rol con 10+ partidas ahí. |
 | `-inhouse a, b, …` | Dos equipos parejos con 10 jugadores. |
+| `-roster [nombre o jugador]` | El roster premade (4+ del mismo plantel juntos en Flex o Normales): plantel, métricas de proceso con intervalo y su diferencia con la referencia; menús de roster y período. |
 | `-matchups [jugador]`, `-jungla [jugador]`, `-mapa [jugador]` | Contra cada campeón rival, de qué buff arrancás, dónde morís o matás. |
 
 ## Para administradores (Gestionar servidor)

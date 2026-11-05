@@ -9,6 +9,7 @@
 import { state, cachedFetch } from './data.js';
 import { onRoute } from './router.js';
 import { escapeHtml, iconoCampeon, campeon, num } from './utils.js';
+import { renderRosters } from './rosters.js';
 
 const ROLES = ['Top', 'Jungla', 'Mid', 'ADC', 'Support'];
 let datos = null;
@@ -118,9 +119,16 @@ function ideal() {
         <td class="num mono">${pct(x.wr_aj)}<span class="ic">${x.n} part.</span></td></tr>`).join('')}</tbody></table></div>`).join('');
 }
 
-async function render() {
-    datos ||= await cachedFetch('equipos.json');
+const TABS = { armar: '5 ideal e inhouse', rosters: 'Rosters' };
+
+async function render(tab) {
+    document.querySelectorAll('#equipos-tabs a').forEach(a => a.classList.toggle('is-active', a.dataset.tab === tab));
     const cont = document.getElementById('equipos-cuerpo');
+    if (tab === 'rosters') {
+        cont.innerHTML = '<div class="skeleton"></div>';
+        return renderRosters(cont);
+    }
+    datos ||= await cachedFetch('equipos.json');
     const pids = Object.keys(datos.jugadores).sort((a, b) => datos.jugadores[a].nombre.localeCompare(datos.jugadores[b].nombre));
     cont.innerHTML = `
       <section class="section"><h2 class="h3">El 5 ideal del grupo</h2>
@@ -139,7 +147,9 @@ async function render() {
 }
 
 export function initEquipos() {
-    onRoute('equipos', () => render().catch(err => {
+    document.getElementById('equipos-tabs').innerHTML = Object.entries(TABS).map(([k, l]) =>
+        `<a href="#/equipos/${k}" data-tab="${k}">${l}</a>`).join('');
+    onRoute('equipos', (tab) => render(TABS[tab] ? tab : 'armar').catch(err => {
         console.error('[equipos]', err);
         document.getElementById('equipos-cuerpo').innerHTML = '<div class="error-state">No se pudo cargar equipos.</div>';
     }));

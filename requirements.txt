@@ -3,3 +3,5 @@ requests==2.34.2
 numpy==2.5.2
 # Modelo de probabilidad de ganar (fase 5): regresión logística y calibración.
 scikit-learn==1.9.1
+# Rosters premade (fase 7): comunidades del grafo de quién juega con quién.
+networkx==3.6.1

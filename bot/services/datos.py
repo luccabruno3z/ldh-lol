@@ -117,6 +117,13 @@ class Datos:
         """Curva de probabilidad de ganar y eventos de una partida (fase 5)."""
         return await self._json(f"partida/{quote(match_id)}.json")
 
+    async def rosters(self) -> dict:
+        """Los rosters premade (fase 7): índice con plantel y partidas."""
+        return await self._json("roster/index.json") or {"rosters": []}
+
+    async def roster(self, rid: str) -> dict | None:
+        return await self._json(f"roster/{quote(rid)}.json")
+
     async def muertes(self, persona_id: str) -> dict | None:
         return await self._json(f"muertes/{quote(persona_id)}.json")
 

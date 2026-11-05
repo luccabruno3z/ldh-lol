@@ -9,7 +9,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 from . import estadistica as est
-from . import fase2, fase3, fase4, fase5
+from . import fase2, fase3, fase4, fase5, roster
 from .ajustes import AJUSTES, DATOS, RAIZ, SALIDA
 from .almacen import cargar_estado
 from .base import RUTA_BASE, valor_rango
@@ -214,6 +214,7 @@ def publicar() -> dict:
     salida_f3 = fase3.generar(db, filas_por, rangos, _escribir)
     fase4.generar(db, filas_por, dict(db.execute("SELECT id, nombre FROM personas")), _escribir)
     fase5.generar(db, filas_por, _escribir, salida_f3["indices"])
+    roster.generar(db, _escribir)  # rosters premade de Flex y Normales (fase 7)
     # Informes de coaching: los escribe Claude a pedido y viven en datos/informes (api se borra en cada corrida).
     # Solo de personas que siguen vinculadas.
     vinculadas = {r[0] for r in db.execute("SELECT id FROM personas")}
