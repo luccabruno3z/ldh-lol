@@ -63,6 +63,7 @@ Cada uno solo cambia su propia pool. Cambiarla reinicia el seguimiento desde ese
 | `-ideal` | El 5 ideal: una persona por rol con 10+ partidas ahí. |
 | `-inhouse a, b, …` | Dos equipos parejos con 10 jugadores. |
 | `-roster [nombre o jugador]` | El roster premade (4+ del mismo plantel juntos en Flex o Normales): plantel, métricas de proceso con intervalo y su diferencia con la referencia; menús de roster y período. |
+| `-informe_roster [nombre o jugador]` | El último informe semanal del roster, con la evidencia de cada prioridad y los minutos del VOD que cita. |
 | `-matchups [jugador]`, `-jungla [jugador]`, `-mapa [jugador]` | Contra cada campeón rival, de qué buff arrancás, dónde morís o matás. |
 
 ## Para administradores (Gestionar servidor)

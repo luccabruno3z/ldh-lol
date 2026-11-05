@@ -406,7 +406,7 @@ export function activarCurvas(tbody, pid) {
 const TIPO_EV = { observacion: 'observación', asociacion: 'asociación', estimacion_modelo: 'estimación del modelo', contexto: 'contexto' };
 const FASE_EV = { temprana: 'antes del 14', media: 'del 14 al 25', tardia: 'después del 25' };
 
-function evidenciaHtml(e) {
+export function evidenciaHtml(e) {
     const extra = [e.por_partida_fmt, e.con_objetivo_fmt,
         e.fases_fmt && Object.entries(e.fases_fmt).map(([k, v]) => `${FASE_EV[k] || k}: ${v}`).join(' · ')].filter(Boolean);
     return `<li><span class="tag">${TIPO_EV[e.tipo] || e.tipo}</span> ${escapeHtml(e.que)}: <strong class="mono">${escapeHtml(e.fmt || '—')}</strong>

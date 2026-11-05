@@ -5,6 +5,9 @@ docs/REGLAS_EVIDENCIA.md. El texto no lleva cifras: las cifras salen de las evid
 al informe para que la web y el bot no dependan del paquete.
 
     python -m ldh validar_informe <borrador.json>     valida y, si pasa, lo deja en datos/informes/<pid>.json
+
+El informe semanal de un roster (fase 7) usa el mismo esquema con "roster" y "semana" en vez de "persona" y
+"modo", y queda en datos/informes_roster/<rid>/<semana>.json. Solo puede nombrar a gente del plantel.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ from . import evidencia as ev
 from .ajustes import DATOS
 
 CARPETA = DATOS / "informes"
+CARPETA_ROSTER = DATOS / "informes_roster"
 MAX_PRIORIDADES = 2
 CAMPOS_PRIORIDAD = ("titulo", "observacion", "evidencias", "posible_explicacion", "falta_verificar", "ejercicio",
                     "como_revisar")
@@ -41,7 +45,10 @@ def _textos(inf: dict):
 def validar(inf: dict, paquete: dict, nombres_vinculados: set[str]) -> list[str]:
     errores = []
     ids = {e["id"]: e for e in paquete["evidencias"]}
-    if inf.get("persona") != paquete["persona"] or inf.get("modo") != paquete["modo"]:
+    if paquete.get("tipo") == "roster":
+        if inf.get("roster") != paquete["persona"] or inf.get("semana") != paquete["semana"]:
+            errores.append("El roster o la semana no coinciden con el paquete.")
+    elif inf.get("persona") != paquete["persona"] or inf.get("modo") != paquete["modo"]:
         errores.append("La persona o el modo no coinciden con el paquete.")
     if inf.get("hash") != paquete["hash"]:
         errores.append("El hash no es el del paquete actual: rearmá el paquete y revisá el informe.")
@@ -94,7 +101,7 @@ def validar(inf: dict, paquete: dict, nombres_vinculados: set[str]) -> list[str]
 
 def publicable(inf: dict, paquete: dict) -> dict:
     """El informe con las evidencias citadas copiadas adentro, listo para datos/informes/<pid>.json."""
-    citadas = {e for p in inf["prioridades"] for e in p["evidencias"]} | {
+    citadas = {e for p in inf["prioridades"] for e in p["evidencias"] + (p.get("momentos") or [])} | {
         e for t in inf.get("mantener") or [] for e in t.get("evidencias") or []}
     return {**inf, "fecha": inf.get("fecha") or date.today().isoformat(), "nombre": paquete["nombre"],
             "datos_al": paquete.get("datos_al"), "autor": "Claude, a pedido de Lucca",
@@ -104,17 +111,27 @@ def publicable(inf: dict, paquete: dict) -> dict:
 
 def validar_archivo(ruta: str) -> int:
     inf = json.loads(Path(ruta).read_text(encoding="utf-8"))
-    paquete = ev.armar(inf["persona"], inf.get("modo", "solo"))
-    nombres = {p["nombre"] for p in (ev._leer("personas.json") or [])}
+    es_roster = "roster" in inf
+    if es_roster:
+        paquete = ev.armar_roster(inf["roster"], inf.get("semana"))
+        nombres = set(paquete["plantel"])  # un informe de roster solo nombra a su plantel
+    else:
+        paquete = ev.armar(inf["persona"], inf.get("modo", "solo"))
+        nombres = {p["nombre"] for p in (ev._leer("personas.json") or [])}
     # Los campeones también son nombres propios permitidos (con y sin espacios: "Dr. Mundo" y "DrMundo").
     for c in ((ev._leer("campeones.json") or {}).get("campeones") or {}).values():
         nombres |= {c.get("nombre", ""), c.get("key", "")}
     errores = validar(inf, paquete, nombres)
+    if es_roster:  # un vinculado de afuera del plantel no se nombra, aunque su nombre no tenga pinta de cuenta
+        texto = " ".join(t for _, t in _textos(inf) if isinstance(t, str)).lower()
+        for p in ev._leer("personas.json") or []:
+            if p["nombre"] not in nombres and re.search(rf"\b{re.escape(p['nombre'].lower())}\b", texto):
+                errores.append(f"Nombra a {p['nombre']!r}, que no es del plantel del roster.")
     if errores:
         print("El informe NO pasa:\n- " + "\n- ".join(errores))
         return 1
-    CARPETA.mkdir(parents=True, exist_ok=True)
-    destino = CARPETA / f"{inf['persona']}.json"
+    destino = (CARPETA_ROSTER / inf["roster"] / f"{inf['semana']}.json") if es_roster else CARPETA / f"{inf['persona']}.json"
+    destino.parent.mkdir(parents=True, exist_ok=True)
     destino.write_text(json.dumps(publicable(inf, paquete), ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"Pasa. Guardado en {destino}")
     return 0

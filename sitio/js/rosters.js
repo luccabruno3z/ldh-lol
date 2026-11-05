@@ -3,6 +3,7 @@
 
 import { cachedFetch } from './data.js';
 import { escapeHtml, num, conIntervalo, como, glos, tagChica, fecha } from './utils.js';
+import { evidenciaHtml } from './fase5.js';
 
 const VENTANAS = { semana: 'Última semana', mes: 'Últimas 4 semanas', temporada: 'Temporada' };
 const MIN = 10;  // el mismo umbral de muestra chica que el resto del sitio (min_partidas)
@@ -36,7 +37,34 @@ function conclusion(d) {
     return `<p class="conclusion">Para mirar en la temporada: ${txt.join('; ')}. Es una comparación, no la causa: sirve para elegir qué revisar en los VOD.</p>`;
 }
 
-function tarjeta(d) {
+/** Un informe semanal: hasta 2 prioridades con su evidencia y los minutos del VOD que cita. */
+function informeHtml(inf) {
+    const ev = Object.fromEntries((inf.evidencias || []).map(e => [e.id, e]));
+    const lista = (ids) => `<ul class="inf-ev">${(ids || []).map(i => ev[i]).filter(Boolean).map(evidenciaHtml).join('')}</ul>`;
+    return `<p class="lead">${escapeHtml(inf.resumen || '')}</p>
+      <div class="inf-prios">${inf.prioridades.map((x, i) => `<article class="card inf-prio">
+        <h4><span class="inf-num">${i + 1}</span> ${escapeHtml(x.titulo)}</h4>
+        <p>${escapeHtml(x.observacion)}</p>
+        <details><summary>Ver la evidencia (${x.evidencias.length})</summary>${lista(x.evidencias)}</details>
+        <p><strong>Puede ser porque</strong> ${escapeHtml(x.posible_explicacion)}</p>
+        <p class="dim"><strong>Falta ver:</strong> ${escapeHtml(x.falta_verificar)}</p>
+        <p class="inf-ej"><strong>Para practicar:</strong> ${escapeHtml(x.ejercicio)}</p>
+        <p class="dim"><strong>Cómo revisarlo:</strong> ${escapeHtml(x.como_revisar)}</p>
+        ${x.momentos?.length ? `<ul class="inf-vod">${x.momentos.map(i => ev[i]).filter(Boolean).map(e => `<li><span class="tag">VOD</span> ${escapeHtml(e.que)}</li>`).join('')}</ul>` : ''}</article>`).join('')}</div>
+      ${inf.mantener?.length ? `<h4>Lo que conviene mantener</h4><ul>${inf.mantener.map(t => `<li>${escapeHtml(t.texto)}${t.evidencias?.length ? `<details><summary>evidencia</summary>${lista(t.evidencias)}</details>` : ''}</li>`).join('')}</ul>` : ''}
+      ${inf.proxima_revision ? `<p class="dim">Próxima revisión: ${escapeHtml(inf.proxima_revision)}</p>` : ''}`;
+}
+
+function informes(d, lista) {
+    if (!lista?.length) return '';
+    const [ult, ...viejos] = lista;
+    return `<section class="section inf"><h3 class="h4">Informe de la semana <span class="dim">· ${escapeHtml(ult.semana)}</span></h3>
+      ${informeHtml(ult)}
+      ${viejos.length ? `<details><summary>Informes anteriores (${viejos.length})</summary>${viejos.map(v => `<h4>${escapeHtml(v.semana)}</h4>${informeHtml(v)}`).join('')}</details>` : ''}
+      <p class="nota">Escrito por ${escapeHtml(ult.autor || 'Claude')} con los datos al ${escapeHtml((ult.datos_al || '').slice(0, 10))}. Cada cifra sale de una evidencia con su intervalo y n; lo que dice "puede ser" es una hipótesis para revisar en los VOD, no un diagnóstico.</p></section>`;
+}
+
+function tarjeta(d, inf) {
     const v = d.ventanas[sel.ventana];
     const ref = d.referencia.metricas;
     const filas = Object.entries(d.metricas).map(([k, meta]) => `<tr${k === 'winrate' ? ' class="dim"' : ''}>
@@ -53,6 +81,7 @@ function tarjeta(d) {
       <div class="section-head"><h2 class="h3">${escapeHtml(d.nombre)}</h2>
         <span class="dim">${d.partidas} partidas juntos · la última ${fecha(d.ultima, false)}</span></div>
       ${conclusion(d)}
+      ${informes(d, inf?.informes)}
       <div class="section-head"><h3 class="h4">Métricas de proceso ${glos('g-intervalo', '¿cómo se lee el intervalo?')}</h3>
         <div class="chips-cola" role="group" aria-label="Período">${Object.entries(VENTANAS).map(([k, l]) =>
             `<button type="button" class="chip-cola${k === sel.ventana ? ' is-active' : ''}" data-ventana="${k}" aria-pressed="${k === sel.ventana}">${l} <span class="dim">(${d.ventanas[k].n})</span></button>`).join('')}</div></div>
@@ -77,11 +106,12 @@ export async function renderRosters(cont) {
     }
     if (!rs.some(r => r.id === sel.roster)) sel.roster = rs[0].id;
     const pintar = async () => {
-        const d = await cachedFetch(`roster/${encodeURIComponent(sel.roster)}.json`);
+        const [d, inf] = await Promise.all([cachedFetch(`roster/${encodeURIComponent(sel.roster)}.json`),
+                                            cachedFetch(`roster/${encodeURIComponent(sel.roster)}/informes.json`, { silent: true })]);
         cont.innerHTML = `<p class="dim">Los grupos que juegan juntos en Flex y Normales, detectados solos por quién juega con quién. Las métricas son de proceso (lo que el equipo controla): con pocas partidas por mes, el winrate casi siempre es ruido.</p>
           ${rs.length > 1 ? `<div class="chips-cola" role="group" aria-label="Roster">${rs.map(r =>
               `<button type="button" class="chip-cola${r.id === sel.roster ? ' is-active' : ''}" data-roster="${escapeHtml(r.id)}" aria-pressed="${r.id === sel.roster}">${escapeHtml(r.nombre)} <span class="dim">(${r.partidas})</span></button>`).join('')}</div>` : ''}
-          ${tarjeta(d)}`;
+          ${tarjeta(d, inf)}`;
         cont.querySelectorAll('[data-roster]').forEach(b => b.addEventListener('click', () => { sel.roster = b.dataset.roster; pintar(); }));
         cont.querySelectorAll('[data-ventana]').forEach(b => b.addEventListener('click', () => { sel.ventana = b.dataset.ventana; pintar(); }));
     };

@@ -124,6 +124,10 @@ class Datos:
     async def roster(self, rid: str) -> dict | None:
         return await self._json(f"roster/{quote(rid)}.json")
 
+    async def informes_roster(self, rid: str) -> list[dict]:
+        """Los informes semanales de un roster, del más nuevo al más viejo."""
+        return ((await self._json(f"roster/{quote(rid)}/informes.json")) or {}).get("informes") or []
+
     async def muertes(self, persona_id: str) -> dict | None:
         return await self._json(f"muertes/{quote(persona_id)}.json")
 

@@ -23,6 +23,7 @@ import itertools
 import json
 import sqlite3
 from collections import Counter, defaultdict
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -43,6 +44,8 @@ SUMAR_CON = 3  # se suma al plantel quien jugó MIN_PARTIDAS o más con 3+ del p
 MIN_COMPARAR = AJUSTES["min_partidas"]  # el umbral único de «muestra chica»
 ALFA = AJUSTES["ajuste_muestra"]["alfa"]
 DIA_MS = 86_400_000
+SEMANAS = 8  # semanas ISO con partidas que se publican (para el informe semanal)
+HORA_AR = timezone(timedelta(hours=-3))
 VENTANAS = {"semana": 7, "mes": 28, "temporada": None}  # días hacia atrás desde la última partida guardada
 MIN_ORO = 14
 MIN_P15 = 15
@@ -160,6 +163,12 @@ def _partida(db: sqlite3.Connection, m: dict, mid: str, lado: str) -> dict | Non
     return d
 
 
+def semana_iso(ms: int) -> str:
+    """'2026-W45': la semana ISO (lunes a domingo, hora de Argentina) de un instante en ms."""
+    a, w, _ = datetime.fromtimestamp(ms / 1000, HORA_AR).isocalendar()
+    return f"{a}-W{w:02d}"
+
+
 def _resumen(filas: list[dict]) -> dict:
     out = {}
     for k, (_, _, tipo) in METRICAS.items():
@@ -242,8 +251,16 @@ def generar(db: sqlite3.Connection, escribir: Callable) -> list[dict]:
         for v, dias in VENTANAS.items():
             fs = filas if dias is None else [f for f in filas if f["inicio"] >= ultima - dias * DIA_MS]
             ventanas[v] = {"n": len(fs), "metricas": _resumen(fs)}
+        lado_de = dict(r["lados"])  # match -> lado del roster
+        por_semana = defaultdict(list)
+        for f in filas:
+            por_semana[semana_iso(f["inicio"])].append(f)
+        semanas = {w: {"n": len(fs), "metricas": _resumen(fs),
+                       "partidas": [{"match": f["match"], "inicio": f["inicio"], "cola": f["cola"], "win": f["win"],
+                                     "lado": lado_de[f["match"]], "jugadores": sorted(presentes[f["match"]])} for f in fs]}
+                   for w, fs in sorted(por_semana.items(), reverse=True)[:SEMANAS]}
         d = {"id": r["id"], "nombre": r["nombre"], "plantel": plantel, "partidas": len(filas),
-             "ultima": filas[0]["inicio"] if filas else None, "ventanas": ventanas,
+             "ultima": filas[0]["inicio"] if filas else None, "ventanas": ventanas, "semanas": semanas,
              "referencia": {"n": len(ref), "metricas": ref_res}, "contra_referencia": _contra(filas, ref),
              "historial": [{"match": f["match"], "inicio": f["inicio"], "cola": f["cola"], "win": f["win"],
                             "jugadores": sorted(presentes[f["match"]])} for f in filas[:20]],

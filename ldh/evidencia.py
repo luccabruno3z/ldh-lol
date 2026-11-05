@@ -13,10 +13,11 @@ import hashlib
 import json
 from pathlib import Path
 
-from .ajustes import RAIZ, SALIDA
+from .ajustes import AJUSTES, RAIZ, SALIDA
 
 API = SALIDA / "api"
 CACHE = RAIZ / ".cache" / "evidencia"
+AJUSTES_MIN = AJUSTES["min_partidas"]
 TIPOS = ("observacion", "asociacion", "estimacion_modelo", "contexto")
 
 
@@ -43,8 +44,9 @@ def _fmt(v, lo, hi, n=None, dec=0, signo=False, k=1, suf="") -> str:
 
 
 class Paquete:
-    def __init__(self, persona: str, nombre: str, modo: str):
+    def __init__(self, persona: str, nombre: str, modo: str, extra: dict | None = None):
         self.persona, self.nombre, self.modo = persona, nombre, modo
+        self.extra = extra or {}  # el paquete de un roster suma tipo, semana y plantel
         self.items: list[dict] = []
 
     def add(self, id_: str, tipo: str, que: str, rol: str | None, v=None, lo=None, hi=None, n=None, *,
@@ -61,7 +63,7 @@ class Paquete:
             "prueba": prueba, "limitaciones": limitaciones or [], **(extra or {})})
 
     def json(self) -> dict:
-        cuerpo = {"persona": self.persona, "nombre": self.nombre, "modo": self.modo, "evidencias": self.items}
+        cuerpo = {"persona": self.persona, "nombre": self.nombre, "modo": self.modo, **self.extra, "evidencias": self.items}
         h = hashlib.sha256(json.dumps(cuerpo, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:12]
         meta = _leer("meta.json") or {}
         return {**cuerpo, "hash": h, "datos_al": meta.get("generado") or meta.get("actualizado")}
@@ -252,6 +254,99 @@ def armar(persona: str, modo: str = "solo") -> dict:
     return pk.json()
 
 
+# ---------------------------------------------------------------- informe semanal por roster (fase 7)
+
+def _formato_metrica(k: str, meta: dict, diferencia: bool = False) -> dict:
+    """Cómo se escribe cada métrica del roster: proporciones en % (o en pts si es una diferencia)."""
+    if meta["tipo"] == "prop" or k == "objetivos":
+        return {"dec": 0, "k": 100, "suf": " pts" if diferencia else " %", "signo": diferencia}
+    return {"dec": 2 if k == "vision" else 0 if k == "oro14" else 1, "signo": k != "vision" or diferencia}
+
+
+def _vod_roster(pk: Paquete, sem: dict, nombres: dict) -> None:
+    """Los momentos para el VOD de las partidas de la semana, desde el lado del roster (contexto)."""
+    for h in sem["partidas"]:
+        d = _leer(f"partida/{h['match']}.json")
+        if not d or not d.get("momentos"):
+            continue
+        eq = 100 if h["lado"] == "azul" else 200
+        for i, x in enumerate(d["momentos"], 1):
+            if x["tipo"] == "muerte":
+                if d["lados"].get(x["persona"]) != h["lado"]:
+                    continue
+                u = list(dict.fromkeys(x.get("perdidos") or []))
+                que = (f"{_mmss(x['t'])}: muerte de {nombres.get(x['persona'], x['persona'])}"
+                       + (f", después el rival tomó {', '.join(OBJ_VOD.get(o, o) for o in u)}" if u else ""))
+                v = -x["costo"]
+            else:
+                v = x["delta"] if eq == 100 else -x["delta"]
+                k = x["kills"]
+                nos, ellos = (k["azul"], k["rojo"]) if eq == 100 else (k["rojo"], k["azul"])
+                obj = [f"{'propio' if o['equipo'] == eq else 'rival'}: {OBJ_VOD.get(o['tipo'], o['tipo'])}"
+                       for o in x.get("objetivos") or []]
+                muertos = [nombres.get(m["persona"], m["persona"]) for m in x.get("muertes") or []
+                           if d["lados"].get(m["persona"]) == h["lado"]]
+                que = (f"{_mmss(x['desde'])} a {_mmss(x['hasta'])}: la chance del equipo {'sube' if v > 0 else 'baja'}; "
+                       f"kills {nos} a {ellos}" + (f"; objetivos {', '.join(obj)}" if obj else "")
+                       + (f"; {'mueren' if len(muertos) > 1 else 'muere'} {' y '.join(muertos)}" if muertos else ""))
+            pk.add(f"vod.{h['match']}.{i}", "contexto", f"Momento para el VOD ({'victoria' if h['win'] else 'derrota'}, "
+                   f"{h['cola']}) · {que}", None, v, dec=0, signo=True, k=100, suf=" pts",
+                   limitaciones=["Estimación del modelo; sirve para elegir qué mirar, no es la causa."],
+                   extra={"match": h["match"], "t": x["t"]})
+
+
+def armar_roster(rid: str, semana: str | None = None) -> dict:
+    """El paquete de un roster para una semana ISO (por defecto, la última con partidas)."""
+    d = _leer(f"roster/{rid}.json")
+    if not d:
+        opciones = ", ".join(f"{r['id']} ({r['nombre']})" for r in (_leer("roster/index.json") or {}).get("rosters", []))
+        raise SystemExit(f"No existe el roster {rid!r}. Opciones: {opciones or 'ninguno'}")
+    semanas = d.get("semanas") or {}
+    semana = semana or next(iter(semanas), None)
+    if semana not in semanas:
+        raise SystemExit(f"El roster no tiene partidas en la semana {semana!r}. Semanas: {', '.join(semanas) or 'ninguna'}")
+    sem = semanas[semana]
+    # Nombres de todos los vinculados: en una partida del roster puede jugar alguien de afuera del plantel.
+    nombres = {p["id"]: p["nombre"] for p in (_leer("personas.json") or [])} | {p["id"]: p["nombre"] for p in d["plantel"]}
+    pk = Paquete(rid, d["nombre"], "roster", {"tipo": "roster", "semana": semana,
+                                               "plantel": [p["nombre"] for p in d["plantel"]]})
+    ganadas = sum(h["win"] for h in sem["partidas"])
+    pk.add("contexto.roster", "contexto", f"Roster {d['nombre']}: {len(d['plantel'])} en el plantel; en la semana "
+           f"{semana} jugaron {sem['n']} partidas juntos ({ganadas} ganadas); {d['partidas']} en la temporada", None)
+    for k, meta in d["metricas"].items():
+        f = _formato_metrica(k, meta)
+        if k == "winrate":
+            w = sem["metricas"][k]
+            pk.add("contexto.winrate", "contexto", "Winrate de la semana (solo contexto: con esta muestra casi siempre es ruido)",
+                   None, w["v"], n=w["n"], **f)
+            continue
+        x = sem["metricas"][k]
+        if x.get("n"):
+            pk.add(f"semana.{k}", "observacion", f"{meta['nombre']} en la semana ({meta['unidad']})", None,
+                   x["v"], x["lo"], x["hi"], x["n"], **f,
+                   limitaciones=[f"Muestra chica: menos de {AJUSTES_MIN} partidas."] if x["n"] < AJUSTES_MIN else [])
+        t = d["ventanas"]["temporada"]["metricas"][k]
+        if t.get("n"):
+            pk.add(f"temporada.{k}", "observacion", f"{meta['nombre']} en la temporada ({meta['unidad']})", None,
+                   t["v"], t["lo"], t["hi"], t["n"], **f)
+        c = d["contra_referencia"].get(k) or {}
+        if c.get("v") is not None and c.get("nivel") != "muestra chica":
+            pk.add(f"referencia.{k}", "asociacion", f"{meta['nombre']}: temporada del roster menos la referencia "
+                   "(las demás partidas de Flex y Normales del grupo)", None, c["v"], c["lo"], c["hi"], (c["n"], c["n_ref"]),
+                   **_formato_metrica(k, meta, True), prueba=f"{c['nivel']}, p BH = {_n(c.get('p_bh'), 3)}",
+                   limitaciones=["Descriptivo: el roster juega contra otros rivales y en otros horarios que la referencia."])
+    _vod_roster(pk, sem, nombres)
+    return pk.json()
+
+
+def guardar_roster(rid: str, semana: str | None = None) -> Path:
+    d = armar_roster(rid, semana)
+    CACHE.mkdir(parents=True, exist_ok=True)
+    ruta = CACHE / f"roster-{rid}-{d['semana']}.json"
+    ruta.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+    return ruta
+
+
 def guardar(persona: str, modo: str = "solo") -> Path:
     d = armar(persona, modo)
     CACHE.mkdir(parents=True, exist_ok=True)
@@ -262,7 +357,7 @@ def guardar(persona: str, modo: str = "solo") -> Path:
 
 def resumen(d: dict) -> str:
     """Una línea por evidencia, para leer rápido sin gastar contexto."""
-    lineas = [f"{d['nombre']} · {d['modo']} · hash {d['hash']} · {len(d['evidencias'])} evidencias"]
+    lineas = [f"{d['nombre']} · {d.get('semana') or d['modo']} · hash {d['hash']} · {len(d['evidencias'])} evidencias"]
     for e in d["evidencias"]:
         extra = " · ".join(str(e[k]) for k in ("prueba",) if e.get(k))
         lineas.append(f"[{e['tipo'][:5]}] {e['id']}: {e['que']} = {e['fmt'] or '—'}" + (f" · {extra}" if extra else ""))

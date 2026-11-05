@@ -1,4 +1,4 @@
-"""python -m ldh [ingestar|reconstruir|publicar|todo|referencia [armar]|timelines empaquetar|desempaquetar <carpeta>|evidencia <persona> [modo]|validar_informe <archivo>]"""
+"""python -m ldh [ingestar|reconstruir|publicar|todo|referencia [armar]|timelines empaquetar|desempaquetar <carpeta>|evidencia <persona> [modo]|evidencia_roster <rid> [semana]|validar_informe <archivo>]"""
 
 from __future__ import annotations
 
@@ -17,6 +17,13 @@ def main(argv: list[str]) -> int:
         # python -m ldh evidencia <persona> [solo|normal|todo]: el paquete para escribir un informe.
         from . import evidencia
         ruta = evidencia.guardar(argv[1], argv[2] if len(argv) > 2 else "solo")
+        print(evidencia.resumen(json.loads(ruta.read_text(encoding="utf-8"))))
+        print(f"\nPaquete completo: {ruta}")
+        return 0
+    if orden == "evidencia_roster":
+        # python -m ldh evidencia_roster <rid> [2026-W45]: el paquete del informe semanal de un roster.
+        from . import evidencia
+        ruta = evidencia.guardar_roster(argv[1], argv[2] if len(argv) > 2 else None)
         print(evidencia.resumen(json.loads(ruta.read_text(encoding="utf-8"))))
         print(f"\nPaquete completo: {ruta}")
         return 0

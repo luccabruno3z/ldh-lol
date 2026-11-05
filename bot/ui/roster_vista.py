@@ -72,6 +72,39 @@ def texto_roster(d: dict, ventana: str) -> str:
     return "\n".join(lin)
 
 
+def tarjeta_informe_roster(d: dict, inf: dict | None) -> discord.ui.LayoutView:
+    """El último informe semanal del roster, con la evidencia de cada prioridad (no hay botón aparte: es del grupo)."""
+    from bot.ui.informe_vista import _ev
+    nombre = discord.utils.escape_markdown(d["nombre"])
+    view = discord.ui.LayoutView(timeout=None)
+    boton = discord.ui.ActionRow(discord.ui.Button(label="Ver en la web", url=f"{WEB}#/equipos/rosters"))
+    if not inf:
+        view.add_item(discord.ui.Container(discord.ui.TextDisplay(
+            f"## {nombre} · informe semanal\nTodavía no hay un informe de este roster. Lo escribe Claude a pedido: "
+            "pedíselo a Lucca. Mientras tanto, `-roster` tiene las métricas."), boton, accent_colour=0x00CCCC))
+        return view
+    ev = {e["id"]: e for e in inf.get("evidencias") or []}
+    lin = [f"## {nombre} · informe de la semana {inf['semana']}",
+           f"-# {inf.get('fecha', '')} · escrito por {inf.get('autor', 'Claude')}", inf.get("resumen", "")]
+    for i, x in enumerate(inf["prioridades"], 1):
+        lin += [f"### {i}. {x['titulo']}", x["observacion"],
+                *[_ev(ev[e]) for e in x["evidencias"] if e in ev],
+                f"**Puede ser porque** {x['posible_explicacion']}", f"-# Falta ver: {x['falta_verificar']}",
+                f"**Para practicar:** {x['ejercicio']}", f"-# Cómo revisarlo: {x['como_revisar']}",
+                *[f"-# 🎬 {ev[m]['que']}" for m in x.get("momentos") or [] if m in ev]]
+    if inf.get("mantener"):
+        lin.append("### Mantener\n" + "\n".join(f"• {t['texto']}" for t in inf["mantener"]))
+    if inf.get("proxima_revision"):
+        lin.append(f"-# Próxima revisión: {inf['proxima_revision']}")
+    lin.append("-# Cada cifra sale de una evidencia con su intervalo y n. Lo que dice \"puede ser\" es una hipótesis "
+               "para revisar en los VOD, no un diagnóstico.")
+    texto = "\n".join(l for l in lin if l)
+    if len(texto) > 3900:
+        texto = texto[:3890] + "\n…"
+    view.add_item(discord.ui.Container(discord.ui.TextDisplay(texto), boton, accent_colour=0x00CCCC))
+    return view
+
+
 class SelectorRoster(discord.ui.DynamicItem[discord.ui.Select],
                      template=r"lr:(?P<rid>[A-Za-z0-9_-]+):(?P<ventana>[a-z]+):(?P<clave>rid|ventana)"):
     def __init__(self, rid: str, ventana: str, clave: str, opciones: list[discord.SelectOption] | None = None):

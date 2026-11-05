@@ -52,3 +52,13 @@ Se mantienen como pruebas de regresión: Mordekaiser de Lucca, objetivos de Glar
 - El paquete usa el id de persona y el nombre público del sitio. Nunca lleva PUUID, Discord ID ni la sal de anonimización.
 - Solo hay informes de personas vinculadas.
 - Un informe es una lectura de datos que ya son públicos en el sitio. Si alguien no quiere el suyo, se borra `datos/informes/<persona>.json`.
+
+## Informe semanal por roster (fase 7)
+- **Paquete:** `python -m ldh evidencia_roster <rid> [2026-W45]` (sin semana, la última con partidas). Trae:
+  - las métricas de proceso de la semana y de la temporada (`semana.<métrica>`, `temporada.<métrica>`), cada una con intervalo y n;
+  - la diferencia de la temporada con la referencia (`referencia.<métrica>`), con su nivel y la p BH;
+  - el winrate de la semana como contexto;
+  - los momentos para el VOD de las partidas de la semana, desde el lado del roster (`vod.<partida>.<n>`).
+- **Borrador:** el mismo esquema que el de personas, con `"roster": "<rid>"` y `"semana": "2026-W45"` en vez de `persona` y `modo`.
+- **Validador:** `python -m ldh validar_informe <borrador>` reconoce el tipo. Mismas reglas (1 o 2 prioridades, sin cifras en el texto, sin lenguaje causal, «cómo revisarlo» obligatorio, `momentos` opcionales), y además solo se puede nombrar a gente del plantel del roster.
+- Queda en `datos/informes_roster/<rid>/<semana>.json`. `publicar` lo copia a `api/roster/<rid>/informes.json` si el roster sigue existiendo. Se ve en la pestaña Rosters de Equipos y con `-informe_roster`.

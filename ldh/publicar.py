@@ -214,7 +214,13 @@ def publicar() -> dict:
     salida_f3 = fase3.generar(db, filas_por, rangos, _escribir)
     fase4.generar(db, filas_por, dict(db.execute("SELECT id, nombre FROM personas")), _escribir)
     fase5.generar(db, filas_por, _escribir, salida_f3["indices"])
-    roster.generar(db, _escribir)  # rosters premade de Flex y Normales (fase 7)
+    rosters = roster.generar(db, _escribir)  # rosters premade de Flex y Normales (fase 7)
+    # Informes semanales por roster: como los de personas, viven en datos/ y solo se publican si el roster sigue.
+    for r in rosters:
+        informes = [json.loads(p.read_text(encoding="utf-8"))
+                    for p in sorted((DATOS / "informes_roster" / r["id"]).glob("*.json"), reverse=True)]
+        if informes:
+            _escribir(f"roster/{r['id']}/informes.json", {"informes": informes})
     # Informes de coaching: los escribe Claude a pedido y viven en datos/informes (api se borra en cada corrida).
     # Solo de personas que siguen vinculadas.
     vinculadas = {r[0] for r in db.execute("SELECT id FROM personas")}
