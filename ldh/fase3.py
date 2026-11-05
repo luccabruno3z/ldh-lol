@@ -645,7 +645,7 @@ def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], rangos: di
     # franja), así no se comparan winrates de franjas distintas. Primero los que se separan del ruido.
     orden = {m: sorted(t, key=lambda x: (x["veredicto"] != "mejorando", -x["cambio"]["lo"])) for m, t in mejora.items()}
     escribir("rankings/mejora.json", {
-        "nota": "Índice por partida (0–100, contra la propia franja y rol) sobre la recta de tendencia: de dónde "
+        "nota": "Nota de partida (0–100, contra la propia franja y rol) sobre la recta de tendencia: de dónde "
                 "arrancó a dónde está, y cuánto cambió a lo largo de sus partidas. 'Mejorando' solo si todo el "
                 "intervalo del cambio está arriba de cero.",
         "tabla": orden["solo"], "modos": orden})

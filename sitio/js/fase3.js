@@ -4,7 +4,7 @@
    el modo (solo/dúo, normales o todo) elige qué partidas tuyas entran. */
 
 import { state, cachedFetch, rutaCoaching, MODOS, EN_MODO, rolGuardado, elegirRol, alCambiarRol } from './data.js';
-import { escapeHtml, iconoCampeon, campeon, num } from './utils.js';
+import { escapeHtml, iconoCampeon, campeon, num, como } from './utils.js';
 import { pct, chipConf } from './fase2.js';
 import { radar, seccionTendencia, graficoFranjas } from './graficos.js';
 
@@ -59,14 +59,15 @@ function performance(r, franja) {
         : '<p class="nota" style="text-align:center">El anillo punteado es la mitad de tu franja (50).</p>'}</div>
       </div>
       <div class="table-wrap"><table class="data-table">
-        <thead><tr><th>Componente</th><th>Nivel en tu franja</th><th class="num">Peso</th><th class="num">Aporta</th><th class="num">Puede sumar</th></tr></thead>
+        <thead><tr><th>Componente</th><th>Nivel en tu franja<span class="ic">0 a 100 · 50 = la mitad</span></th><th class="num">Peso<span class="ic">% del Performance</span></th><th class="num">Aporta<span class="ic">pts de Performance</span></th><th class="num">Puede sumar<span class="ic">pts si llegás a 100</span></th></tr></thead>
         <tbody>${r.componentes.map(c => `<tr>
           <td>${escapeHtml(c.nombre)}${c.sin_dato ? ' <span class="tag">sin dato</span>' : ''}<div class="dim small">${c.metricas.map(k => escapeHtml(r.metricas[k]?.nombre || k)).join(' · ')}</div></td>
           <td>${c.sin_dato ? '<span class="dim">cuenta como 50</span>' : `${barra(c.nivel, c.lo, c.hi)} <span class="mono">${num(c.nivel * 100, 0)}</span><span class="ic">${num(c.lo * 100, 0)} a ${num(c.hi * 100, 0)}</span>`}</td>
-          <td class="num mono">${num(c.peso * 100, 0)}</td>
+          <td class="num mono">${num(c.peso * 100, 0)} %</td>
           <td class="num mono">${num(c.aporte * 100, 1)}</td>
-          <td class="num mono">${num(c.margen * 100, 1)}</td></tr>`).join('')}</tbody></table></div>
-      <p class="nota">Cada componente es tu percentil contra ${r.n_ref} jugadores de ${escapeHtml(franja)} en el mismo rol (50 = la mitad de tu franja), y el Performance es la suma con los pesos. Con pocas partidas el índice se acerca a 50: con ${r.n} partidas pesa ${num(100 / (1 + Math.exp(-(r.n - (state.ajustes?.performance?.penalizacion_centro ?? 15)) / (state.ajustes?.performance?.penalizacion_escala ?? 4))), 0)} %. Los intervalos son bootstrap de tus partidas.${r.ref_winrate_crudo != null ? ` Los jugadores de referencia entran por su rango actual y en esas partidas ganaron el ${Math.round(r.ref_winrate_crudo * 100)} % (vienen de ${r.ref_winrate_crudo < 0.47 ? 'bajar' : r.ref_winrate_crudo > 0.53 ? 'subir' : 'ir parejos'}): sus victorias y derrotas se ponderan al 50 %.` : ''}</p>`;
+          <td class="num mono" title="Si llegaras a 100 en ${escapeHtml(c.nombre)}, tu Performance subiría hasta ${num(c.margen * 100, 1)} puntos">+${num(c.margen * 100, 1)}</td></tr>`).join('')}</tbody></table></div>
+      <p class="nota">Las tres columnas de la derecha están en puntos del Performance (0 a 100): "Aporta" es lo que ya suma cada componente, y "Puede sumar", lo que subiría tu Performance si llegaras a 100 en ese componente.</p>
+      ${como(`Cada componente es tu percentil contra ${r.n_ref} jugadores de ${escapeHtml(franja)} en el mismo rol (50 = la mitad de tu franja), y el Performance es la suma con los pesos. Con pocas partidas el Performance se acerca a 50: con ${r.n} partidas pesa ${num(100 / (1 + Math.exp(-(r.n - (state.ajustes?.performance?.penalizacion_centro ?? 15)) / (state.ajustes?.performance?.penalizacion_escala ?? 4))), 0)} %. Los intervalos son bootstrap de tus partidas.${r.ref_winrate_crudo != null ? ` Los jugadores de referencia entran por su rango actual y en esas partidas ganaron el ${Math.round(r.ref_winrate_crudo * 100)} % (vienen de ${r.ref_winrate_crudo < 0.47 ? 'bajar' : r.ref_winrate_crudo > 0.53 ? 'subir' : 'ir parejos'}): sus victorias y derrotas se ponderan al 50 %.` : ''}`)}`;
 }
 
 // ---- Tu juego en una mirada y cómo sumar ----
@@ -186,6 +187,7 @@ export async function bloquesFase3(p, cont, modo = 'solo') {
     cont.innerHTML = `<section class="section" id="f3-coaching">
         <div class="section-head"><h3>Coaching</h3>${roles.length > 1 ? selector('f3-rol', 'Rol', roles, rol) : ''}</div>
         <p class="dim">${textoFranja(d)}</p>
+        <p class="dim small">El Performance (0 a 100) resume toda tu temporada en el rol contra tu franja. No confundir con la nota de partida de "¿Estás mejorando?", que mira partida por partida.</p>
         ${d.nota_modo ? `<p class="aviso-modo">${escapeHtml(d.nota_modo)}</p>` : ''}
         <div id="f3-cuerpo">${roles.length ? coaching() : vacio}</div>
       </section>

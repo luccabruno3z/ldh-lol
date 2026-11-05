@@ -4,7 +4,7 @@
 
 import { state, loadPerfil, cachedFetch, rutaCoaching, MODOS, EN_MODO } from './data.js';
 import { onRoute, go } from './router.js';
-import { escapeHtml, nombreCola, conIntervalo, num, seSeparan } from './utils.js';
+import { escapeHtml, nombreCola, conIntervalo, num, seSeparan, como } from './utils.js';
 import { radar } from './graficos.js';
 
 const METRICAS = [
@@ -30,7 +30,7 @@ function fila(nombre, tipo, ma, mb) {
       <span class="vs-nombre">${nombre}</span>
       <div class="vs-lado vs-a${gana === 'a' ? ' gana' : ''}"><span class="vs-val">${conIntervalo(ma, tipo)}</span><span class="vs-barra"><i style="width:${w(ma)}"></i></span></div>
       <div class="vs-lado vs-b${gana === 'b' ? ' gana' : ''}"><span class="vs-barra"><i style="width:${w(mb)}"></i></span><span class="vs-val">${conIntervalo(mb, tipo)}</span></div>
-      <span class="vs-veredicto">${separan ? '<span class="tag win">se separan</span>' : '<span class="tag">no se puede decir</span>'}</span>
+      <span class="vs-veredicto">${separan ? `<span class="tag win">más ${escapeHtml(nombreDe(gana))}</span>` : '<span class="tag">parejos</span>'}</span>
     </div>`;
 }
 
@@ -48,10 +48,28 @@ async function radarComun(a, b, rol, cola) {
     }
     return `<h4>Performance en ${escapeHtml(rol)} contra ${escapeHtml(ca.franja)}</h4>
       ${radar(ra.componentes, { segundo: rb.componentes, titulo: 'Componentes de los dos jugadores' })}
-      <p class="nota" style="text-align:center"><span class="sw-a"></span> ${escapeHtml(nombre(sel.a))} · <span class="sw-b"></span> ${escapeHtml(nombre(sel.b))} · el anillo punteado es la mitad de la franja</p>`;
+      <p class="nota" style="text-align:center"><span class="sw-a"></span> forma de ${escapeHtml(nombre(sel.a))} · <span class="sw-b"></span> forma de ${escapeHtml(nombre(sel.b))} · el anillo punteado es la mitad de ${escapeHtml(ca.franja)} (50); más afuera es mejor</p>`;
 }
 
 const nombre = (id) => state.personas.find(p => p.id === id)?.nombre || id;
+const nombreDe = (lado) => nombre(lado === 'a' ? sel.a : sel.b);
+
+/** Quién gana en qué, en una frase: "parejos" no es empate, es que con estas partidas no se puede decir. */
+function resumenVs(fa, fb) {
+    if (!fa || !fb) return '';
+    const gana = { a: [], b: [] };
+    let parejas = 0;
+    METRICAS.forEach(([k, n]) => {
+        const ma = fa[k], mb = fb[k];
+        if (!ma || !mb || ma.v == null || mb.v == null) return;
+        if (seSeparan(ma, mb)) gana[ma.v > mb.v ? 'a' : 'b'].push(n); else parejas += 1;
+    });
+    const parte = (l) => (gana[l].length ? `<strong>${escapeHtml(nombreDe(l))}</strong> tiene más ${gana[l].join(', ')}` : '');
+    const partes = [parte('a'), parte('b')].filter(Boolean);
+    const txt = partes.length ? `${partes.join('; ')}.${parejas ? ` En ${parejas === 1 ? 'la otra métrica' : `las otras ${parejas}`}, con estas partidas no se puede decir quién tiene más.` : ''}`
+        : 'En todas las métricas están parejos: con estas partidas no se puede decir quién rinde más.';
+    return `<p class="conclusion">${txt}</p>`;
+}
 
 async function render() {
     const cont = document.getElementById('comparar-cuerpo');
@@ -81,9 +99,11 @@ async function render() {
       <div class="vs-cab"><span></span><a href="#/jugadores/${encodeURIComponent(sel.a)}" class="vs-a-nombre">${escapeHtml(nombre(sel.a))}</a>
         <a href="#/jugadores/${encodeURIComponent(sel.b)}" class="vs-b-nombre">${escapeHtml(nombre(sel.b))}</a><span></span></div>
       <div class="vs-cab dim"><span></span><span>${fa ? `${fa.n} partidas` : '—'}</span><span>${fb ? `${fb.n} partidas` : '—'}</span><span></span></div>
+      ${resumenVs(fa, fb)}
       <div class="vs">${METRICAS.map(([k, n, t]) => fila(n, t, fa?.[k], fb?.[k])).join('')}</div>
       ${(fa?.muestra_chica || fb?.muestra_chica) ? '<p class="nota">Alguno tiene menos de 10 partidas en este filtro: muestra chica, sin conclusiones.</p>' : ''}
-      <p class="nota">"Se separan" cuando el intervalo del 95 % de la diferencia no toca el cero (aproximado desde el intervalo de cada uno); si no, con estas partidas no se puede decir quién rinde más. Es la misma cola y el mismo rol para los dos.</p>
+      <p class="nota">Cada número tiene abajo su rango probable. "Más …" marca a quién le da más esa métrica, de forma clara; "parejos" es que con estas partidas no se puede decir. Es la misma cola y el mismo rol para los dos.</p>
+      ${como('Una métrica se separa cuando el intervalo del 95 % de la diferencia no toca el cero (aproximado desde el intervalo de cada uno: el error de la diferencia es la raíz de la suma de los cuadrados).')}
       <div id="cmp-radar"></div>`}`;
     const cambiar = () => go('comparar', `${sel.a}/${sel.b}`);
     cont.querySelector('#cmp-a').addEventListener('change', e => { sel.a = e.target.value; cambiar(); });

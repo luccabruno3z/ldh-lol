@@ -2,7 +2,7 @@
    sinergia. Cada bloque carga su JSON y falla solo: si uno no anda, el resto sí. */
 
 import { state, cachedFetch, rutaCoaching, MODOS } from './data.js';
-import { escapeHtml, nombreCola, conIntervalo, iconoCampeon, campeon, num } from './utils.js';
+import { escapeHtml, nombreCola, conIntervalo, iconoCampeon, campeon, num, como, tagChica } from './utils.js';
 
 const CONF = { alta: 'Confianza alta (15+ partidas)', media: 'Confianza media (8 a 14)', baja: 'Confianza baja: menos de 8 partidas o una sola partida pesa demasiado' };
 
@@ -40,7 +40,7 @@ function tablaRoles(d, cola, co) {
         // Con referencia de tu franja (fase 3) se usa esa: mejor que la mediana de un grupo de amigos.
         const fr = co?.roles?.[t.rol]?.metricas?.[ms[0]?.clave];
         return `<tr class="${t.muestra_chica ? 'chica' : ''}">
-          <td>${escapeHtml(t.rol)}${t.muestra_chica ? ' <span class="tag">muestra chica</span>' : ''}</td>
+          <td>${escapeHtml(t.rol)}${t.muestra_chica ? tagChica(state.ajustes?.min_partidas ?? 10) : ''}</td>
           <td class="num mono">${t.n}</td>
           <td class="num">${winrateAj(t)}</td>
           <td class="num">${kdaAj(t)}</td>
@@ -77,7 +77,7 @@ function tablaCampeones(filas, todos) {
         <th class="num">KDA ajustado</th><th class="num">De tus partidas</th><th>Último parche</th><th>Confianza</th></tr></thead>
       <tbody>${vis.map(t => `<tr class="${t.muestra_chica ? 'chica' : ''}">
         <td class="champ">${iconoCampeon(t.champ, 28)}<span>${escapeHtml(campeon(t.champ))}</span></td>
-        <td>${escapeHtml(t.rol || '—')}${t.muestra_chica ? ' <span class="tag">muestra chica</span>' : ''}</td>
+        <td>${escapeHtml(t.rol || '—')}${t.muestra_chica ? tagChica(state.ajustes?.min_partidas ?? 10) : ''}</td>
         <td class="num mono">${t.n}</td>
         <td class="num">${winrateAj(t)}</td>
         <td class="num">${kdaAj(t)}</td>
@@ -104,8 +104,8 @@ function bloquePool(pool, cola) {
     if (!p) return '';
     const veredicto = p.p == null ? '<span class="dim">sin partidas de un lado</span>'
         : p.p < (state.ajustes?.ajuste_muestra?.alfa ?? 0.05)
-            ? `<span class="tag ${p.dif.v > 0 ? 'win' : 'loss'}">señal</span> <span class="dim">Fisher p = ${num(p.p, 3)}</span>`
-            : `<span class="tag">no discrimina</span> <span class="dim">Fisher p = ${num(p.p, 3)}</span>`;
+            ? `<span class="tag ${p.dif.v > 0 ? 'win' : 'loss'}" title="Prueba exacta de Fisher: p = ${num(p.p, 3)}">señal</span> <span class="dim">${p.dif.v > 0 ? 'dentro de tu pool ganás más' : 'fuera de tu pool ganás más'}</span>`
+            : `<span class="tag" title="Prueba exacta de Fisher: p = ${num(p.p, 3)}">ruido</span> <span class="dim">dentro y fuera de tu pool ganás parecido</span>`;
     return `<div class="pool">
       <div class="pool-cifras">
         <div><span class="dim">Dentro del pool</span> ${conIntervalo(p.dentro, 'pct')} <span class="dim">n = ${p.dentro.n}</span></div>
@@ -171,18 +171,17 @@ async function sinergia(p, cont, modo) {
         : 'Con ningún compañero rendís mejor más allá del ruido: ninguna mejora supera lo que explica el azar.'}</p>
       <div class="table-wrap"><table class="data-table">
         <thead><tr><th>Compañero</th><th>Cola</th><th class="num">Juntos</th><th class="num">Juntos: winrate</th><th class="num">Sin esa persona</th>
-          <th class="num">Sin esa persona, mismo período</th><th class="num">Diferencia</th><th class="num">p ajustado</th><th></th></tr></thead>
+          <th class="num">Sin esa persona, mismo período</th><th class="num">Diferencia<span class="ic">pts de winrate</span></th><th></th></tr></thead>
         <tbody>${filas.map(r => `<tr class="${r.muestra_chica ? 'chica' : ''}">
-          <td><a href="#/jugadores/${encodeURIComponent(r.companero)}">${escapeHtml(nombrePersona(r.companero))}</a>${r.muestra_chica ? ' <span class="tag">muestra chica</span>' : ''}</td>
+          <td><a href="#/jugadores/${encodeURIComponent(r.companero)}">${escapeHtml(nombrePersona(r.companero))}</a>${r.muestra_chica ? tagChica(state.ajustes?.min_partidas ?? 10, 'partidas juntos') : ''}</td>
           <td>${escapeHtml(nombreCola(r.cola))}</td>
           <td class="num mono">${r.juntos}</td>
           <td class="num">${conIntervalo(r.con, 'pct')}</td>
           <td class="num">${conIntervalo(r.sin, 'pct')} <span class="dim">n = ${r.sin.n}</span></td>
           <td class="num">${conIntervalo(r.sin_mismo_periodo, 'pct')}</td>
-          <td class="num">${difWinrate(r.dif)}</td>
-          <td class="num mono">${num(r.p_bh, 3)}</td>
+          <td class="num" title="p corregido (BH) = ${num(r.p_bh, 3)}">${difWinrate(r.dif)}</td>
           <td>${senal(r)}</td></tr>`).join('')}</tbody></table></div>
-      <p class="nota">${NOTA_SENAL} "Mismo período" mira solo las partidas sin ese compañero entre la primera y la última que jugaron juntos, para descartar que la diferencia sea de época.</p>
+      ${como(`${NOTA_SENAL} "Mismo período" mira solo las partidas sin ese compañero entre la primera y la última que jugaron juntos, para descartar que la diferencia sea de época.`)}
     </section>`;
 }
 

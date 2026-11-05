@@ -98,12 +98,11 @@ async function jungla(p, cont) {
         const otro = x.buff_habitual === 'azul' ? 'rojo' : 'azul';
         const wrA = x.lado_habitual === 'arriba' ? x.wr_arriba : x.wr_abajo, wrB = x.lado_habitual === 'arriba' ? x.wr_abajo : x.wr_arriba;
         return `<div class="card eq-card"><h4>Lado ${l} <span class="dim">${x.n} partidas</span></h4>
-          <p>Arrancás en el <strong>buff ${escapeHtml(x.buff_habitual)}</strong> el <strong>${pct(x.pct_habitual)}</strong> de las veces
-            ${x.predecible ? '<span class="tag loss">predecible</span>' : '<span class="tag">variás</span>'}</p>
-          <p class="dim">Arrancando en el ${escapeHtml(x.buff_habitual)}: ${conIntervalo(wrA, 'pct')} (${wrA.n}) · en el ${otro}: ${conIntervalo(wrB, 'pct')} (${wrB.n})
-            ${x.p != null ? `· Fisher p = ${num(x.p, 2)}` : ''}</p></div>`;
+          <p>Arrancás en el <strong>buff ${escapeHtml(x.buff_habitual)}</strong> el <strong>${pct(x.pct_habitual)}</strong> de las veces.
+            ${x.predecible ? '<span class="tag loss">predecible</span> <span class="dim">el rival puede adivinar tu ruta</span>' : '<span class="tag">no tan predecible</span> <span class="dim">no alcanza para que el rival lo dé por seguro</span>'}</p>
+          <p class="dim"${x.p != null ? ` title="Prueba exacta de Fisher: p = ${num(x.p, 2)}"` : ''}>Winrate arrancando en el ${escapeHtml(x.buff_habitual)}: ${conIntervalo(wrA, 'pct')} en ${wrA.n} partidas · en el ${otro}: ${conIntervalo(wrB, 'pct')} en ${wrB.n} partidas</p></div>`;
       }).join('')}</div>
-      <p class="nota">Con todas tus partidas de la Grieta, sin importar el modo. El arranque es <strong>inferido</strong> por dónde estás en el minuto 1, esperando el primer campamento: Riot no dice qué campamento hiciste primero (se validó contra los casos conocidos de Coach AI). "Predecible" quiere decir que hasta el borde de abajo del intervalo pasa el ${num(d.umbral * 100, 0)} %: el jungla rival puede jugar tu ruta sin verte. Mezclar un poco tiene sentido si el winrate no cambia entre un arranque y el otro. Va por lado porque desde cada base el mapa es distinto.</p></section>`;
+      <p class="nota">Con todas tus partidas de la Grieta, sin importar el modo. El arranque es <strong>inferido</strong> por dónde estás en el minuto 1, esperando el primer campamento: Riot no dice qué campamento hiciste primero (se validó contra casos conocidos). "Predecible" quiere decir que hasta el borde de abajo del intervalo pasa el ${num(d.umbral * 100, 0)} %: el jungla rival puede jugar tu ruta sin verte. Mezclar un poco tiene sentido si el winrate no cambia entre un arranque y el otro. Va por lado porque desde cada base el mapa es distinto.</p></section>`;
 }
 
 /** Los tres bloques, cada uno aislado. En la vista de una sola cuenta no se muestran. */

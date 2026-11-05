@@ -82,3 +82,14 @@ export function pistaDif(v, lo, hi, rango, tono = '', etiqueta = '') {
 }
 
 export { num };
+
+/** "¿Cómo se calcula?": el detalle técnico (pruebas, correcciones, citas) plegado, para que la lectura
+    rápida quede con la etiqueta y la conclusión. */
+export function como(html) {
+    return html ? `<details class="como"><summary>¿Cómo se calcula?</summary><p class="nota">${html}</p></details>` : '';
+}
+
+/** La etiqueta de muestra chica dice siempre su umbral, así no hay que adivinar qué es "chica" en cada tabla. */
+export function tagChica(min, que = 'partidas') {
+    return ` <span class="tag" title="Menos de ${min} ${que}: el número puede cambiar mucho con pocas partidas más">muestra chica</span>`;
+}

@@ -2,7 +2,7 @@
    solo. Cada persona se compara consigo misma: si no, el que juega peor aparece más en las rachas. */
 
 import { cachedFetch, EN_MODO, rolGuardado, elegirRol, alCambiarRol } from './data.js';
-import { escapeHtml, num, campeon, conIntervalo, pistaDif } from './utils.js';
+import { escapeHtml, num, campeon, conIntervalo, pistaDif, como } from './utils.js';
 
 const pct = (v) => (v == null ? '—' : `${num(v * 100, 0)} %`);
 const pts = (v) => `${v > 0 ? '+' : ''}${num(v * 100, 1)}`;
@@ -25,6 +25,17 @@ function lectura(d) {
     return `Después de 2 derrotas, si seguís enseguida ganás <strong>${pct(s.v)}</strong> (${s.n} partidas); si cortás, <strong>${pct(k.v)}</strong> (${k.n}). ${veredicto}`;
 }
 
+/** ¿Corto o no? La respuesta práctica, sin pasarse de lo que dicen los números. */
+function conclusionRachas(d, corte) {
+    const c = d.comparaciones.corta_vs_sigue, s = d.estados.tras_2_sigue, k = d.estados.tras_2_corta;
+    if (!s.n || !k.n) return '';
+    const txt = c.muestra_chica ? 'Todavía no se puede decir si te conviene cortar: faltan rachas de 2 derrotas de los dos lados.'
+        : c.senal && c.dif.v > 0 ? `En tus partidas, cortar ${corte} min o más después de 2 derrotas va con ganar más. Probalo una semana y mirá si se sostiene.`
+        : c.senal ? 'En tus partidas, seguir después de 2 derrotas va con ganar más que cortar: tus números no dan motivo para frenar.'
+        : 'Cortar o seguir después de 2 derrotas da parecido en tus partidas: decidilo por cómo te sentís, no por los números.';
+    return `<p class="conclusion">${txt}</p>`;
+}
+
 export async function bloqueRachas(p, cont, modo) {
     if (p._cuenta) return;  // las rachas son de la persona: una sesión puede mezclar cuentas
     const [d, g] = await Promise.all([cachedFetch(`rachas/${encodeURIComponent(p.id)}.json`), cachedFetch('rachas/grupo.json')]);
@@ -38,15 +49,18 @@ export async function bloqueRachas(p, cont, modo) {
     cont.innerHTML = `<section class="section">
       <h3>¿Cómo te va después de perder? <span class="dim">· ${escapeHtml(EN_MODO[modo])}</span></h3>
       <p class="lead">${lectura(m)}</p>
+      ${conclusionRachas(m, d.corte_min)}
       <div class="rb-lista">${filas}</div>
       <p class="dim small">Winrate de la partida según cómo venías. La línea del medio es 50 %; la franja, el intervalo del 95 %. De la partida ${d.largas_desde} de la sesión en adelante: ${pct(m.sesion.largas.v)} (${m.sesion.largas.n}), antes ${pct(m.sesion.primeras.v)} (${m.sesion.primeras.n}).</p>
       <h4>En el grupo, cada uno contra sí mismo</h4>
+      <p class="dim small">Esto es el promedio del grupo, no vos: puede dar señal en el grupo y ruido en tus partidas. Para decidir, vale lo tuyo de arriba.</p>
       <ul class="rb-grupo">
         ${grupo(gr.racha_vs_victoria, 'Después de 2+ derrotas seguidas, contra después de ganar')}
         ${grupo(gr.corta_vs_sigue, `Cortar ${d.corte_min}+ min después de 2 derrotas, contra seguir`)}
         ${grupo(gr.largas_vs_cortas, `De la partida ${d.largas_desde} de la sesión en adelante, contra las primeras`)}
       </ul>
-      <p class="nota">Una sesión son partidas con menos de ${d.sesion_min} min entre una y otra; "cortar" es esperar ${d.corte_min} min o más. Cuentan todas tus colas para saber cómo venías (una ARAM también corta una racha). Lo del grupo compara a cada persona consigo misma (Mantel–Haenszel), porque si no, el que juega peor aparece más en las rachas. En Corea, Deng y otros (2024) encontraron algo parecido: rachas de derrotas con peor rendimiento, y mejor con pausas. Es una asociación: no mide tilt ni asegura que una pausa lo arregle.</p>
+      <p class="nota">Una sesión son partidas con menos de ${d.sesion_min} min entre una y otra; "cortar" es esperar ${d.corte_min} min o más. Los "pts" son puntos de winrate. Es una asociación: no mide tilt ni asegura que una pausa lo arregle.</p>
+      ${como(`Cuentan todas tus colas para saber cómo venías (una ARAM también corta una racha). Lo del grupo compara a cada persona consigo misma (Mantel–Haenszel), porque si no, el que juega peor aparece más en las rachas. En Corea, Deng y otros (2024) encontraron algo parecido: rachas de derrotas con peor rendimiento, y mejor con pausas.`)}
     </section>`;
 }
 
@@ -62,16 +76,21 @@ function perdidos(xs) {
     return u.length ? `el rival tomó ${u.map(x => OBJ[x] || x).join(', ')}` : 'sin objetivo perdido';
 }
 
+// Más chicos que antes: con cientos de muertes los círculos se tapaban entre sí.
+const radio = (c) => 1.5 + Math.sqrt(Math.max(c, 0)) * 20;
+
 function mapaMuertes(puntos, version) {
     const S = 320;
     const fase = (m) => (m < 14 ? 'temprana' : m < 25 ? 'media' : 'tardia');
     const circ = puntos.map(([m, x, y, c]) => {
         const px = ((x - MAPA.x0) / (MAPA.x1 - MAPA.x0)) * S, py = S - ((y - MAPA.y0) / (MAPA.y1 - MAPA.y0)) * S;
-        return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(2 + Math.sqrt(Math.max(c, 0)) * 30).toFixed(1)}" class="mu-p mu-${fase(m)}"><title>Minuto ${num(m, 0)}: ${P(c)} pts</title></circle>`;
+        return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${radio(c).toFixed(1)}" class="mu-p mu-${fase(m)}"><title>Minuto ${num(m, 0)}: ${P(c)} pts de chance</title></circle>`;
     }).join('');
+    const tam = (c, t) => `<span class="mu-tam"><svg width="${2 * radio(c) + 2}" height="${2 * radio(c) + 2}" aria-hidden="true"><circle cx="${radio(c) + 1}" cy="${radio(c) + 1}" r="${radio(c)}"/></svg>${t}</span>`;
     return `<svg class="g-mapa mu-mapa" viewBox="0 0 ${S} ${S}" role="img" aria-label="${puntos.length} muertes sobre el minimapa; el tamaño es cuánto bajaron tus chances">
       <image href="https://ddragon.leagueoflegends.com/cdn/${version}/img/map/map11.png" width="${S}" height="${S}" opacity="0.5"/>${circ}</svg>
-      <p class="fr-leyenda"><span class="fr-item"><span class="fr-sw mu-temprana"></span>antes del 14</span> <span class="fr-item"><span class="fr-sw mu-media"></span>del 14 al 25</span> <span class="fr-item"><span class="fr-sw mu-tardia"></span>después del 25</span> <span class="dim">· más grande = bajó más · todo visto desde tu base abajo a la izquierda (las del lado rojo, espejadas)</span></p>`;
+      <p class="fr-leyenda"><span class="fr-item"><span class="fr-sw mu-temprana"></span>antes del 14</span> <span class="fr-item"><span class="fr-sw mu-media"></span>del 14 al 25</span> <span class="fr-item"><span class="fr-sw mu-tardia"></span>después del 25</span> </p>
+      <p class="fr-leyenda">${tam(0.02, '2 pts')} ${tam(0.1, '10 pts')} ${tam(0.3, '30 pts')} <span class="dim">· cuánto bajó la chance de ganar · todo visto desde tu base abajo a la izquierda (las del lado rojo, espejadas)</span></p>`;
 }
 
 export async function bloqueMuertes(p, cont, modo, version) {
@@ -99,15 +118,18 @@ export async function bloqueMuertes(p, cont, modo, version) {
             const f = r.fases?.[k] || { n: 0 };
             return `<div class="rb-fila"><span class="rb-nombre">${n}</span>
               <span class="rb-pista"><span class="mu-barra mu-${k}" style="width:${((f.costo || 0) / max) * 100}%"></span></span>
-              <span class="rb-num"><strong>${P(f.costo)} pts</strong> <span class="dim">por muerte · ${f.n}</span></span></div>`;
+              <span class="rb-num"><strong>${P(f.costo)} pts</strong> <span class="dim">de chance por muerte · ${f.n}</span></span></div>`;
         }).join('');
         const comp = med == null ? '' : r.por_partida > med * 1.1 ? `, más que la mediana del grupo (${P(med, 0)})`
             : r.por_partida < med * 0.9 ? `, menos que la mediana del grupo (${P(med, 0)})` : `, como la mediana del grupo (${P(med, 0)})`;
         const todos = rol === 'Todos' || !conSelector;
-        const muestra = todos && m.puntos.length < r.n ? `<p class="dim">El mapa muestra ${m.puntos.length} de tus ${r.n} muertes, las más recientes.</p>` : '';
+        // Los puntos traen el rol al final (los JSON viejos no): sin él, el mapa de un rol no se puede filtrar.
+        const conRol = m.puntos.some(x => x.length > 4);
+        const puntos = todos ? m.puntos.slice(-400) : m.puntos.filter(x => x[4] === rol);
+        const muestra = puntos.length < r.n ? `<p class="dim">El mapa muestra ${puntos.length} de tus ${r.n} muertes${todos ? '' : ` de ${escapeHtml(rol)}`}, las más recientes.</p>` : '';
         cont.querySelector('#mu-cuerpo').innerHTML = !r.n ? '<p class="dim">Sin muertes con timeline en este rol.</p> ' : `
           <p class="lead">Según el modelo, cada muerte le baja a tu equipo <strong>${P(r.por_muerte.v)} puntos</strong> de probabilidad de ganar <span class="dim">(${P(r.por_muerte.lo)} a ${P(r.por_muerte.hi)}, ${r.n} muertes)</span>. Por partida suman <strong>${P(r.por_partida, 0)} puntos</strong>${comp}. El <strong>${P(r.con_objetivo, 0)} %</strong> de tus muertes, el rival toma un objetivo en el minuto siguiente.</p>
-          <div class="mu-grid"><div>${todos ? mapaMuertes(m.puntos, version) + muestra : '<p class="dim">El mapa muestra todos tus roles juntos.</p>'}</div>
+          <div class="mu-grid"><div>${todos || conRol ? mapaMuertes(puntos, version) + muestra : '<p class="dim">El mapa por rol aparece con la próxima actualización de datos.</p>'}</div>
             <div><h4>Cuándo</h4><div class="rb-lista">${fases}</div>
               <h4>Dónde más bajan</h4>
               <div class="table-wrap"><table class="data-table"><thead><tr><th>Zona</th><th class="num">Muertes</th><th class="num">Por muerte</th><th class="num">Por partida</th></tr></thead>
@@ -124,7 +146,8 @@ export async function bloqueMuertes(p, cont, modo, version) {
         ${conSelector ? `<label class="selector">Rol <select id="mu-rol">${opciones.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r === 'Todos' ? 'Todos los roles' : r)}</option>`).join('')}</select></label>` : ''}</div>
       <div id="mu-cuerpo"></div>
       <div id="mu-caras"></div>
-      <p class="nota">${escapeHtml(d.nota)} Sale del modelo de probabilidad de ganar (Guías → Cómo calculamos la probabilidad de ganar). Morir no siempre es un error: lo que más pesa es morir y que el rival se lleve algo, y morir tarde, cuando un Barón decide la partida.</p></section>`;
+      <p class="nota">Morir no siempre es un error: lo que más pesa es morir y que el rival se lleve algo, y morir tarde, cuando un Barón decide la partida. Los "pts" son puntos de probabilidad de ganar de tu equipo (0 a 100).</p>
+      ${como(`${escapeHtml(d.nota)} Sale del modelo de probabilidad de ganar (Guías → Cómo calculamos la probabilidad de ganar).`)}</section>`;
     if (!conSelector) rol = opciones[0];
     pintar();
     cont.querySelector('#mu-rol')?.addEventListener('change', (e) => {
@@ -170,7 +193,7 @@ export async function bloqueConversion(p, cont, modo) {
           <td class="num mono" data-label="Ganadas / esperadas">${x.n ? `${x.ganadas} / ${num(x.esperadas, 0)}` : '—'}</td>
           <td class="num" data-label="Real − esperado">${medible ? `<span class="v">${pts(x.v)}</span><span class="ic">${pts(x.lo)} a ${pts(x.hi)}</span>` : '—'}</td>
           <td class="dv-celda">${medible ? pistaDif(x.v, x.lo, x.hi, 0.25, x.senal ? (x.contra_grupo > 0 ? 'pos' : 'neg') : '', `${pts(x.v)} puntos por partida, de ${pts(x.lo)} a ${pts(x.hi)}`) : ''}</td>
-          <td data-label="Contra el grupo">${x.senal ? `<span class="tag ${x.contra_grupo > 0 ? 'win' : 'loss'}">señal</span> ` : ''}${lecturaConversion(x, k)}${x.p_bh != null ? `<span class="ic">p = ${num(x.p_bh, 2)}</span>` : ''}</td></tr>`;
+          <td data-label="Contra el grupo"${x.p_bh != null ? ` title="p corregido (BH) = ${num(x.p_bh, 2)}"` : ''}>${x.senal ? `<span class="tag ${x.contra_grupo > 0 ? 'win' : 'loss'}">señal</span> ` : ''}${lecturaConversion(x, k)}</td></tr>`;
     }).join('');
     const v = m.ventaja || {}, dz = m.desventaja || {};
     const frases = [
@@ -179,9 +202,24 @@ export async function bloqueConversion(p, cont, modo) {
     ].filter(Boolean).join(' ');
     cont.innerHTML = `<section class="section">${titulo}
       ${frases ? `<p class="lead">${frases}</p>` : ''}
+      ${conclusionConversion(m)}
       <div class="table-wrap"><table class="data-table tabla-apilable"><thead><tr><th>Al minuto 15</th><th class="num">Partidas</th><th class="num">Ganadas<span class="ic">/ esperadas</span></th><th class="num">Real − esperado<span class="ic">pts por partida</span></th><th class="dv-celda"><span class="sr-only">Intervalo sobre el cero</span></th><th>Contra el grupo</th></tr></thead>
         <tbody>${filas}</tbody></table></div>
-      <p class="nota">${escapeHtml(d.nota)}</p></section>`;
+      <p class="nota">"Real − esperado" está en puntos de winrate por partida: +10 es ganar 1 partida más de cada 10 de lo que daba la ventaja que tenían.</p>
+      ${como(escapeHtml(d.nota))}</section>`;
+}
+
+/** ¿Qué hago con esto? Una línea: en qué tipo de partida está lo que se puede ganar. */
+function conclusionConversion(m) {
+    const v = m.ventaja || {}, dz = m.desventaja || {};
+    const med = (x) => x.n && !x.muestra_chica;
+    if (!med(v) && !med(dz)) return '<p class="conclusion">Con estas partidas no alcanza para sacar una conclusión: hacen falta 15 de cada tipo.</p>';
+    let txt;
+    if (v.senal && v.contra_grupo < 0) txt = 'Donde más se escapa es cerrando: con ventaja al 15 ganan menos de lo esperado. Mirá qué pasa del 15 al 25 en esas partidas (objetivos, agruparse, muertes).';
+    else if (dz.senal && dz.contra_grupo < 0) txt = 'Donde más se escapa es remontando: abajo al 15 ganan menos de lo esperado. En esas partidas, priorizá no regalar más (oleadas, visión) antes que pelear.';
+    else if ((v.senal && v.contra_grupo > 0) || (dz.senal && dz.contra_grupo > 0)) txt = 'Convertís mejor que el grupo: lo que se puede ganar está antes del 15, en llegar con ventaja.';
+    else txt = 'Cerrás y remontás como el grupo: acá no hay ni ventaja ni problema. Lo que se puede ganar está en llegar arriba al minuto 15.';
+    return `<p class="conclusion">${txt}</p>`;
 }
 
 // ---- Gráfico de una partida: la probabilidad de ganar de tu equipo, minuto a minuto ----
@@ -377,12 +415,12 @@ export async function bloquePool(p, cont, modo) {
           <p><strong>Cumplimiento:</strong> ${pct(x.cumplimiento.v)}${x.cumplimiento.lo != null ? ` <span class="dim">(${num(x.cumplimiento.lo * 100, 0)} a ${num(x.cumplimiento.hi * 100, 0)} %)</span>` : ''} de tus últimas ${x.cumplimiento.n} partidas del rol</p>
           <div class="table-wrap"><table class="data-table"><thead><tr><th></th><th>Con la pool</th><th>Fuera</th><th>Diferencia</th></tr></thead><tbody>
             <tr><th>Winrate desde que la declaraste</th><td>${ic(dd.dentro)} <span class="ic">n = ${dd.dentro.n}</span></td><td>${ic(dd.fuera)} <span class="ic">n = ${dd.fuera.n}</span></td><td>${dif(dd.dif, 'pct')}${dd.p != null ? ` <span class="dim">p = ${num(dd.p, 3)}</span>` : ''}</td></tr>
-            <tr><th>Índice desde que la declaraste</th><td>${conIntervalo(dd.indice_dentro, 1)}</td><td>${conIntervalo(dd.indice_fuera, 1)}</td><td>${dif(dd.dif_indice, 1)}</td></tr>
+            <tr><th>Nota de partida desde que la declaraste</th><td>${conIntervalo(dd.indice_dentro, 1)}</td><td>${conIntervalo(dd.indice_fuera, 1)}</td><td>${dif(dd.dif_indice, 1)}</td></tr>
           </tbody></table></div>
           ${dd.muestra_chica ? '<p class="dim">Muestra chica: algún lado tiene menos de 10 partidas.</p>' : ''}
           <div class="table-wrap"><table class="data-table"><thead><tr><th></th><th>Antes</th><th>Después</th><th>Diferencia</th></tr></thead><tbody>
             <tr><th>Partidas con la pool</th><td>${ic(ad.prop_antes)} <span class="ic">n = ${ad.prop_antes.n}</span></td><td>${ic(ad.prop_despues)} <span class="ic">n = ${ad.prop_despues.n}</span></td><td>${dif(ad.dif_prop, 'pct')}</td></tr>
-            <tr><th>Tu índice en el rol</th><td>${conIntervalo(ad.indice_antes, 1)}</td><td>${conIntervalo(ad.indice_despues, 1)}</td><td>${dif(ad.dif_indice, 1)}</td></tr>
+            <tr><th>Tu nota de partida en el rol</th><td>${conIntervalo(ad.indice_antes, 1)}</td><td>${conIntervalo(ad.indice_despues, 1)}</td><td>${dif(ad.dif_indice, 1)}</td></tr>
           </tbody></table></div>
           ${ad.muestra_chica ? '<p class="dim">Muestra chica: algún lado tiene menos de 10 partidas.</p>' : ''}
           <div class="cv-chips">${x.campeones.map(c => `<span class="chip-cola">${escapeHtml(campeon(c.champ))} · ${c.n} partidas${c.winrate?.v != null ? ` · ${pct(c.winrate.v)}` : ''} <span class="tag ${ESTADO_POOL[c.estado] ?? ''}">${escapeHtml(c.estado)}</span></span>`).join('')}</div>

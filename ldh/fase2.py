@@ -152,7 +152,7 @@ def roles(filas: list[dict], med_kda: dict, med_rol: dict) -> dict:
     tabla.sort(key=lambda t: (t["muestra_chica"], MODOS.index(t["cola"]), ROLES.index(t["rol"])))
     mejor = {}
     for cola in MODOS:
-        cand = [t for t in tabla if t["cola"] == cola and t["confianza"] != "baja"]
+        cand = [t for t in tabla if t["cola"] == cola and t["confianza"] != "baja" and t["n"] >= MIN]
         if cand:
             m = max(cand, key=lambda t: t["winrate_aj"])
             mejor[cola] = {"rol": m["rol"], "winrate_aj": m["winrate_aj"], "n": m["n"]}

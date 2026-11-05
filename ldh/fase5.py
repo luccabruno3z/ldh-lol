@@ -324,12 +324,21 @@ def muertes(muertes_por: dict, filas_por: dict) -> tuple[dict, dict]:
             por[pid][modo] = {"roles": roles, "caras": [{k: d[k] for k in ("match", "min", "costo", "zona", "fase",
                                                                          "perdidos", "arriba", "rol")} | {"zona_nombre": ZONAS.get(d["zona"])}
                                                         for d in caras],
-                              # Las 400 más recientes: con todas, el mapa de quien juega mucho se tapaba.
-                              "puntos": [[d["min"], d["x"], d["y"], round(d["costo"], 3)]
-                                         for d in sorted(mm, key=lambda d: (d["inicio"], d["t"])) if d["x"] is not None][-400:]}
+                              # Las 400 más recientes de cada rol (con todas, el mapa de quien juega mucho se
+                              # tapaba). El rol va al final: la web filtra por rol y en "Todos" toma las últimas 400.
+                              "puntos": _puntos_mapa(mm)}
     import statistics
     mediana = {f"{m}|{r}": round(statistics.median(v), 4) for (m, r), v in refs.items() if len(v) >= 3}
     return por, mediana
+
+
+def _puntos_mapa(muertes: list[dict], tope: int = 400) -> list[list]:
+    orden = sorted((d for d in muertes if d["x"] is not None), key=lambda d: (d["inicio"], d["t"]))
+    por_rol = defaultdict(list)
+    for d in orden:
+        por_rol[d["rol"]].append(d)
+    quedan = {id(d) for g in por_rol.values() for d in g[-tope:]}
+    return [[d["min"], d["x"], d["y"], round(d["costo"], 3), d["rol"]] for d in orden if id(d) in quedan]
 
 
 # ---------------------------------------------------------------- D. curvas de aprendizaje
@@ -793,9 +802,9 @@ def pool_objetivo(pools: dict, filas_por: dict[str, list[dict]], indices: dict, 
 
 NOTA_POOL = ("Tu pool objetivo la armás en el Pool Designer de Machine LoLing y la traés con -pool en el bot. "
              "Cumplimiento: qué parte de tus últimas 20 partidas del rol fueron con la pool. Dentro contra fuera: "
-             "desde que la declaraste. Antes y después: cuánto jugabas esos campeones y tu índice. Son asociaciones: "
-             "también cambian el parche, tus rivales y tu práctica. El índice es el de la tendencia (50 = la mediana "
-             "de tu franja). 'Muestra chica' si algún lado tiene menos de 10 partidas.")
+             "desde que la declaraste. Antes y después: cuánto jugabas esos campeones y tu nota de partida. Son asociaciones: "
+             "también cambian el parche, tus rivales y tu práctica. La nota de partida es la de la tendencia (50 = la "
+             "mediana de tu franja). 'Muestra chica' si algún lado tiene menos de 10 partidas.")
 
 
 # ---------------------------------------------------------------- F. conversión de ventajas
@@ -954,7 +963,7 @@ NOTA_OBJETIVOS = ("Cuánto sube la probabilidad de ganar de tu equipo cada objet
 def generar(db: sqlite3.Connection, filas_por: dict[str, list[dict]], escribir: Callable, indices: dict | None = None) -> None:
     if indices is not None:
         cp, cg = curvas(indices)
-        nota = ("Tu índice por partida (el de la tendencia, contra tu franja y rol) menos tu nivel normal en ese rol, "
+        nota = ("Tu nota de partida (la de la tendencia, contra tu franja y rol) menos tu nivel normal en ese rol, "
                 "según cuántas partidas llevabas con el campeón en ese rol. 0 = tu nivel normal.")
         tramos = [f"{a}–{b}" if b < 10_000 else f"{a}+" for a, b in TRAMOS_CURVA]
         escribir("curvas/grupo.json", {"modos": cg, "tramos": tramos, "nota": nota,

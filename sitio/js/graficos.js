@@ -16,8 +16,7 @@ function lecturaEvo(c, ventana) {
     const veredicto = c.senal
         ? (c.ultimas.v > c.resto.v ? '<span class="tag win">venís mejor</span>' : '<span class="tag loss">venís peor</span>')
         : '<span class="tag">igual que siempre (ruido)</span>';
-    return `<p class="evo-lectura">En tus últimas <strong>${ventana}</strong> ganás <strong>${P(c.ultimas.v)}</strong>; antes, ${P(c.resto.v)}. ${veredicto}
-      <span class="dim">Fisher p = ${num(c.p, 2)}</span></p>`;
+    return `<p class="evo-lectura" title="Prueba exacta de Fisher: p = ${num(c.p, 2)}">En tus últimas <strong>${ventana}</strong> ganás <strong>${P(c.ultimas.v)}</strong>; antes, ${P(c.resto.v)}. ${veredicto}</p>`;
 }
 
 function lineaWinrate(c, ventana) {
@@ -102,12 +101,12 @@ document.addEventListener('click', (e) => {
     sec.querySelectorAll('.evo-panel').forEach(p => { p.hidden = p.dataset.panel !== b.dataset.evo; });
 });
 
-// ---- Tendencia: ¿estás mejorando? (índice por partida contra tu franja) ----
+// ---- Tendencia: ¿estás mejorando? (nota de partida contra tu franja) ----
 
 /** t: {puntos [{t, v}], recta {desde, hasta}, pendiente, lo, hi, veredicto, inicio, ahora, ventana, n}. */
 export function seccionTendencia(t, rol, franja) {
     if (!t) return `<p class="dim">Hacen falta 30 partidas de ${escapeHtml(rol)} en este modo para medir una tendencia.</p>`;
-    const W = 640, H = 210, m = { l: 34, r: 12, t: 14, b: 24 };
+    const W = 640, H = 220, m = { l: 34, r: 12, t: 18, b: 24 };
     // Eje = número de partida (la recta se ajusta por partida); los meses quedan como rótulos.
     const n1 = Math.max(1, t.n - 1);
     const ref = t.ref;  // dónde juegan los jugadores de la franja en este mismo índice
@@ -117,16 +116,17 @@ export function seccionTendencia(t, rol, franja) {
     const y = (v) => m.t + (1 - (v - lo) / (hi - lo)) * (H - m.t - m.b);
     const linea = t.puntos.map(p => `${x(p.i)},${y(p.v)}`).join(' ');
     // Un rótulo por mes, salteando los que quedarían pegados al anterior.
+    // Los meses van arriba, como marcas de calendario; abajo queda solo el eje real (número de partida).
     let ultimo = -99;
-    const meses = (t.meses || []).filter(mm => { const ok = x(mm.i) - ultimo > 28; if (ok) ultimo = x(mm.i); return ok; })
+    const meses = (t.meses || []).filter(mm => { const ok = x(mm.i) - ultimo > 34 && x(mm.i) < W - m.r - 24; if (ok) ultimo = x(mm.i); return ok; })
         .map(mm => `<line x1="${x(mm.i)}" x2="${x(mm.i)}" y1="${m.t}" y2="${H - m.b}" class="g-grilla"/>
-          <text x="${x(mm.i) + 3}" y="${H - 6}" class="g-eje">${MESES[mm.mes - 1]}</text>`);
+          <text x="${x(mm.i) + 3}" y="${m.t + 10}" class="g-eje g-eje--mes">${MESES[mm.mes - 1]}</text>`);
     const clase = t.veredicto === 'mejorando' ? 'win' : t.veredicto === 'empeorando' ? 'loss' : '';
     const signo = (v) => `${v > 0 ? '+' : ''}${num(v, 1)}`;
     return `<p class="evo-lectura">Empezaste la temporada en <strong>${num(t.inicio, 0)}</strong> y hoy estás en <strong>${num(t.ahora, 0)}</strong>
         <span class="tag ${clase}">${escapeHtml(t.veredicto)}</span>
-        <span class="dim">${signo(t.cambio.v)} puntos en tus ${t.n} partidas (${signo(t.cambio.lo)} a ${signo(t.cambio.hi)})</span></p>
-      <svg class="g-evo" viewBox="0 0 ${W} ${H}" role="img" aria-label="Tu índice por partida en ${escapeHtml(rol)} a lo largo de la temporada: de ${num(t.inicio, 0)} a ${num(t.ahora, 0)}, ${escapeHtml(t.veredicto)}">
+        <span class="dim">${signo(t.cambio.v)} pts de nota en tus ${t.n} partidas (${signo(t.cambio.lo)} a ${signo(t.cambio.hi)})</span></p>
+      <svg class="g-evo" viewBox="0 0 ${W} ${H}" role="img" aria-label="Tu nota de partida en ${escapeHtml(rol)} a lo largo de la temporada: de ${num(t.inicio, 0)} a ${num(t.ahora, 0)}, ${escapeHtml(t.veredicto)}">
         ${ref ? `<rect x="${m.l}" width="${W - m.l - m.r}" y="${y(ref.hi)}" height="${y(ref.lo) - y(ref.hi)}" class="g-banda"/>
         <line x1="${m.l}" x2="${W - m.r}" y1="${y(ref.mediana)}" y2="${y(ref.mediana)}" class="g-medio"/>
         <text x="${m.l - 6}" y="${y(ref.mediana) + 4}" class="g-eje" text-anchor="end">${num(ref.mediana, 0)}</text>
@@ -137,10 +137,12 @@ export function seccionTendencia(t, rol, franja) {
         <polyline points="${linea}" class="g-linea"/>
         <line x1="${x(t.recta.desde.i)}" y1="${y(t.recta.desde.v)}" x2="${x(t.recta.hasta.i)}" y2="${y(t.recta.hasta.v)}" class="g-recta g-recta--${clase || 'neutra'}"/>
         <circle cx="${x(t.n - 1)}" cy="${y(t.puntos[t.puntos.length - 1].v)}" r="5" class="g-punto"/>
+        <text x="${m.l}" y="${H - 6}" class="g-eje">partida 1</text>
+        <text x="${(m.l + W - m.r) / 2}" y="${H - 6}" class="g-eje" text-anchor="middle">tus partidas de ${escapeHtml(rol)}, en orden →</text>
         <text x="${W - m.r}" y="${H - 6}" class="g-eje" text-anchor="end">partida ${t.n}</text>
         ${meses.join('')}
       </svg>
-      <p class="nota">Cada partida recibe un índice de 0 a 100: el promedio de tus percentiles en ${t.metricas.map(escapeHtml).join(', ').toLowerCase()}, contra jugadores de ${escapeHtml(franja)} en ${escapeHtml(rol)} (las muertes cuentan al revés). La línea celeste es el promedio de tus últimas ${t.ventana} partidas en cada momento y la recta, la tendencia de toda la temporada (${t.n} partidas). Mide cómo jugás, no si ganaste: el winrate depende demasiado de los compañeros. "Sin tendencia clara" quiere decir que el intervalo de la pendiente cruza el cero. El rol está fijo, pero el campeón no: si cambiaste de campeones en el camino, parte de la tendencia puede ser eso y no que jugás mejor.${ref ? ` La franja gris es dónde juegan los ${ref.jugadores} jugadores de referencia de ${escapeHtml(franja)} con este mismo índice: la mitad del medio, y la línea punteada, su mediana.` : ''}</p>`;
+      <p class="nota">Cada partida recibe una <strong>nota de partida</strong> de 0 a 100 (no es el Performance, que resume toda la temporada): el promedio de tus percentiles en ${t.metricas.map(escapeHtml).join(', ').toLowerCase()}, contra jugadores de ${escapeHtml(franja)} en ${escapeHtml(rol)} (las muertes cuentan al revés). La línea celeste es el promedio de tus últimas ${t.ventana} partidas en cada momento y la recta, la tendencia de toda la temporada (${t.n} partidas). Mide cómo jugás, no si ganaste: el winrate depende demasiado de los compañeros. "Sin tendencia clara" quiere decir que el intervalo de la pendiente cruza el cero. El rol está fijo, pero el campeón no: si cambiaste de campeones en el camino, parte de la tendencia puede ser eso y no que jugás mejor.${ref ? ` La franja gris es dónde juegan los ${ref.jugadores} jugadores de referencia de ${escapeHtml(franja)} con esta misma nota: la mitad del medio, y la línea punteada, su mediana.` : ''}</p>`;
 }
 
 // ---- Radar de los componentes del Performance contra tu franja ----

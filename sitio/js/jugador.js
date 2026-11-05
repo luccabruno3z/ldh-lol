@@ -8,7 +8,7 @@ import { bloquesFase2 } from './fase2.js';
 import { bloquesFase3 } from './fase3.js';
 import { bloquesFase4 } from './fase4.js';
 import { bloqueRachas, bloqueMuertes, bloqueCurvas, activarCurvas, bloqueInforme, bloquePool, bloqueConversion } from './fase5.js';
-import { escapeHtml, rangoTexto, tierClase, nombreCola, conIntervalo, iconoCampeon, campeon, fecha, num } from './utils.js';
+import { escapeHtml, rangoTexto, tierClase, nombreCola, conIntervalo, iconoCampeon, campeon, fecha, num, como } from './utils.js';
 
 const COLS = [
     ['winrate', 'Winrate', 'pct'], ['kda', 'KDA', 2], ['cs_min', 'CS/min', 1], ['oro_min', 'Oro/min', 0],
@@ -61,11 +61,11 @@ function resumen(p, modo) {
     const tarjeta = (titulo, valor, detalle, clase = '') =>
         `<div class="res-card ${clase}"><span class="res-tit">${titulo}</span><span class="res-val">${valor}</span><span class="res-det">${detalle}</span></div>`;
     return `<div class="resumen">
-      ${tarjeta('Solo/Dúo', solo ? escapeHtml(rangoTexto(solo).split(' · ')[0]) : 'Sin clasificar',
-                solo ? `${solo.lp} LP · ${solo.wins} V / ${solo.losses} D` : 'todavía sin rango', tierClase(solo))}
+      ${tarjeta(modo === 'solo' ? 'Solo/Dúo' : 'Rango · Solo/Dúo', solo ? escapeHtml(rangoTexto(solo).split(' · ')[0]) : 'Sin clasificar',
+                (solo ? `${solo.lp} LP · ${solo.wins} V / ${solo.losses} D` : 'todavía sin rango') + (modo === 'solo' ? '' : ' · el rango es siempre el de ranked'), tierClase(solo))}
       ${tarjeta(`Winrate en ${escapeHtml(MODOS[modo])}`, principal ? conIntervalo(principal.winrate, 'pct') : '—', principal ? `${principal.n} partidas` : 'sin partidas en este modo')}
       ${tarjeta('Mejor rol', mejor ? escapeHtml(mejor.rol) : '—',
-                mejor ? `${Math.round(mejor.winrate_aj * 100)} % ajustado en ${mejor.n} partidas` : 'ningún rol con confianza media todavía')}
+                mejor ? `${Math.round(mejor.winrate_aj * 100)} % ajustado en ${mejor.n} partidas` : `ningún rol con ${state.ajustes?.min_partidas ?? 10}+ partidas y confianza media`)}
       ${f ? tarjeta('Últimas 10', conIntervalo(f.comparacion.winrate.ultimas, 'pct'),
                 dif?.ruido ? 'igual que tu resto (ruido)' : dif?.v > 0 ? 'mejor que tu resto' : 'peor que tu resto',
                 dif?.ruido ? '' : dif?.v > 0 ? 'res-bien' : 'res-mal') : ''}
@@ -107,8 +107,8 @@ function tablaKpis(filas, cola) {
     return `<div class="table-wrap"><table class="data-table kpis">${cab}<tbody>${filasKpis(grandes)}</tbody></table></div>
     ${chicas.length ? `<details class="plegable"><summary>${chicas.length} ${chicas.length === 1 ? 'rol' : 'roles'} con muestra chica (${chicas.map(f => `${escapeHtml(f.rol)} ${f.n}`).join(', ')})</summary>
       <div class="table-wrap"><table class="data-table kpis">${cab}<tbody>${filasKpis(chicas)}</tbody></table></div></details>` : ''}
-    <p class="nota">Cada valor lleva su intervalo del ${Math.round((state.ajustes?.confianza || 0.95) * 100)} % (Wilson para el winrate, bootstrap para el resto).
-      Los roles con menos de ${state.ajustes?.min_partidas ?? 10} partidas no permiten sacar conclusiones.</p>`;
+    <p class="nota">El número chico abajo de cada valor es su rango probable. Los roles con menos de ${state.ajustes?.min_partidas ?? 10} partidas no permiten sacar conclusiones.</p>
+    ${como(`Cada rango es el intervalo del ${Math.round((state.ajustes?.confianza || 0.95) * 100)} %: Wilson para el winrate y bootstrap (remuestreo de tus partidas) para el resto.`)}`;
 }
 
 function grafForma(partidas) {
