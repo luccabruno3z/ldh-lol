@@ -14,6 +14,8 @@ from datetime import datetime
 
 import discord
 
+from bot.services import formato as F
+
 from bot.cogs.perfil import WEB
 from bot.services.metas import MAX_CAMPEONES
 
@@ -62,7 +64,7 @@ def _seguimiento(seg: dict | None, decl: dict, campeones: dict) -> list[str]:
     x = modos[modo]
     c, dd, ad = x["cumplimiento"], x["desde_que_la_declaraste"], x["antes_y_despues"]
     lin = [f"### Seguimiento en {EN_MODO.get(modo, modo)}",
-           f"**Cumplimiento:** {c['v'] * 100:.0f} % de tus últimas {c['n']} partidas del rol "
+           f"**Cumplimiento:** {c['v'] * 100:.0f} % de tus últimas {F.partidas(c['n'])} del rol "
            f"({c['lo'] * 100:.0f}–{c['hi'] * 100:.0f})" if c.get("v") is not None else "**Cumplimiento:** sin partidas"]
     if dd["dentro"]["n"] or dd["fuera"]["n"]:
         p = f" · p = {dd['p']:.3f}".replace(".", ",") if dd.get("p") is not None else ""
@@ -76,10 +78,10 @@ def _seguimiento(seg: dict | None, decl: dict, campeones: dict) -> list[str]:
     filas = []
     for ch in x["campeones"]:
         idx = ch["indice"]
-        filas.append(f"• {_nombre(campeones, ch['champ'])}: {ch['n']} partidas · {_pct(ch['winrate'])}"
-                     + (f" · índice {idx['v']:.0f}" if idx.get("v") is not None else "") + f" · {ch['estado']}")
+        filas.append(f"• {_nombre(campeones, ch['champ'])}: {F.partidas(ch['n'])} · {_pct(ch['winrate'])}"
+                     + (f" · nota de partida {idx['v']:.0f}" if idx.get("v") is not None else "") + f" · {ch['estado']}")
     lin += filas
-    lin.append("-# Son asociaciones: también pesan el parche, los rivales y tu práctica. Índice: 50 = la mediana de tu franja.")
+    lin.append("-# Son asociaciones: también pesan el parche, los rivales y tu práctica. Nota de partida: 50 = la mediana de tu franja.")
     return lin
 
 

@@ -28,16 +28,27 @@ GLOSARIO = {
     "Intervalo": "El rango donde está el valor real (en gris, \"x a y\"). Si es ancho, todavía hay pocas partidas.",
     "Confianza": "**alta** 15 partidas o más · **media** de 8 a 14 · **baja** menos de 8. "
                  "Con confianza baja algo no puede ser \"tu mejor\" nada.",
-    "Ruido": "La diferencia existe en los números pero, con estas partidas, podría ser azar. No se puede decir que cambió.",
+    "Señal / a confirmar / ruido": "**Señal**: la diferencia se separa del azar, aun teniendo en cuenta que se comparan "
+                                  "muchas cosas a la vez (corrección de Benjamini–Hochberg). **A confirmar**: apunta a una "
+                                  "diferencia, pero con tantas comparaciones alguna sale así por suerte; mirala de nuevo con más "
+                                  "partidas. **Ruido**: la diferencia existe en los números, pero con estas partidas podría ser azar.",
     "Muestra chica": "Menos de 10 partidas: va al final o plegado, y no se sacan conclusiones.",
     "Franja y percentil": "Te comparamos con jugadores de tu rango (Hierro–Bronce, Plata–Oro o Platino–Esmeralda) "
                           "en tu rol. \"Mejor que el 70 %\" es contra ellos, no contra el grupo.",
-    "Performance": "Índice de 0 a 100 con 7 componentes, cada uno es tu percentil contra tu franja. 50 = la mitad de tu franja.",
+    "Performance": "Nota de 0 a 100 de toda tu temporada en un rol: junta tus percentiles de 7 componentes contra tu franja. "
+                   "50 = la mitad de tu franja. Con pocas partidas se acerca a 50.",
+    "Nota de partida": "Lo mismo que el Performance, pero de una sola partida. Sirve para ver si venís mejorando "
+                       "(`-grafico tendencia`), no para compararte con otros.",
+    "Referencia": "Los jugadores contra los que te medimos: jugadores al azar de LAS en solo/dúo, con 10+ partidas en el rol, "
+                  "de cada franja. No son del grupo.",
+    "KDA": "(Kills + asistencias) ÷ muertes, sumando todas tus partidas: así una partida sin muertes no lo infla.",
+    "KP (Part. kills)": "Participación en kills: en qué parte de las kills de tu equipo estuviste, matando o asistiendo.",
+    "CS/min": "Súbditos y monstruos que mataste por minuto de partida.",
+    "Colas": "Las estadísticas usan la Grieta: solo/dúo, flex y normales (\"todo\" las junta). ARAM y otras colas suman en "
+             "tu total de partidas, pero no en los números.",
     "Pool": "Una partida es \"de tu pool\" si ya tenías 5+ partidas con ese campeón en ese rol en los 90 días anteriores.",
     "Privacidad": "Solo aparecen las cuentas de quienes se sumaron al grupo, y sus estadísticas son públicas en la web "
                   "y el bot. Los demás jugadores de las partidas quedan anónimos. Para dejar de aparecer, pedíselo a Lucca.",
-    "Señal": "En sinergia y en el pool: la diferencia pasa la prueba (Fisher, y con tantos pares, ajustada por "
-             "Benjamini-Hochberg). Si no, es ruido.",
 }
 
 AYUDA = {
@@ -52,13 +63,13 @@ AYUDA = {
                 "`-informe [jugador]` tu informe: dos prioridades con su evidencia y qué practicar (lo escribe Claude a pedido)\n"
                 "`-pool [jugador]` tu pool objetivo por rol: armala en Machine LoLing, elegila acá y mirá cómo la venís "
                 "cumpliendo · `-pool agregar <campeón> [rol]` · `-pool sacar <campeón> [rol]`\n"
-                "`-performance [jugador] [rol] [solo|normal|todo]` tu índice y sus 7 componentes contra tu franja\n"
+                "`-performance [jugador] [rol] [solo|normal|todo]` tu Performance (0 a 100) y sus 7 componentes contra tu franja\n"
                 "`-mejora [jugador] [rol] [solo|normal|todo]` las 3 brechas más grandes como metas en números\n"
                 "`-temprano [jugador] [rol] [solo|normal|todo]` CS, oro y XP a los 10 y 15 contra tu rival directo\n"
                 "`-cierre [jugador] [solo|normal|todo]` ¿Cerrás las que ibas ganando? Ganadas contra esperadas al minuto 15\n"
                 "-# Sin modo: solo/dúo si te alcanza, si no `todo` (solo/dúo, flex y normales juntas).\n"
                 "`-tips <rol>` consejos del rol",
-    "Gráficos": "`-grafico [jugador] tendencia [rol] [modo]` ¿estás mejorando? Tu índice por partida contra tu franja y su tendencia\n"
+    "Gráficos": "`-grafico [jugador] tendencia [rol] [modo]` ¿estás mejorando? Tu nota de partida contra tu franja y su tendencia\n"
                 "`-grafico [jugador] evolucion [modo]` ¿venís mejor o peor? Tu winrate de las últimas 20 contra tu temporada\n"
                 "`-grafico [jugador] radar [rol] [modo]` la rosa de tus 7 componentes contra tu franja\n"
                 "`-grafico [jugador] franjas [rol] [modo]` tus números al lado de la mediana de cada franja de elo\n"
@@ -182,8 +193,8 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
         signo = lambda v: f"{'+' if v > 0 else ''}{F.num(v, 1)}"
         texto = (f"## {discord.utils.escape_markdown(nombre)} · ¿estás mejorando?\n"
                  f"De **{F.num(t['inicio'], 0)}** a **{F.num(t['ahora'], 0)}** → **{t['veredicto']}** "
-                 f"({signo(F.cambio(t)['v'])} puntos en tus {t['n']} partidas, {signo(F.cambio(t)['lo'])} a {signo(F.cambio(t)['hi'])})\n"
-                 f"-# Índice de 0 a 100 por partida: tus percentiles en {', '.join(t['metricas']).lower()} contra "
+                 f"({signo(F.cambio(t)['v'])} puntos en tus {F.partidas(t['n'])}, {signo(F.cambio(t)['lo'])} a {signo(F.cambio(t)['hi'])})\n"
+                 f"-# Nota de partida (0 a 100): tus percentiles en {', '.join(t['metricas']).lower()} contra "
                  f"{d['franja']} en {rol_n}. Mide cómo jugás, no si ganaste. 50 = la mitad de tu franja. "
                  "El rol está fijo, el campeón no: si cambiaste de campeones, parte de la tendencia puede ser eso.")
     elif tipo.lower().startswith("cur"):
@@ -200,13 +211,15 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
                               f"{nombre} · ¿cuánto te lleva aprender un campeón? · {EN_MODO.get(modo_c)}")
         t0, tN = g["tramos"][0], g["tramos"][-1]
         lineas = [f"## {discord.utils.escape_markdown(nombre)} · curva de aprendizaje",
-                  f"En el grupo, las primeras {t0['tramo']} partidas con un campeón nuevo se juega "
+                  f"En el grupo, las primeras {F.partidas(t0['tramo'])} con un campeón nuevo se juega "
                   f"**{F.num(abs(t0['v']), 1)} pts por debajo** del nivel normal (gana {F.pct(t0['winrate']['v'])}); "
                   f"con {tN['tramo']}, {F.num(tN['v'], 1, True)} (gana {F.pct(tN['winrate']['v'])})."]
+        estado = {"por encima": "por encima de tu nivel", "por debajo": "por debajo de tu nivel"}
         for x in mios:
             a = x["ahora"]
-            lineas.append(f"**{nom(x['champ'])}** ({x['rol']}, {x['n']} partidas): en tus últimas {a['n']}, **{x['estado']}** "
-                          f"de tu nivel ({F.num(a['v'], 1, True)}, {F.num(a['lo'], 1, True)} a {F.num(a['hi'], 1, True)})")
+            lineas.append(f"**{nom(x['champ'])}** ({x['rol']}, {F.partidas(x['n'])}): en tus últimas {a['n']}, "
+                          f"**{estado.get(x['estado'], x['estado'])}** "
+                          f"({F.num(a['v'], 1, True)}, {F.num(a['lo'], 1, True)} a {F.num(a['hi'], 1, True)})")
         if not mios:
             lineas.append("Todavía no tenés campeones con 10+ partidas en ese rol y modo.")
         lineas.append("-# Tus líneas saltan porque cada tramo tiene pocas partidas: mirá hacia dónde van, no cada punto. "
@@ -246,9 +259,10 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
         png = graficos.rachas(m, r["estados"], f"{nombre} · ¿cómo te va después de perder? · {EN_MODO.get(modo_r)}")
         c, s2, k2 = m["comparaciones"]["corta_vs_sigue"], m["estados"]["tras_2_sigue"], m["estados"]["tras_2_corta"]
         if s2["n"] and k2["n"]:
+            etq = F.etiqueta_senal(c["senal"], c.get("dif"), c["muestra_chica"])
             ver = ("con tan pocas partidas no se puede decir nada" if c["muestra_chica"]
                    else ("**cortar se asocia con ganar más**" if c["dif"]["v"] > 0 else "**cortar se asocia con ganar menos**") if c["senal"]
-                   else "la diferencia es **ruido**")
+                   else f"la diferencia es **{etq.strip('*')}**")
             lectura = (f"Después de 2 derrotas, seguido ganás **{F.pct(s2['v'])}** ({s2['n']}); cortando "
                        f"{r['corte_min']}+ min, **{F.pct(k2['v'])}** ({k2['n']}) → {ver}.")
         else:
@@ -308,7 +322,7 @@ async def armar_grafico(bot, p: dict, tipo: str, rol: str | None, modo: str | No
         else:
             resp = ""
         texto = (f"## {discord.utils.escape_markdown(nombre)} · ¿venís mejor o peor?\n{resp}\n"
-                 f"-# Cada punto es tu winrate en las {evo['ventana']} partidas anteriores a esa fecha. "
+                 f"-# Cada punto es tu winrate en las {F.partidas(evo['ventana'])} anteriores a esa fecha. "
                  "La banda es el margen de error; la línea naranja, tu promedio de la temporada.")
     view = discord.ui.LayoutView(timeout=None)
     view.add_item(discord.ui.Container(
@@ -381,7 +395,12 @@ class Extra(commands.Cog):
 
     @commands.hybrid_command(name="glosario", description="Qué significa cada término (ajustado, intervalo, ruido…)")
     async def glosario(self, ctx: commands.Context, *, termino: str | None = None):
-        inicial = next((k for k in GLOSARIO if termino and termino.lower() in k.lower()), None)
+        t = F.normalizar(termino or "")
+        inicial = next((k for k in GLOSARIO if t and (t in F.normalizar(k) or F.normalizar(k) in t)), None)
+        if termino and not inicial:
+            await ctx.reply(f"No tengo **{discord.utils.escape_markdown(termino)}** en el glosario. Términos: "
+                            + ", ".join(GLOSARIO) + ".", view=_VistaTexto(GLOSARIO, "Glosario", None))
+            return
         await ctx.reply(view=_VistaTexto(GLOSARIO, "Glosario", inicial))
 
     @commands.hybrid_command(name="tips", description="Consejos de juego para un rol")

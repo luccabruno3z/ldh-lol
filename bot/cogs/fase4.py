@@ -82,7 +82,7 @@ class Fase4(commands.Cog):
         op = eq["ideal"][0]
         lineas = ["## El 5 ideal del grupo", f"-# Fuerza {F.pct(op['fuerza'])} · winrate ajustado en el rol, todas las colas de Grieta"]
         for x in op["equipo"]:
-            lineas.append(f"**{x['rol']}** · {eq['jugadores'][x['persona']]['nombre']} · {F.pct(x['wr_aj'])} en {x['n']} partidas")
+            lineas.append(f"**{x['rol']}** · {eq['jugadores'][x['persona']]['nombre']} · {F.pct(x['wr_aj'])} en {F.partidas(x['n'])}")
         if len(eq["ideal"]) > 1:
             alt = eq["ideal"][1]
             cambios = [f"{x['rol']}: {eq['jugadores'][x['persona']]['nombre']}" for x, y in zip(alt["equipo"], op["equipo"])
@@ -139,7 +139,7 @@ class Fase4(commands.Cog):
             wr_h, wr_o = ((x["wr_arriba"], x["wr_abajo"]) if x["lado_habitual"] == "arriba" else (x["wr_abajo"], x["wr_arriba"]))
             gana = (f"arrancando en el {x['buff_habitual']} ganás {F.pct(wr_h['v'])} ({wr_h['n']})"
                     + (f", en el {otro} {F.pct(wr_o['v'])} ({wr_o['n']})" if wr_o.get("n") else ""))
-            lineas += [f"**Lado {lado}** ({x['n']} partidas): arrancás en el buff {x['buff_habitual']} el "
+            lineas += [f"**Lado {lado}** ({F.partidas(x['n'])}): arrancás en el buff {x['buff_habitual']} el "
                        f"{F.pct(x['pct_habitual'])} de las veces → {tag}",
                        f"-# de {F.rango_pct(ic)} de las veces · {gana}"]
         lineas.append(f"-# Arranque inferido por la posición en el minuto 1 (Riot no dice qué campamento hiciste primero). "

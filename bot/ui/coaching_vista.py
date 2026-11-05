@@ -14,13 +14,13 @@ from bot.services import formato as F
 
 # Qué se puede ver: (etiqueta, descripción). Las que empiezan con "g" son gráficos.
 VISTAS = {
-    "perf": ("Performance", "Tu índice y sus 7 componentes contra tu franja"),
+    "perf": ("Performance", "Tu Performance y sus 7 componentes contra tu franja"),
     "mejora": ("Plan de mejora", "Las brechas más grandes como metas en números"),
     "temp": ("Primeros 15 minutos", "CS, oro y XP a los 10 y 15 contra tu rival"),
     "conv": ("¿Cerrás las que ibas ganando?", "Ganadas contra esperadas según cómo iba tu equipo al 15"),
     "gfra": ("Gráfico: contra cada franja", "Tus números al lado de la mediana de cada elo"),
     "grad": ("Gráfico: radar", "Tus 7 componentes con la mediana de cada franja"),
-    "gten": ("Gráfico: ¿estás mejorando?", "Tu índice por partida y su tendencia"),
+    "gten": ("Gráfico: ¿estás mejorando?", "Tu nota de partida y su tendencia"),
     "gevo": ("Gráfico: winrate en el tiempo", "Tus últimas 20 contra tu temporada"),
     "grac": ("Gráfico: ¿cómo te va después de perder?", "Tu winrate según cómo venías: rachas y pausas"),
     "gmue": ("Gráfico: tus chances al morir", "Dónde morís y cuánto estima el modelo que bajan tus chances"),
@@ -44,7 +44,7 @@ def texto_conversion(p: dict, d: dict | None, modo: str) -> str:
     lin = [f"## {nombre} · ¿cerrás las que ibas ganando? · {EN_MODO.get(modo, modo)}"]
     if not m or not any(x.get("n") for x in m.values()):
         return "\n".join(lin + ["Todavía no hay partidas de 16 minutos o más con timeline en este modo."])
-    pts = lambda v: f"{v * 100:+.1f}".replace(".", ",")  # noqa: E731
+    pts = lambda v: F.num(v * 100, 1, True)  # noqa: E731
     for k, nombre_t in CONV.items():
         x = m.get(k) or {}
         if not x.get("n"):
@@ -56,7 +56,7 @@ def texto_conversion(p: dict, d: dict | None, modo: str) -> str:
         if x.get("senal"):
             lectura = ("más" if x["contra_grupo"] > 0 else "menos") + " que el grupo"
         else:
-            lectura = "como el grupo (ruido)"
+            lectura = "como el grupo (" + F.etiqueta_senal(False, None).strip("*") + ")"
         p_bh = f" · p = {x['p_bh']:.2f}".replace(".", ",") if x.get("p_bh") is not None else ""
         lin.append(f"**{nombre_t}:** {x['ganadas']} ganadas de {x['esperadas']:.0f} esperadas en {x['n']} · "
                    f"{pts(x['v'])} pts por partida ({pts(x['lo'])} a {pts(x['hi'])}) · {lectura}{p_bh}")
@@ -150,11 +150,11 @@ async def vista_coaching(bot, vista: str, pid: str, rol: str | None, modo: str |
     if roles and vista not in SIN_ROL:
         items.append(sel("rol", [discord.SelectOption(
             label=r, value=r, default=r == rol,
-            description=f"{d['roles'][r]['n']} partidas" + (" · sin referencia" if d["roles"][r].get("sin_referencia") else ""))
+            description=f"{F.partidas(d['roles'][r]['n'])}" + (" · sin referencia" if d["roles"][r].get("sin_referencia") else ""))
             for r in ROLES if r in roles]))
     items.append(sel("modo", [discord.SelectOption(
         label=l, value=m, default=m == modo,
-        description=f"{n_modo[m]} partidas" if n_modo.get(m) is not None else None) for m, l in MODOS.items()]))
+        description=f"{F.partidas(n_modo[m])}" if n_modo.get(m) is not None else None) for m, l in MODOS.items()]))
     items.append(discord.ui.ActionRow(discord.ui.Button(label="Ver en la web", url=f"{WEB}#/jugadores/{pid}/coaching")))
     view = discord.ui.LayoutView(timeout=None)
     view.add_item(discord.ui.Container(*items, accent_colour=0x00CCCC))

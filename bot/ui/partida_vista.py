@@ -63,7 +63,7 @@ async def vista_partida(bot, pid: str, i: int, owner: int) -> tuple[discord.ui.L
         champs = await datos.campeones()
         champ = (champs.get(str(m["champ"])) or {}).get("nombre", m["champ"])
         cab = (f"## {nombre} · {'✅ Victoria' if m['win'] else '❌ Derrota'} con {champ}\n"
-               f"-# {m['rol'] or ''} · {m['k']}/{m['d']}/{m['a']} · {F.num(m.get('dur'), 0)} min · partida {i + 1} del historial")
+               f"-# {m['rol'] or ''} · {m['k']}/{m['d']}/{m['a']} · {F.num(m.get('dur'), 0)} min · {'tu última partida' if i == 0 else f'tu partida {i + 1} contando desde la última'}")
         d = await datos.partida(m["id"])
         if not d:
             texto = cab + "\nEsta partida no tiene timeline: no hay gráfico."

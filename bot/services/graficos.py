@@ -107,7 +107,7 @@ def tendencia(t: dict, titulo: str, franja: str) -> io.BytesIO:
     vs = [p["v"] for p in t["puntos"]]
     ax.set_ylim(max(0, min(vs + [40]) - 8), min(100, max(vs + [60]) + 8))
     ax.set_xlim(0, t["n"] - 1)
-    ax.set_ylabel(f"índice (promedio de {t['ventana']} partidas)", color=TENUE)
+    ax.set_ylabel(f"nota de partida (promedio de {t['ventana']})", color=TENUE)
     ax.set_xlabel(f"partidas ({t['n']})", color=TENUE)
     marcas, ultimo = [], -1e9
     for mm in t.get("meses", []):

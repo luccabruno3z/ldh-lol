@@ -21,10 +21,15 @@ def tarjeta_top(d: dict, cola: str, nombres: dict, nombre_cola: dict) -> discord
     lineas = [f"## Top · {nombre_cola.get(cola, cola)}",
               f"-# {PERIODOS[d['periodo']]} · winrate ajustado · mínimo {d['min']} partidas"]
     # La medalla va en la fila (antes había una línea aparte que repetía la tabla).
+    # La medalla sigue al orden de la tabla: si el 1.º no la tiene (confianza baja), se aclara abajo.
+    medallas = iter(MEDALLAS)
     for r in c["tabla"][:MAX_FILAS]:
         pid = r["persona"]
-        marca = MEDALLAS[c["podio"].index(pid)] if pid in c["podio"] else f"`{r['puesto']}.`"
-        lineas += [f"{marca} **{nombres.get(pid, pid)}** · {F.pct(r['winrate_aj'])} · {r['n']} partidas",
+        if pid in c["podio"]:
+            marca = next(medallas, f"`{r['puesto']}.`")
+        else:
+            marca = f"`{r['puesto']}.`"
+        lineas += [f"{marca} **{nombres.get(pid, pid)}** · {F.pct(r['winrate_aj'])} · {F.partidas(r['n'])}",
                    f"-# real {F.pct(r['winrate']['v'])} ({F.rango_pct(r['winrate'])}) · confianza {r['confianza']}"]
     if not c["tabla"]:
         lineas.append(f"Nadie tiene {d['min']}+ partidas en este período.")
@@ -32,17 +37,30 @@ def tarjeta_top(d: dict, cola: str, nombres: dict, nombre_cola: dict) -> discord
         lineas.append("Sin podio: nadie llega a 50 % ajustado con confianza media o alta.")
     if c.get("sin_muestra"):
         lineas.append(f"-# Sin muestra suficiente: {len(c['sin_muestra'])} personas más.")
-    lineas.append("-# Medalla solo con confianza media o alta y 50 % ajustado o más.")
+    primero_sin = c["tabla"] and c["tabla"][0]["persona"] not in c["podio"] and c["podio"]
+    lineas.append("-# Medalla solo con confianza media o alta y 50 % ajustado o más"
+                  + (": por eso alguien de arriba puede no tenerla." if primero_sin else "."))
     return tarjeta_simple(lineas, f"{WEB}#/rankings/periodo")
+
+
+# Unidad y por qué de cada métrica de -top_rol (el nombre viene del pipeline).
+UNIDAD_ROL = {"oro": "de oro", "cs": "de CS", "xp": "de XP", "vision": "de visión/min", "dano": "de daño/min", "kp": "pts de KP"}
+POR_QUE_ROL = {"oro": "La ventaja de oro a los 15 resume cómo salís de la línea: es lo que más se asocia con ganar en ese rol.",
+               "vision": "En Support la visión es lo propio del rol: es lo que más depende de vos y no del tirador.",
+               "cs": "El farmeo es la base del oro del rol.", "xp": "La experiencia marca quién llega antes a los niveles clave."}
 
 
 def tarjeta_top_rol(v: dict, cola: str, rol: str, nombres: dict, nombre_cola: dict) -> discord.ui.LayoutView:
     g = v["grupos"][f"{cola}|{rol}"]
     dec = 0 if "oro" in g["metrica"] else 1 if "cs" in g["metrica"] else 2
     signo = g["metrica"].startswith("dif")
+    clave = next((k for k in UNIDAD_ROL if k in g["metrica"]), None)
+    u = f" {UNIDAD_ROL[clave]}" if clave else ""
     lineas = [f"## {rol} · {nombre_cola.get(cola, cola)}", f"-# {g['nombre']}, contra el rival directo de la misma partida"]
+    if clave in POR_QUE_ROL:
+        lineas.append(f"-# Por qué esta métrica: {POR_QUE_ROL[clave]}")
     for i, r in enumerate(g["tabla"][:MAX_FILAS]):
-        lineas += [f"`{i + 1}.` **{nombres.get(r['persona'], r['persona'])}**: {F.num(r['valor']['v'], dec, signo)} · {r['n']} partidas",
+        lineas += [f"`{i + 1}.` **{nombres.get(r['persona'], r['persona'])}**: {F.num(r['valor']['v'], dec, signo)}{u} · {F.partidas(r['n'])}",
                    f"-# {F.rango(r['valor'], dec, signo)} · WR {F.pct(r['winrate']['v'])}"]
     if not g["tabla"]:
         lineas.append(f"Nadie tiene {v['min']}+ partidas de {rol} en esta cola.")
@@ -58,10 +76,10 @@ def tarjeta_companeros(d: dict, nombres: dict, modo: str = "todo") -> discord.ui
                                        "cada compañero contra sí mismo, mismo período"]
     for i, r in enumerate(tabla[:12], 1):
         s = r["suma"]
-        tag = (" · **señal**" if r["senal"] else " · ruido" if s.get("ruido", True) else " · a confirmar")
+        tag = " · " + F.etiqueta_senal(r["senal"], None if s.get("ruido", True) else s)
         lineas += [f"`{i}.` **{nombres.get(r['persona'], r['persona'])}**: {F.num(s['v'] * 100, 1, True)} pts{tag}",
                    f"-# {F.num(s['lo'] * 100, 1, True)} a {F.num(s['hi'] * 100, 1, True)} · {r['companeros']} compañeros · "
-                   f"{r['juntos']} partidas"]
+                   f"{F.partidas(r['juntos'])}"]
     if not tabla:
         lineas.append("Todavía no hay suficientes partidas juntos en este modo.")
     lineas.append("-# 'Señal' con el p corregido por Benjamini–Hochberg (se compara a todos a la vez). No mide solo cómo "
@@ -83,7 +101,7 @@ def tarjeta_duos(d: dict, nombres: dict, modo: str = "todo", pid: str | None = N
     pct = lambda v: f"{F.num(v * 100, 0)} %"  # noqa: E731
     for i, r in enumerate(tabla[:12], 1):
         x = r["dif"]
-        tag = (" · **señal**" if r["senal"] else " · a confirmar" if x["lo"] > 0 or x["hi"] < 0 else " · ruido")
+        tag = " · " + F.etiqueta_senal(r["senal"], x)
         lineas += [f"`{i}.` **{nombres.get(r['a'], r['a'])} + {nombres.get(r['b'], r['b'])}**: "
                    f"{F.num(x['v'] * 100, 0, True)} pts{tag}",
                    f"-# {F.num(x['lo'] * 100, 0, True)} a {F.num(x['hi'] * 100, 0, True)} · juntos {pct(r['real']['v'])} "
@@ -100,13 +118,20 @@ def tarjeta_duos(d: dict, nombres: dict, modo: str = "todo", pid: str | None = N
 
 def tarjeta_mejora(d: dict, nombres: dict, modo: str = "solo") -> discord.ui.LayoutView:
     from bot.cogs.coaching import EN_MODO
-    tabla = (d.get("modos") or {}).get(modo, d["tabla"] if modo == "solo" else [])
+    todas = (d.get("modos") or {}).get(modo, d["tabla"] if modo == "solo" else [])
+    # Una fila por persona (su rol con más cambio) y ordenadas por cuánto cambiaron.
+    mejor = {}
+    for x in todas:
+        if x["persona"] not in mejor or F.cambio(x)["v"] > F.cambio(mejor[x["persona"]])["v"]:
+            mejor[x["persona"]] = x
+    tabla = sorted(mejor.values(), key=lambda x: -F.cambio(x)["v"])
     en = EN_MODO.get(modo, modo)
-    lineas = ["## Quién más mejoró", f"-# Índice por partida contra su propia franja, en {en} · cambio a lo largo de sus partidas"]
+    lineas = ["## Quién más mejoró", f"-# Nota de partida contra su propia franja, en {en} · ordenado por cuánto cambió "
+                                     "a lo largo de sus partidas · una fila por persona (su rol con más cambio)"]
     for i, x in enumerate(tabla[:10], 1):
         tag = {"mejorando": "**mejorando**", "empeorando": "empeorando"}.get(x["veredicto"], "sin tendencia clara")
         lineas += [f"`{i}.` **{nombres.get(x['persona'], x['persona'])}** · {x['rol']} · {F.num(x['inicio'], 0)} → {F.num(x['ahora'], 0)} · {tag}",
-                   f"-# {F.num(F.cambio(x)['v'], 1, True)} puntos ({F.num(F.cambio(x)['lo'], 1, True)} a {F.num(F.cambio(x)['hi'], 1, True)}) en {x['n']} partidas"]
+                   f"-# {F.num(F.cambio(x)['v'], 1, True)} puntos ({F.num(F.cambio(x)['lo'], 1, True)} a {F.num(F.cambio(x)['hi'], 1, True)}) en {F.partidas(x['n'])}"]
     if not tabla:
         lineas.append(f"Nadie tiene 30+ partidas de {en} en un rol con referencia.")
     lineas.append("-# Mejorando solo si todo el intervalo está arriba de cero. Cada uno contra su franja: se puede comparar entre rangos.")
@@ -138,7 +163,13 @@ class Rankings(commands.Cog):
         await ctx.reply(view=vista)
 
     @commands.hybrid_command(name="top_rol", description="Ranking por rol con la métrica de cada rol contra el rival directo")
-    async def top_rol(self, ctx: commands.Context, rol: str = "top", cola: str = "solo", ventana: str = "temporada"):
+    async def top_rol(self, ctx: commands.Context, rol: str | None = None, cola: str = "solo", ventana: str = "temporada"):
+        if rol is None or (F.cola(rol) and not ROLES.get(rol.lower())):  # -top_rol, -top_rol flex
+            if rol is not None:
+                cola = rol
+            pid = self.bot.get_cog("Perfil").vinculos.get(str(ctx.author.id))
+            d = await self.datos.coaching_auto(pid) if pid else None
+            rol = ((d or {}).get("rol_principal") or "top").lower()
         rol, cola = ROLES.get(rol.lower()), F.cola(cola)
         if not rol or not cola:
             await ctx.reply("Uso: `-top_rol <top|jungla|mid|adc|support> [solo|flex|normal|todo] [temporada|reciente]`", ephemeral=True)

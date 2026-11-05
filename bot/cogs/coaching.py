@@ -79,10 +79,17 @@ def tarjeta_performance(p: dict, d: dict, pedido: str | None) -> discord.ui.Layo
     lineas = [f"## {discord.utils.escape_markdown(p['nombre'])} · Performance",
               f"-# {rol} en {_en(d)} · {r['n']} partidas · contra {d['franja']}",
               f"# {_num(pf['v'] * 100)}/100",
-              f"-# {F.rango(pf, 0, k=100)} · confianza {r['confianza']}"]
+              f"-# {F.rango(pf, 0, k=100)} · confianza {r['confianza']}"
+              + (" · rango ancho: con más partidas se va a mover" if pf.get("hi") is not None and pf.get("lo") is not None
+                 and (pf["hi"] - pf["lo"]) > 0.20 else "")]
     # Solo contra la propia franja: "rendís como un X" sería estimar un rango (Riot prohíbe MMR/ELO).
-    lado = ("por encima de" if pf["lo"] > 0.5 else "por debajo de" if pf["hi"] < 0.5 else "a la par de")
-    lineas.append(f"Estás {lado} la mitad de los jugadores de {d['franja']} en {rol}.")
+    # La frase sigue al número (45 y 61 ya no dicen lo mismo); si el intervalo toca el 50, se aclara.
+    v = pf["v"]
+    tramo = ("muy por debajo de" if v < 0.35 else "algo por debajo de" if v < 0.47 else "en la mitad de"
+             if v <= 0.53 else "algo por encima de" if v <= 0.65 else "muy por encima de")
+    duda = (" Con estas partidas todavía podrías estar en la mitad." if pf["lo"] <= 0.5 <= pf["hi"] and tramo != "en la mitad de"
+            else "")
+    lineas.append(f"Estás **{tramo}** los jugadores de {d['franja']} en {rol}.{duda}")
     lineas.append("### Componentes")
     for c in r["componentes"]:
         if c["sin_dato"]:
@@ -133,7 +140,7 @@ def tarjeta_temprano(p: dict, d: dict, pedido: str | None) -> discord.ui.LayoutV
     lin = t["linea"]
     if lin["gana"]["n"] and lin["pierde"]["n"]:
         # Lo más útil primero: si la partida se pierde en la línea o después.
-        veredicto = "se separa del ruido" if lin["senal"] else "no se separa del ruido"
+        veredicto = "señal" if lin["senal"] else "ruido"
         lineas += [f"Vas arriba a los 15 en **{F.pct(lin['pct_gana']['v'])}** de las partidas.",
                    f"Arriba ganás **{F.pct(lin['gana']['v'])}** · abajo, **{F.pct(lin['pierde']['v'])}** ({veredicto})",
                    f"-# arriba {F.rango_pct(lin['gana'])} en {lin['gana']['n']} · abajo {F.rango_pct(lin['pierde'])} "

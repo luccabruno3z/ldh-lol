@@ -120,7 +120,7 @@ def _pool(pk: Paquete, d: dict) -> None:
         return
     x = p["dif"]
     pk.add("pool.dentro_fuera", "asociacion", "Winrate dentro del pool menos fuera del pool", None, x["v"], x["lo"], x["hi"],
-           (p["dentro"]["n"], p["fuera"]["n"]), k=100, signo=True, suf=" pts", prueba=f"Fisher p = {p.get('p')}",
+           (p["dentro"]["n"], p["fuera"]["n"]), k=100, signo=True, suf=" pts", prueba=f"Fisher p = {_n(p.get('p'), 3)}",
            limitaciones=[d["pool"].get("regla", ""), "No demuestra que cambiar de campeón cause la diferencia."])
 
 
@@ -137,7 +137,7 @@ def _rachas(pk: Paquete, d: dict | None) -> None:
             continue
         pk.add(f"rachas.{clave}", "asociacion", nombres.get(clave, clave), None, x["v"], x["lo"], x["hi"],
                (x.get("na"), x.get("nb")), k=100, signo=True, suf=" pts",
-               prueba=("muestra chica" if c.get("muestra_chica") else "señal" if c.get("senal") else "ruido") + f", p = {c.get('p')}",
+               prueba=("muestra chica" if c.get("muestra_chica") else "señal" if c.get("senal") else "ruido") + f", p = {_n(c.get('p'), 3)}",
                limitaciones=["Asociación: no mide tilt ni asegura que una pausa lo arregle."])
 
 
@@ -169,7 +169,7 @@ def _conversion(pk: Paquete, d: dict | None) -> None:
             continue
         pk.add(f"conversion.{tramo}", "estimacion_modelo", que, None, x["v"], x["lo"], x["hi"], x["n"],
                dec=1, k=100, signo=True, suf=" pts",
-               prueba=("señal" if x.get("senal") else "ruido") + f" contra el grupo, p BH = {x.get('p_bh')}",
+               prueba=("señal" if x.get("senal") else "ruido") + f" contra el grupo, p BH = {_n(x.get('p_bh'), 3)}",
                limitaciones=["El modelo se entrenó con estas partidas: el grupo da cerca de cero por construcción.",
                              "Es del equipo, no solo de la persona; es una asociación."],
                extra={"ganadas": x["ganadas"], "esperadas": x["esperadas"], "contra_grupo": x.get("contra_grupo")})

@@ -112,3 +112,15 @@ def plural(n: int, uno: str, varios: str | None = None) -> str:
 
 def partidas(n: int) -> str:
     return plural(n, "partida")
+
+
+def etiqueta_senal(senal: bool, dif: dict | None = None, muestra_chica: bool = False) -> str:
+    """El mismo criterio que la web: "señal" pasa la corrección por muchas comparaciones (BH); "a confirmar" tiene el
+    intervalo de un solo lado del cero pero no la pasa; "ruido" cruza el cero."""
+    if muestra_chica:
+        return "muestra chica"
+    if senal:
+        return "**señal**"
+    if dif and dif.get("lo") is not None and dif.get("hi") is not None and (dif["lo"] > 0 or dif["hi"] < 0):
+        return "a confirmar"
+    return "ruido"
