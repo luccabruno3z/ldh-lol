@@ -4,7 +4,7 @@
    el modo (solo/dúo, normales o todo) elige qué partidas tuyas entran. */
 
 import { state, cachedFetch, rutaCoaching, MODOS, EN_MODO, rolGuardado, elegirRol, alCambiarRol } from './data.js';
-import { escapeHtml, iconoCampeon, campeon, num, como } from './utils.js';
+import { escapeHtml, iconoCampeon, campeon, num, como, glos } from './utils.js';
 import { pct, chipConf } from './fase2.js';
 import { radar, seccionTendencia, graficoFranjas } from './graficos.js';
 
@@ -109,7 +109,7 @@ function temprano(d, cola, rol) {
     const ref = d.roles?.[rol]?.metricas || {};
     const l = t.linea;
     const lineaTxt = l.gana.n && l.pierde.n
-        ? `Vas arriba en oro contra tu rival a los 15 en ${pct(l.pct_gana.v)} de las partidas. Cuando vas arriba ganás ${pct(l.gana.v)} (${l.gana.n} partidas); cuando vas abajo, ${pct(l.pierde.v)} (${l.pierde.n}). ${l.senal ? '' : 'La diferencia no se separa del ruido. '}<span class="dim">Fisher p = ${num(l.p, 3)}</span>`
+        ? `Vas arriba en oro contra tu rival a los 15 en ${pct(l.pct_gana.v)} de las partidas. Cuando vas arriba ganás ${pct(l.gana.v)} (${l.gana.n} partidas); cuando vas abajo, ${pct(l.pierde.v)} (${l.pierde.n}). <span title="Prueba exacta de Fisher: p = ${num(l.p, 3)}">${l.senal ? '' : 'La diferencia no se separa del ruido.'}</span>`
         : '';
     return `<div class="table-wrap"><table class="data-table">
       <thead><tr><th>Métrica</th><th class="num">Tu promedio</th><th>Contra tu franja</th><th class="num">Mediana de tu franja</th></tr></thead>
@@ -187,7 +187,7 @@ export async function bloquesFase3(p, cont, modo = 'solo') {
     cont.innerHTML = `<section class="section" id="f3-coaching">
         <div class="section-head"><h3>Coaching</h3>${roles.length > 1 ? selector('f3-rol', 'Rol', roles, rol) : ''}</div>
         <p class="dim">${textoFranja(d)}</p>
-        <p class="dim small">El Performance (0 a 100) resume toda tu temporada en el rol contra tu franja. No confundir con la nota de partida de "¿Estás mejorando?", que mira partida por partida.</p>
+        <p class="dim small">El Performance (0 a 100) resume toda tu temporada en el rol contra tu franja. No confundir con la nota de partida de "¿Estás mejorando?", que mira partida por partida. ${glos('performance')}</p>
         ${d.nota_modo ? `<p class="aviso-modo">${escapeHtml(d.nota_modo)}</p>` : ''}
         <div id="f3-cuerpo">${roles.length ? coaching() : vacio}</div>
       </section>

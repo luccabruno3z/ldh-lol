@@ -1,6 +1,7 @@
 /* inicio.js — el grupo con su rango y las últimas partidas. */
 
 import { state, loadRecientes } from './data.js';
+import { onRoute } from './router.js';
 import { escapeHtml, rangoTexto, tierClase, hace, iconoCampeon, nombreCola, fecha } from './utils.js';
 
 export async function initInicio() {
@@ -11,12 +12,23 @@ export async function initInicio() {
         `datos actualizados ${hace(Date.parse(meta.generado))}` +
         (ing && ing.cuentas_con_pendientes ? ` · todavía se están bajando partidas de ${ing.cuentas_con_pendientes} cuentas` : '');
 
-    // "Cómo leer los números" abre el glosario en lugar de navegar (el hash lo usa el router).
-    document.querySelector('[data-abrir="como-leer"]')?.addEventListener('click', (e) => {
-        e.preventDefault();
+    // #/inicio/glosario abre "Cómo leer los números"; #/inicio/glosario/<id> va además a esa entrada.
+    const abrirGlosario = (param) => {
+        const [que, id] = (param || '').split('/');
+        if (que !== 'glosario') return;
         const d = document.getElementById('como-leer');
         d.open = true;
-        d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const dt = id && document.getElementById(`g-${id}`);
+        document.querySelectorAll('.glosario .resaltado').forEach(x => x.classList.remove('resaltado'));
+        if (dt) { dt.classList.add('resaltado'); dt.nextElementSibling?.classList.add('resaltado'); }
+        // Después del scroll arriba que hace el router al cambiar de vista.
+        setTimeout(() => (dt || d).scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: dt ? 'center' : 'start' }), 30);
+    };
+    onRoute('inicio', abrirGlosario);
+    // Un link al mismo hash no dispara hashchange: se abre a mano.
+    document.addEventListener('click', (e) => {
+        const a = e.target.closest('a[href^="#/inicio/glosario"]');
+        if (a && a.getAttribute('href') === location.hash) { e.preventDefault(); abrirGlosario(a.getAttribute('href').slice('#/inicio/'.length)); }
     });
 
     const ordenadas = [...personas].sort((a, b) => (b.n > 0) - (a.n > 0) || b.n - a.n);

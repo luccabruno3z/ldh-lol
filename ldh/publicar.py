@@ -160,10 +160,30 @@ def _historial(f: dict, lp: dict | None) -> dict:
     }
 
 
+def _versionar_sitio() -> str:
+    """Cache-busting sin build: el mismo ?v=<hash del código> en la hoja de estilos, en main.js y en cada import
+    entre módulos. Tiene que ser el mismo en todos lados: un módulo con otra URL sería otra instancia (otro `state`)."""
+    import hashlib
+    import re
+    archivos = sorted((RAIZ / "sitio").rglob("*.js")) + sorted((RAIZ / "sitio").rglob("*.css"))
+    h = hashlib.sha1(b"".join(f.read_bytes() for f in archivos)).hexdigest()[:10]
+    html = SALIDA / "index.html"
+    t = html.read_text(encoding="utf-8")
+    t = t.replace('href="css/styles.css"', f'href="css/styles.css?v={h}"').replace('src="js/main.js"', f'src="js/main.js?v={h}"')
+    html.write_text(t, encoding="utf-8", newline="\n")
+    for js in (SALIDA / "js").glob("*.js"):
+        t = js.read_text(encoding="utf-8")
+        t2 = re.sub(r"(from\s+'\./[\w-]+\.js)'", lambda m: f"{m.group(1)}?v={h}'", t)
+        if t2 != t:
+            js.write_text(t2, encoding="utf-8", newline="\n")
+    return h
+
+
 def publicar() -> dict:
     if API.exists():
         shutil.rmtree(API)
     shutil.copytree(RAIZ / "sitio", SALIDA, dirs_exist_ok=True)
+    _versionar_sitio()
     db = sqlite3.connect(RUTA_BASE)
     db.row_factory = sqlite3.Row
     estado = cargar_estado()

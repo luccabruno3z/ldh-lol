@@ -10,6 +10,18 @@ const TIERS = { IRON: 'Hierro', BRONZE: 'Bronce', SILVER: 'Plata', GOLD: 'Oro', 
     DIAMOND: 'Diamante', MASTER: 'Maestro', GRANDMASTER: 'Gran Maestro', CHALLENGER: 'Retador' };
 const SIN_DIVISION = new Set(['MASTER', 'GRANDMASTER', 'CHALLENGER']);
 
+/** "SILVER" → "Plata". Para los lugares que reciben el tier suelto (el gráfico de LP). */
+export const tierNombre = (t) => TIERS[t] || t || '';
+
+/** Link a una entrada del glosario de Inicio (#/inicio/glosario/<id>). */
+export function glos(id, texto = '¿Qué es?') {
+    return `<a class="glos" href="#/inicio/glosario/${id}">${texto}</a>`;
+}
+
+/** Un nombre de métrica dentro de una frase: "Oro/min" → "oro/min", pero "KDA" y "CS/min" quedan igual. */
+export const enFrase = (n) => (n === 'Part. kills' ? 'participación en kills'
+    : /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]/.test(n) ? n[0].toLowerCase() + n.slice(1) : n);
+
 export function rangoTexto(r) {
     if (!r || !r.tier) return 'Sin clasificar';
     const div = SIN_DIVISION.has(r.tier) ? '' : ` ${r.division}`;

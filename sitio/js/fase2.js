@@ -156,7 +156,7 @@ export function senal(r, dif = r.dif) {
     return '<span class="tag">ruido</span>';
 }
 
-export const NOTA_SENAL = '"Señal": se separa del azar aun corrigiendo por todas las comparaciones a la vez. "A confirmar": el intervalo no cruza el cero, pero con tantas parejas comparadas alguna sale así por suerte. "Ruido": el intervalo cruza el cero.';
+export const NOTA_SENAL = '"Señal": se separa del azar aun corrigiendo por todas las comparaciones a la vez. "A confirmar": el intervalo no cruza el cero, pero con tantas parejas comparadas alguna sale así por suerte. "Ruido": el intervalo cruza el cero. <a class="glos" href="#/inicio/glosario/senal">Más en el glosario</a>.';
 
 async function sinergia(p, cont, modo) {
     if (p._cuenta) return;  // la sinergia es de la persona: se compara con y sin cada amigo en todas sus cuentas

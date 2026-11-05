@@ -4,7 +4,7 @@
 
 import { cachedFetch } from './data.js';
 import { onRoute } from './router.js';
-import { escapeHtml, iconoCampeon, campeon, num } from './utils.js';
+import { escapeHtml, iconoCampeon, campeon, num, glos } from './utils.js';
 
 const ROLES = ['Top', 'Jungla', 'Mid', 'ADC', 'Support'];
 const FRANJAS = ['Hierro–Bronce', 'Plata–Oro', 'Platino–Esmeralda'];
@@ -51,7 +51,7 @@ async function modeloVictoria() {
     const v = d.validacion;
     const eq = d.equivalencias.map(e => `<tr><td>${escapeHtml(e.nombre)}</td><td class="num mono">${Math.abs(e.oro) < 200 ? '<span class="dim">casi nada</span>' : `${num(e.oro, 0)} de oro`}</td></tr>`).join('');
     return `<section class="section"><h2 class="h3">Cómo calculamos la probabilidad de ganar</h2>
-      <p>Con el estado de la partida en cada minuto (diferencia de oro, XP, kills, torres, dragones, Barón, inhibidores…) un modelo estima la chance de ganar de cada equipo. Es la idea de la tesis de xPetu, entrenada con las ${num(d.partidas, 0)} partidas del grupo.</p>
+      <p>Con el estado de la partida en cada minuto (diferencia de oro, XP, kills, torres, dragones, Barón, inhibidores…) un modelo estima la chance de ganar de cada equipo. La idea sale de la tesis de xPetu, un trabajo sobre la probabilidad de ganar minuto a minuto en LoL; acá el modelo está entrenado con las ${num(d.partidas, 0)} partidas del grupo, no con las de la tesis.</p>
       <div class="calib-grid"><div>${grafCalibracion(v.calibracion)}
         <p class="nota" style="text-align:center">Eje horizontal: lo que predice. Vertical: cuántas se ganaron de verdad. Sobre la diagonal es perfecto.</p></div>
         <div><p class="lead">En ${num(v.partidas_prueba, 0)} partidas apartadas, la peor franja se desvía <strong>${num(v.peor_decil * 100, 1)} puntos</strong>. A los 15 minutos acierta el ganador el <strong>${num(v.acierto_15 * 100, 0)} %</strong> de las veces (los estudios dan 72–75 %).</p>
@@ -135,7 +135,7 @@ async function render() {
         <div class="table-wrap"><table class="data-table tabla-apilable">
           <thead><tr><th>Métrica</th>${FRANJAS.map(fr => `<th class="num">${fr}<span class="ic">${celda(fr)?.jugadores ?? 0} jugadores</span></th>`).join('')}</tr></thead>
           <tbody>${filas}</tbody></table></div>
-        <p class="nota">Medianas por jugador de la muestra de referencia: jugadores al azar de LAS en solo/dúo, con 10+ partidas en ${rol}, bajados el ${escapeHtml(ref.bajada || '—')}. Las victorias y derrotas se ponderan al 50 % (los de Hierro–Bronce venían de bajar). Las diferencias son contra el rival directo de la misma partida.</p></section>
+        <p class="nota">Medianas por jugador de la muestra de referencia: jugadores al azar de LAS en solo/dúo, con 10+ partidas en ${rol}, bajados el ${escapeHtml(ref.bajada || '—')}. Las victorias y derrotas se ponderan al 50 % (los de Hierro–Bronce venían de bajar). Las diferencias son contra el rival directo de la misma partida. ${glos('referencia', 'Qué es la referencia')}</p></section>
       <section class="section"><h2 class="h3">Consejos para ${rol}</h2>
         <dl class="glosario">${Object.entries(COMPONENTES).map(([k, n]) => {
             const t = consejos[k]?.[rol] || consejos[k]?.['_'];

@@ -1,7 +1,7 @@
 /* graficos.js — gráficos en SVG a mano: sin dependencias, con los colores del tema (claro y
    oscuro) y legibles a 375 px. Cada gráfico muestra su intervalo, como las tablas. */
 
-import { escapeHtml, nombreCola, num } from './utils.js';
+import { escapeHtml, nombreCola, num, tierNombre } from './utils.js';
 
 const COLAS = ['solo', 'flex', 'normal'];
 
@@ -68,8 +68,8 @@ function lineaLp(lp) {
     const ult = lp[lp.length - 1];
     return `<svg class="g-lp" viewBox="0 0 ${W} ${H}" role="img" aria-label="LP de solo/dúo en el tiempo">
       <polyline points="${pasos}" class="g-linea g-linea--lp"/>
-      ${lp.map(f => `<circle cx="${x(f.t)}" cy="${y(f.valor)}" r="2.5" class="g-punto--lp"><title>${escapeHtml(f.tier)} ${escapeHtml(f.division || '')} · ${f.lp} LP</title></circle>`).join('')}
-      <text x="${W - m.r}" y="${y(ult.valor) - 6}" class="g-eje" text-anchor="end">${escapeHtml(ult.tier)} ${escapeHtml(ult.division || '')} · ${ult.lp} LP</text>
+      ${lp.map(f => `<circle cx="${x(f.t)}" cy="${y(f.valor)}" r="2.5" class="g-punto--lp"><title>${escapeHtml(tierNombre(f.tier))} ${escapeHtml(f.division || '')} · ${f.lp} LP</title></circle>`).join('')}
+      <text x="${W - m.r}" y="${y(ult.valor) - 6}" class="g-eje" text-anchor="end">${escapeHtml(tierNombre(ult.tier))} ${escapeHtml(ult.division || '')} · ${ult.lp} LP</text>
     </svg>`;
 }
 

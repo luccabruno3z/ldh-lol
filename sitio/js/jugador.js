@@ -8,7 +8,7 @@ import { bloquesFase2 } from './fase2.js';
 import { bloquesFase3 } from './fase3.js';
 import { bloquesFase4 } from './fase4.js';
 import { bloqueRachas, bloqueMuertes, bloqueCurvas, activarCurvas, bloqueInforme, bloquePool, bloqueConversion } from './fase5.js';
-import { escapeHtml, rangoTexto, tierClase, nombreCola, conIntervalo, iconoCampeon, campeon, fecha, num, como } from './utils.js';
+import { escapeHtml, rangoTexto, tierClase, nombreCola, conIntervalo, iconoCampeon, campeon, fecha, num, como, glos } from './utils.js';
 
 const COLS = [
     ['winrate', 'Winrate', 'pct'], ['kda', 'KDA', 2], ['cs_min', 'CS/min', 1], ['oro_min', 'Oro/min', 0],
@@ -26,6 +26,13 @@ function buscar(texto) {
         || state.personas.find(p => p.nombre.toLowerCase().includes(t) || p.cuentas.some(c => c.toLowerCase().includes(t)));
 }
 
+/** El total cuenta todas las colas; "Todo" solo la Grieta. Si no se aclara, 646 contra 620 parece un error. */
+function otrasColas(p) {
+    const grieta = (p.kpis?.todas || []).find(f => f.rol === 'Todos' && f.cola === 'todo')?.n;
+    const otras = grieta != null ? p.n - grieta : 0;
+    return otras > 0 ? `<br><span class="small">${grieta} en la Grieta (las que cuentan en las estadísticas) y ${otras} de ARAM u otras colas · ${glos('colas', '¿por qué?')}</span>` : '';
+}
+
 function cabecera(p) {
     // Riot cuenta W/L de la temporada; la lista de partidas a veces no llega tan atrás.
     const faltantes = r => {
@@ -38,7 +45,7 @@ function cabecera(p) {
     return `
     <section class="section perfil-head">
       <h2 class="perfil-nombre">${escapeHtml(p.nombre)}</h2>
-      <p class="dim">${p.n} partidas desde el 8/1/2026 · última ${fecha(p.ultima)}</p>
+      <p class="dim">${p.n} partidas desde el 8/1/2026 · última ${fecha(p.ultima)}${otrasColas(p)}</p>
       <div class="cuentas">${rangos.length ? rangos.map(([rid, colas]) => `
         <div class="cuenta">
           <span class="mono">${escapeHtml(rid)}</span>
@@ -107,7 +114,7 @@ function tablaKpis(filas, cola) {
     return `<div class="table-wrap"><table class="data-table kpis tabla-apilable">${cab}<tbody>${filasKpis(grandes)}</tbody></table></div>
     ${chicas.length ? `<details class="plegable"><summary>${chicas.length} ${chicas.length === 1 ? 'rol' : 'roles'} con muestra chica (${chicas.map(f => `${escapeHtml(f.rol)} ${f.n}`).join(', ')})</summary>
       <div class="table-wrap"><table class="data-table kpis tabla-apilable">${cab}<tbody>${filasKpis(chicas)}</tbody></table></div></details>` : ''}
-    <p class="nota">El número chico abajo de cada valor es su rango probable. Los roles con menos de ${state.ajustes?.min_partidas ?? 10} partidas no permiten sacar conclusiones.</p>
+    <p class="nota">El número chico abajo de cada valor es su rango probable. Los roles con menos de ${state.ajustes?.min_partidas ?? 10} partidas no permiten sacar conclusiones. ${glos('kda', 'Qué es cada métrica')}</p>
     ${como(`Cada rango es el intervalo del ${Math.round((state.ajustes?.confianza || 0.95) * 100)} %: Wilson para el winrate y bootstrap (remuestreo de tus partidas) para el resto.`)}`;
 }
 
@@ -334,15 +341,32 @@ async function pintarPerfil(cont, base, vista, tabInicial = 'resumen', modoElegi
 export function initJugador() {
     const lista = document.getElementById('buscar-opciones');
     lista.innerHTML = state.personas.flatMap(p => [p.nombre, ...p.cuentas]).map(n => `<option value="${escapeHtml(n)}">`).join('');
+    const res = document.getElementById('buscar-res');
+    const limpiar = () => { res.hidden = true; res.innerHTML = ''; };
     document.getElementById('buscar').addEventListener('submit', (e) => {
         e.preventDefault();
         const input = document.getElementById('buscar-input');
         const p = buscar(input.value);
-        if (p) { go('jugadores', p.id); input.value = ''; return; }
+        if (p) { go('jugadores', p.id); input.value = ''; limpiar(); return; }
         // El aviso va en el mismo buscador: no se pisa el perfil abierto ni se escribe en una vista oculta.
         input.setCustomValidity('No encontré a nadie con ese nombre en el grupo.');
         input.reportValidity();
     });
-    document.getElementById('buscar-input').addEventListener('input', (e) => e.target.setCustomValidity(''));
+    // Mientras se escribe aparecen los que coinciden (nombre o Riot ID); Enter sigue abriendo el primero.
+    document.getElementById('buscar-input').addEventListener('input', (e) => {
+        e.target.setCustomValidity('');
+        const t = e.target.value.trim().toLowerCase();
+        if (!t) { limpiar(); return; }
+        const hay = state.personas.filter(p => p.nombre.toLowerCase().includes(t) || p.cuentas.some(c => c.toLowerCase().includes(t))).slice(0, 8);
+        res.hidden = false;
+        res.innerHTML = hay.length
+            ? hay.map(p => {
+                const cuenta = p.nombre.toLowerCase().includes(t) ? '' : p.cuentas.find(c => c.toLowerCase().includes(t));
+                return `<a class="chip" href="#/jugadores/${encodeURIComponent(p.id)}">${escapeHtml(p.nombre)}${cuenta ? ` <span class="dim mono">${escapeHtml(cuenta)}</span>` : ''}</a>`;
+            }).join('')
+            : '<span class="dim">Nadie del grupo coincide. Solo aparecen las cuentas que se sumaron.</span>';
+    });
+    res.addEventListener('click', (e) => { if (e.target.closest('a')) { document.getElementById('buscar-input').value = ''; limpiar(); } });
+    document.getElementById('buscar-input').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.target.value = ''; limpiar(); } });
     onRoute('jugadores', (id) => mostrar(id).catch(err => console.error('[perfil]', err)));
 }

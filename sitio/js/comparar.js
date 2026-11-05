@@ -4,7 +4,7 @@
 
 import { state, loadPerfil, cachedFetch, rutaCoaching, MODOS, EN_MODO } from './data.js';
 import { onRoute, go } from './router.js';
-import { escapeHtml, nombreCola, conIntervalo, num, seSeparan, como } from './utils.js';
+import { escapeHtml, nombreCola, conIntervalo, num, seSeparan, como, glos, enFrase } from './utils.js';
 import { radar } from './graficos.js';
 
 const METRICAS = [
@@ -64,7 +64,7 @@ function resumenVs(fa, fb) {
         if (!ma || !mb || ma.v == null || mb.v == null) return;
         if (seSeparan(ma, mb)) gana[ma.v > mb.v ? 'a' : 'b'].push(n); else parejas += 1;
     });
-    const parte = (l) => (gana[l].length ? `<strong>${escapeHtml(nombreDe(l))}</strong> tiene más ${gana[l].join(', ')}` : '');
+    const parte = (l) => (gana[l].length ? `<strong>${escapeHtml(nombreDe(l))}</strong> tiene más ${gana[l].map(enFrase).join(', ')}` : '');
     const partes = [parte('a'), parte('b')].filter(Boolean);
     const txt = partes.length ? `${partes.join('; ')}.${parejas ? ` En ${parejas === 1 ? 'la otra métrica' : `las otras ${parejas}`}, con estas partidas no se puede decir quién tiene más.` : ''}`
         : 'En todas las métricas están parejos: con estas partidas no se puede decir quién rinde más.';
@@ -102,7 +102,7 @@ async function render() {
       ${resumenVs(fa, fb)}
       <div class="vs">${METRICAS.map(([k, n, t]) => fila(n, t, fa?.[k], fb?.[k])).join('')}</div>
       ${(fa?.muestra_chica || fb?.muestra_chica) ? '<p class="nota">Alguno tiene menos de 10 partidas en este filtro: muestra chica, sin conclusiones.</p>' : ''}
-      <p class="nota">Cada número tiene abajo su rango probable. "Más …" marca a quién le da más esa métrica, de forma clara; "parejos" es que con estas partidas no se puede decir. Es la misma cola y el mismo rol para los dos.</p>
+      <p class="nota">Cada número tiene abajo su rango probable. "Más …" marca a quién le da más esa métrica, de forma clara; "parejos" es que con estas partidas no se puede decir. Es la misma cola y el mismo rol para los dos. ${glos('kda', 'Qué es cada métrica')}</p>
       ${como('Una métrica se separa cuando el intervalo del 95 % de la diferencia no toca el cero (aproximado desde el intervalo de cada uno: el error de la diferencia es la raíz de la suma de los cuadrados).')}
       <div id="cmp-radar"></div>`}`;
     const cambiar = () => go('comparar', `${sel.a}/${sel.b}`);

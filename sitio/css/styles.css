@@ -567,3 +567,12 @@ tr.chica .obj-barra { background: var(--text-dim); box-shadow: none; }
     .rk-puesto.tabla-apilable td:nth-child(2) { display: inline-block; font-weight: 600; }
     .rk-puesto.tabla-apilable td:nth-child(2)::before { content: none; }
 }
+
+/* Tanda 4: Inicio y glosario */
+.intro { max-width: 62ch; margin: 4px 0 6px; color: var(--text); font-size: 1.02rem; }
+.glos { font-size: .85em; white-space: nowrap; }
+.glosario dt { scroll-margin-top: 80px; }
+.glosario .resaltado { background: var(--accent-dim); border-radius: var(--r-sm); }
+.glosario dt.resaltado { padding: 0 6px; margin-left: -6px; }
+.buscar-res { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.buscar-res .chip { text-decoration: none; min-height: 36px; display: inline-flex; align-items: center; gap: 6px; }

@@ -34,6 +34,7 @@
   <div class="view" data-view-panel="inicio">
     <header class="view-head">
       <h1 class="view-title">Inicio</h1>
+      <p class="intro">Las estadísticas de League of Legends del grupo: cómo viene cada uno, en qué rol y con qué campeones rinde, y qué mejorar. Cada número dice cuántas partidas lo respaldan, para saber cuánto creerle.</p>
       <p class="view-sub" id="meta-linea">Cargando datos…</p>
     </header>
     <section class="arranque" aria-label="Por dónde empezar">
@@ -43,27 +44,44 @@
       <a class="arranque-card" href="#/rankings">
         <span class="arranque-num">2</span><strong>Mirá los rankings</strong>
         <span class="dim">Quién viene mejor esta semana, por rol y en dúo.</span></a>
-      <a class="arranque-card" href="#como-leer" data-abrir="como-leer">
-        <span class="arranque-num">3</span><strong>Cómo leer los números</strong>
+      <a class="arranque-card" href="#/equipos">
+        <span class="arranque-num">3</span><strong>Armá los equipos</strong>
+        <span class="dim">El 5 ideal del grupo y equipos parejos para una inhouse.</span></a>
+      <a class="arranque-card" href="#/inicio/glosario">
+        <span class="arranque-num">4</span><strong>Cómo leer los números</strong>
         <span class="dim">Qué es "ajustado", el intervalo y cuándo algo es ruido.</span></a>
     </section>
     <details class="section como-leer" id="como-leer">
       <summary><h2>Cómo leer los números</h2></summary>
       <dl class="glosario">
-        <dt>Valor grande y valor chico</dt>
+        <dt id="g-intervalo">Valor grande y valor chico</dt>
         <dd>El número grande es el que importa. Debajo, en gris, va el rango donde está el valor real (el intervalo): si es ancho, todavía hay pocas partidas.</dd>
-        <dt>Ajustado</dt>
+        <dt id="g-ajustado">Ajustado</dt>
         <dd>Con pocas partidas, el winrate y el KDA se acercan al promedio. Así nadie queda primero con 2 de 2. El valor "real" va al lado.</dd>
-        <dt>Confianza</dt>
+        <dt id="g-confianza">Confianza</dt>
         <dd><span class="tag conf-alta">alta</span> 15 partidas o más · <span class="tag conf-media">media</span> de 8 a 14 · <span class="tag conf-baja">baja</span> menos de 8. Con confianza baja algo no puede ser "tu mejor" nada.</dd>
-        <dt>Ruido</dt>
-        <dd>La diferencia existe en los números, pero con estas partidas podría ser azar. No se puede decir que cambió nada.</dd>
-        <dt>Muestra chica</dt>
+        <dt id="g-senal"><span class="tag win">señal</span> <span class="tag">a confirmar</span> <span class="tag">ruido</span></dt>
+        <dd><strong>Señal</strong>: la diferencia se separa del azar, aun teniendo en cuenta que se comparan muchas cosas a la vez. <strong>A confirmar</strong>: apunta a una diferencia, pero con tantas comparaciones alguna sale así por suerte; hay que mirarla de nuevo con más partidas. <strong>Ruido</strong>: la diferencia existe en los números, pero con estas partidas podría ser azar; no se puede decir que cambió nada.</dd>
+        <dt id="g-muestra">Muestra chica</dt>
         <dd>Menos de 10 partidas: se muestra al final o plegado, y no se sacan conclusiones.</dd>
         <dt>Privacidad</dt>
         <dd>Solo aparecen las cuentas de quienes se sumaron al grupo: sumarte hace públicas tus estadísticas en esta web y en el bot. Los demás jugadores de las partidas quedan anónimos. Para dejar de aparecer, pedíselo a Lucca.</dd>
-        <dt>Tu franja y el percentil</dt>
+        <dt id="g-franja">Tu franja y el percentil</dt>
         <dd>Te comparamos con jugadores de tu rango (Hierro–Bronce, Plata–Oro o Platino–Esmeralda) en tu mismo rol. "Mejor que el 70 %" es contra ellos, no contra el grupo.</dd>
+        <dt id="g-referencia">Referencia</dt>
+        <dd>Los jugadores contra los que te medimos: jugadores al azar de LAS en Solo/Dúo, con 10 o más partidas en el rol, de cada franja. No son del grupo. Sus números están en Guías.</dd>
+        <dt id="g-performance">Performance</dt>
+        <dd>Una nota de 0 a 100 de toda tu temporada en un rol: junta tus percentiles de cada componente (combate, farmeo, visión, efectividad…) contra tu franja. 50 es la mitad de tu franja. Con pocas partidas se acerca a 50.</dd>
+        <dt id="g-nota">Nota de partida</dt>
+        <dd>Lo mismo que el Performance, pero de una sola partida. Sirve para ver si venís mejorando partida a partida ("¿Estás mejorando?"), no para compararte con otros.</dd>
+        <dt id="g-kda">KDA</dt>
+        <dd>(Kills + asistencias) ÷ muertes, sumando todas tus partidas: así una partida sin muertes no lo infla.</dd>
+        <dt id="g-kp">KP o Part. kills</dt>
+        <dd>Participación en kills: en qué parte de las kills de tu equipo estuviste, matando o asistiendo.</dd>
+        <dt id="g-cs">CS/min</dt>
+        <dd>Súbditos y monstruos que mataste por minuto de partida.</dd>
+        <dt id="g-colas">Colas y partidas</dt>
+        <dd>Las estadísticas usan la Grieta del Invocador: Solo/Dúo, Flex y Normales ("Todo" las junta). Las ARAM y otras colas se cuentan en tu total de partidas, pero no entran en los números; por eso tu total puede ser más alto que el de "Todo".</dd>
       </dl>
     </details>
     <section class="section" id="grupo">
@@ -85,6 +103,7 @@
         <datalist id="buscar-opciones"></datalist>
         <button type="submit">Ver perfil</button>
       </form>
+      <div class="buscar-res" id="buscar-res" aria-live="polite" hidden></div>
     </header>
     <div id="perfil"><p class="empty-state">Elegí a alguien del grupo para ver su perfil.</p></div>
   </div>
@@ -124,7 +143,7 @@
 
 <footer class="site-footer">
   <p>LDH Stats LoL no está respaldado por Riot Games y no refleja la opinión de Riot Games ni de nadie involucrado oficialmente en la producción o gestión de League of Legends. League of Legends y Riot Games son marcas registradas de Riot Games, Inc.</p>
-  <p><a href="descargas/ldh.sqlite">Descargar la base completa (SQLite)</a></p>
+  <p><a href="#/inicio/glosario">Cómo leer los números</a> · <a href="descargas/ldh.sqlite">Descargar la base completa (SQLite)</a></p>
 </footer>
 
 <script type="module" src="js/main.js"></script>
