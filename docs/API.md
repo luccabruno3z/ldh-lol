@@ -17,7 +17,7 @@ Los modos son `solo` (solo/dúo), `normal` y `todo` (solo, flex y normales). Las
 | `campeones.json` | Nombres y keys de Data Dragon. | Web, bot |
 | `recientes.json` | Las partidas nuevas, para el feed del bot. | Bot (`-canal_feed`) |
 | `partidas_resumen.json` | Una fila por partida y persona, para competencias. | Bot (`-competencia`) |
-| `descargas/ldh.sqlite.gz` | La base completa, comprimida con gzip (se descomprime con `gunzip` o 7-Zip). | Descarga |
+| `ldh.sqlite` (release `base`) | La base completa. No está en Pages: se sube al release `base` en cada corrida (https://github.com/luccabruno3z/ldh-lol/releases/download/base/ldh.sqlite). | Descarga |
 
 ## Por persona
 

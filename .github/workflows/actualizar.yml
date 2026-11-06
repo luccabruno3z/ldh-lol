@@ -113,10 +113,21 @@ jobs:
             gh release upload timelines tl-nuevos/*.tar --clobber --repo "${{ github.repository }}"
           fi
 
-      - name: Comprimir la base para descargar
-        # La base cruda pesa ~300 MB y es el archivo que más tarda en sincronizar Pages (un deploy quedó 10 min en
-        # "syncing_files"). Comprimida baja a ~60 MB; la web enlaza al .gz.
-        run: gzip -9 -f salida/descargas/ldh.sqlite
+      - name: Base completa al release "base"
+        # La base (~300 MB y creciendo) no va a Pages: era el archivo que más tardaba en sincronizar (un deploy quedó
+        # 10 min en "syncing_files") y cuenta para el límite de 1 GB del sitio. En un release el límite es 2 GB por
+        # archivo. Se reemplaza en cada corrida; si falla, la web sale igual (ni la web ni el bot la usan).
+        id: base
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          repo="${{ github.repository }}"
+          gh release view base --repo "$repo" >/dev/null 2>&1 || gh release create base --repo "$repo"             --title "Base completa (SQLite)" --notes "ldh.sqlite: se rehace de cero en cada corrida desde la rama datos y el release timelines. Se reemplaza en cada actualización."
+          gh release upload base salida/descargas/ldh.sqlite --clobber --repo "$repo"
+
+      - name: Sacar la base del sitio
+        run: rm -f salida/descargas/ldh.sqlite
 
       - name: Subir sitio
         uses: actions/upload-pages-artifact@v3
@@ -136,6 +147,15 @@ jobs:
         uses: actions/deploy-pages@v4
         with:
           timeout: 1200000
+
+      - name: Avisar por Discord si no se subió la base
+        if: steps.base.outcome == 'failure'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          if [ -n "$DISCORD_WEBHOOK" ]; then
+            curl -H "Content-Type: application/json"               -d "{\"content\":\"⚠️ LDH Stats LoL: la web se publicó, pero no se pudo subir la base al release: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"               "$DISCORD_WEBHOOK"
+          fi
 
       - name: Avisar por Discord si falló
         if: failure()

@@ -8,7 +8,7 @@ Estadísticas de League of Legends de un grupo de amigos, pensadas para mejorar 
 |---|---|---|
 | Código | rama `main` | Solo cambia con aprobación. El cron nunca commitea acá. |
 | Crudo | rama `datos` | Una partida = un archivo `.json.gz` que no se reescribe. También están `personas.json`, el rango y el estado. |
-| Base | `ldh.sqlite` | Se arma de cero en cada corrida desde el crudo, así cualquier corrección se aplica hacia atrás. Se publica para descargar. |
+| Base | `ldh.sqlite` | Se arma de cero en cada corrida desde el crudo, así cualquier corrección se aplica hacia atrás. Se publica para descargar en el release `base` (no en Pages: pesa ~300 MB). |
 | Web | GitHub Pages | Sitio estático sin build que lee `api/*.json`. |
 | Bot | Railway | Lee los mismos JSON por HTTP. Nunca llama a Riot. |
 
@@ -17,7 +17,7 @@ Cada corrida (`python -m ldh`) hace cinco cosas:
 2. Anota el rango si cambió.
 3. Baja las partidas nuevas desde el 8/1/2026, con tope de partidas y de tiempo.
 4. Reconstruye la base.
-5. Publica `salida/` (web + `api/` + `descargas/`).
+5. Publica `salida/` (web + `api/`) en Pages, y la base en el release `base`.
 
 ## Reglas de los números
 

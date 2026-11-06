@@ -10,7 +10,7 @@ Riot API ──► ingesta ──► rama `datos` (crudo inmutable) ──► re
                                                                   publicar (fases 2 a 6)
      repo `ldh-lol-metas` (pools que escribe el bot) ─────────────────────────►│
                                                                                ▼
-                                        salida/  =  sitio/ + api/*.json + descargas/ldh.sqlite (en Pages, .gz)
+                                        salida/  =  sitio/ + api/*.json  (+ descargas/ldh.sqlite → release `base`)
                                                    │                         │
                                            GitHub Pages (web)         bot en Railway (HTTP)
 ```
