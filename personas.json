@@ -229,5 +229,15 @@
     "principal": true
    }
   ]
+ },
+ {
+  "id": "killjoymakesome",
+  "nombre": "killjoymakesome",
+  "cuentas": [
+   {
+    "riot_id": "killjoymakesome#777",
+    "principal": true
+   }
+  ]
  }
 ]
