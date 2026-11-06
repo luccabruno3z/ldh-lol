@@ -81,7 +81,8 @@ AYUDA = {
                 "-# En `-menu`, **Mis gráficos** manda los tres.",
     "Equipos y mapa": "`-ideal` el 5 ideal del grupo: una persona por rol con 10+ partidas ahí\n"
                       "`-inhouse <10 jugadores separados por coma>` dos equipos parejos, cada uno en un rol que conoce\n"
-                      "`-roster [nombre o jugador]` el roster premade (Flex y Normales) y sus métricas de proceso\n"
+                      "`-roster [nombre o jugador]` un roster de la Virguhouse o de SRX: el plantel y el equipo junto\n"
+                      "`-roster sugerencias` grupos que juegan juntos y todavía no son un roster (Lucca los declara)\n"
                       "`-informe_roster [nombre o jugador]` el último informe semanal del roster\n"
                       "`-matchups [jugador] [cola]` cómo te va contra cada campeón rival directo\n"
                       "`-jungla [jugador]` de qué buff arrancás y qué tan predecible sos, por lado\n"
