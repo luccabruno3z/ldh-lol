@@ -17,7 +17,7 @@ Los modos son `solo` (solo/dúo), `normal` y `todo` (solo, flex y normales). Las
 | `campeones.json` | Nombres y keys de Data Dragon. | Web, bot |
 | `recientes.json` | Las partidas nuevas, para el feed del bot. | Bot (`-canal_feed`) |
 | `partidas_resumen.json` | Una fila por partida y persona, para competencias. | Bot (`-competencia`) |
-| `descargas/ldh.sqlite` | La base completa. | Descarga |
+| `descargas/ldh.sqlite.gz` | La base completa, comprimida con gzip (se descomprime con `gunzip` o 7-Zip). | Descarga |
 
 ## Por persona
 

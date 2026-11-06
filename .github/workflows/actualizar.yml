@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 55
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url || steps.deploy2.outputs.page_url }}
     steps:
       - name: Código (main)
         uses: actions/checkout@v4
@@ -113,6 +113,11 @@ jobs:
             gh release upload timelines tl-nuevos/*.tar --clobber --repo "${{ github.repository }}"
           fi
 
+      - name: Comprimir la base para descargar
+        # La base cruda pesa ~300 MB y es el archivo que más tarda en sincronizar Pages (un deploy quedó 10 min en
+        # "syncing_files"). Comprimida baja a ~60 MB; la web enlaza al .gz.
+        run: gzip -9 -f salida/descargas/ldh.sqlite
+
       - name: Subir sitio
         uses: actions/upload-pages-artifact@v3
         with:
@@ -121,6 +126,16 @@ jobs:
       - name: Publicar en Pages
         id: deploy
         uses: actions/deploy-pages@v4
+        continue-on-error: true  # si se cuelga del lado de GitHub, se reintenta una vez abajo
+        with:
+          timeout: 1200000  # 20 min (el default es 10)
+
+      - name: Publicar en Pages (reintento)
+        id: deploy2
+        if: steps.deploy.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        with:
+          timeout: 1200000
 
       - name: Avisar por Discord si falló
         if: failure()
