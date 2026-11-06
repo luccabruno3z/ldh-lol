@@ -302,7 +302,10 @@ def armar_roster(rid: str, semana: str | None = None) -> dict:
         opciones = ", ".join(f"{r['id']} ({r['nombre']})" for r in (_leer("roster/index.json") or {}).get("rosters", []))
         raise SystemExit(f"No existe el roster {rid!r}. Opciones: {opciones or 'ninguno'}")
     semanas = d.get("semanas") or {}
-    semana = semana or next(iter(semanas), None)
+    if not semanas:
+        raise SystemExit(f"{d['nombre']} todavía no jugó junto ({d.get('juntos', 4)}+ del plantel en el mismo equipo): "
+                         "no hay semanas para un informe. Mientras, el plantel se ve en la web y en -roster.")
+    semana = semana or next(iter(semanas))
     if semana not in semanas:
         raise SystemExit(f"El roster no tiene partidas en la semana {semana!r}. Semanas: {', '.join(semanas) or 'ninguna'}")
     sem = semanas[semana]
@@ -312,7 +315,8 @@ def armar_roster(rid: str, semana: str | None = None) -> dict:
                                                "plantel": [p["nombre"] for p in d["plantel"]]})
     ganadas = sum(h["win"] for h in sem["partidas"])
     pk.add("contexto.roster", "contexto", f"Roster {d['nombre']}: {len(d['plantel'])} en el plantel; en la semana "
-           f"{semana} jugaron {sem['n']} partidas juntos ({ganadas} ganadas); {d['partidas']} en la temporada", None)
+           f"{semana} jugaron {sem['n']} {'partida' if sem['n'] == 1 else 'partidas'} juntos ({ganadas} "
+           f"{'ganada' if ganadas == 1 else 'ganadas'}); {d['partidas']} en la temporada", None)
     for k, meta in d["metricas"].items():
         f = _formato_metrica(k, meta)
         if k == "winrate":

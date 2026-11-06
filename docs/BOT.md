@@ -62,7 +62,9 @@ Cada uno solo cambia su propia pool. Cambiarla reinicia el seguimiento desde ese
 | `-competencia <desde> [hasta] [cola]` | Quién rindió mejor entre dos fechas. |
 | `-ideal` | El 5 ideal: una persona por rol con 10+ partidas ahí. |
 | `-inhouse a, b, …` | Dos equipos parejos con 10 jugadores. |
-| `-roster [nombre o jugador]` | El roster premade (4+ del mismo plantel juntos en Flex o Normales): plantel, métricas de proceso con intervalo y su diferencia con la referencia; menús de roster y período. |
+| `-roster [nombre o jugador]` | Un roster de la Virguhouse o de SRX: el plantel (cada jugador en su rol, desde sus partidas) y el equipo junto (métricas de proceso con intervalo y su diferencia con la referencia); menús de roster y período. |
+| `-roster sugerencias` | Grupos que juegan juntos (10+ partidas con 4+ juntos) y todavía no son un roster. |
+| `-roster crear <nombre> [srx\|virguhouse]`, `-roster sumar <roster> <jugador> <rol> [suplente]`, `-roster sacar <roster> <jugador>`, `-roster borrar <roster>`, `-roster declarar <n> <nombre>` | Solo Lucca (el dueño de la app del bot). Se guarda en `rosters.json` de `ldh-lol-metas`; la web lo toma en la próxima corrida. |
 | `-informe_roster [nombre o jugador]` | El último informe semanal del roster, con la evidencia de cada prioridad y los minutos del VOD que cita. |
 | `-matchups [jugador]`, `-jungla [jugador]`, `-mapa [jugador]` | Contra cada campeón rival, de qué buff arrancás, dónde morís o matás. |
 

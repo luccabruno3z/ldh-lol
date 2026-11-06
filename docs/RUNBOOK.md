@@ -22,6 +22,12 @@
 - Si se suma alguien que ya aparecía en partidas guardadas, se lo reconoce por su id anónimo.
 - Al sacar a alguien, deja de publicarse en la corrida siguiente. Su crudo queda con su PUUID real: si pide que se borre, hay que reescribir esos archivos.
 
+## Rosters (Virguhouse y SRX)
+
+- Los crea y edita solo Lucca desde el bot: `-roster crear <nombre> [srx|virguhouse]`, `-roster sumar <roster> <jugador> <rol> [suplente]`, `-roster sacar`, `-roster borrar` y `-roster declarar <n> <nombre>` (desde `-roster sugerencias`). Solo se suman jugadores vinculados: primero, sumarlos a `personas.json`.
+- El bot los guarda en su volumen y en `rosters.json` de `ldh-lol-metas`, con el mismo token que las pools (`GITHUB_TOKEN_METAS`). Si GitHub falla, queda pendiente y se reintenta en el próximo guardado. Si el volumen está vacío, el bot primero trae el archivo de GitHub: nunca sube uno vacío encima.
+- La web y las métricas los toman en la próxima corrida de Actions.
+
 ## Si una corrida falla
 
 - **"La clave de Riot está vencida"**: renovar `RIOT_API_KEY`.

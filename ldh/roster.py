@@ -1,18 +1,21 @@
-"""Rosters premade (fase 7): grupos de vinculados que juegan juntos en Flex y Normales, y sus métricas de
-proceso partida a partida.
+"""Rosters (fase 7): los equipos declarados a mano y sus métricas en dos capas.
 
-Detección. Se arma el grafo de quién juega con quién: cada lado de partida con 4 o más vinculados suma 1 a
-cada par. Las comunidades de ese grafo (Louvain, semilla fija) son los planteles: titulares y suplentes.
-Una partida es del roster cuando hay 4 o más del plantel en el mismo lado. Un roster se publica con
-10 partidas o más. config/rosters.json permite nombrar un roster o fijar su plantel a mano.
+Declarados. Un roster lo crea y lo edita solo Lucca desde el bot (-roster crear/sumar/sacar). Vive en el repo
+ldh-lol-metas (rosters.json, montado en ./metas como las pools): id fijo, nombre, carpeta (virguhouse o srx) y
+plantel con rol y titular o suplente. Solo cuentan los jugadores vinculados.
 
-Métricas. Con 20 a 40 partidas por mes el winrate casi siempre da ruido, así que el foco está en el proceso
-(lo que el equipo controla), cada una con su intervalo del 95 % y su n:
-- oro a los 14 (diferencia del equipo), primer dragón, primer Heraldo, placas antes del 14 (tomadas − cedidas),
-  visión por minuto del equipo, parte de los objetivos grandes que se lleva el equipo, y cierre
-  (ganadas con 60 % o más de chance al minuto 15).
-Se comparan contra la referencia: las demás partidas de Flex y Normales del grupo (lados con algún vinculado
-que no son de ningún roster). Es una comparación descriptiva, no la causa.
+Sugerencias. Para la Virguhouse, el grafo de quién juega con quién propone grupos (comunidades de Louvain con
+semilla fija; se suma a quien jugó 10+ partidas con 3+ del grupo). No se publican como rosters: son una
+propuesta para declarar con un clic. Las que ya se pisan con un roster declarado no se muestran.
+
+Dos capas de métricas:
+- Plantel: desde las partidas de cada jugador en su rol (rango oficial, partidas, winrate, Performance, oro a
+  los 15 contra su rival y campeones). Está desde el primer día, aunque nunca hayan jugado juntos.
+- Equipo: solo las partidas de Flex y Normales con 4+ del plantel en el mismo lado. Con 20 a 40 partidas por mes
+  el winrate casi siempre da ruido, así que el foco está en el proceso, cada métrica con su intervalo del 95 % y
+  su n: oro a los 14, primer dragón, primer Heraldo, placas antes del 14 (tomadas − cedidas), visión por minuto,
+  parte de los objetivos grandes y cierre (ganadas con 60 %+ de chance al minuto 15). Se comparan contra la
+  referencia (las demás partidas de Flex y Normales del grupo). Es descriptivo, no la causa.
 """
 
 from __future__ import annotations
@@ -31,15 +34,17 @@ import numpy as np
 
 from . import estadistica as est
 from . import victoria as V
-from .ajustes import AJUSTES
+from .ajustes import AJUSTES, SALIDA
 from .almacen import _ruta
 from .fase5 import modelo
 
 RAIZ = Path(__file__).resolve().parent.parent
-CONFIG = RAIZ / "config" / "rosters.json"
+API = SALIDA / "api"
+ROLES = ("Top", "Jungla", "Mid", "ADC", "Support")
+CARPETAS = ("virguhouse", "srx")
 COLAS = ("flex", "normal")
 MIN_JUNTOS = 4  # del plantel en el mismo lado
-MIN_PARTIDAS = 10  # para publicar un roster
+MIN_PARTIDAS = 10  # para proponer un grupo como sugerencia
 SUMAR_CON = 3  # se suma al plantel quien jugó MIN_PARTIDAS o más con 3+ del plantel (un jugador puede estar en varios)
 MIN_COMPARAR = AJUSTES["min_partidas"]  # el umbral único de «muestra chica»
 ALFA = AJUSTES["ajuste_muestra"]["alfa"]
@@ -68,8 +73,23 @@ NOTA = ("Métricas de proceso por partida del roster, con el intervalo del 95 % 
         "causa. El winrate va solo como contexto: con estas muestras casi siempre es ruido.")
 
 
-def _config() -> dict:
-    return json.loads(CONFIG.read_text(encoding="utf-8")) if CONFIG.exists() else {}
+def cargar_declarados() -> dict:
+    """Los rosters que declaró Lucca con -roster (repo ldh-lol-metas, montado en ./metas). Sin el repo, ninguno."""
+    import os
+    ruta = Path(os.environ.get("LDH_METAS", RAIZ / "metas")) / "rosters.json"
+    try:
+        d = json.loads(ruta.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def _leer(rel: str) -> dict | None:
+    ruta = API / rel
+    try:
+        return json.loads(ruta.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
 
 
 def _lados(db: sqlite3.Connection) -> dict[tuple[str, str], set[str]]:
@@ -85,35 +105,22 @@ def _rid(nucleo: list[str]) -> str:
     return "r" + hashlib.sha1("|".join(sorted(nucleo)).encode()).hexdigest()[:8]
 
 
-def detectar(db: sqlite3.Connection, nombres: dict[str, str]) -> list[dict]:
-    """Los rosters: plantel, núcleo (los 3 con más partidas, que dan el id estable) y sus lados de partida."""
+def sugerir(db: sqlite3.Connection, nombres: dict[str, str]) -> list[dict]:
+    """Grupos que juegan juntos (para la Virguhouse): plantel, núcleo y sus lados de partida."""
     import networkx as nx
 
     lados = _lados(db)
-    juntos = {k: s for k, s in lados.items() if len(s) >= MIN_JUNTOS}
     g = nx.Graph()
-    for s in juntos.values():
+    for s in (s for s in lados.values() if len(s) >= MIN_JUNTOS):
         for a, b in itertools.combinations(sorted(s), 2):
             w = g.get_edge_data(a, b, {"weight": 0})["weight"]
             g.add_edge(a, b, weight=w + 1)
     planteles = [set(c) for c in nx.community.louvain_communities(g, weight="weight", seed=1)] if g else []
-    cfg = _config()
-    fijos = [r for r in cfg.get("rosters", []) if r.get("plantel")]
-    for r in fijos:  # un plantel fijado a mano reemplaza a la comunidad con la que más se pisa
-        p = set(r["plantel"])
-        if planteles:
-            planteles.remove(max(planteles, key=lambda c: len(c & p)))
-        planteles.append(p)
-    # Louvain pone a cada jugador en una sola comunidad: el que juega con varios grupos queda afuera de todos.
-    # Se suma a quien jugó 10+ partidas con 3+ del plantel (una sola pasada, sin arrastrar a otros). Los planteles
-    # fijados a mano no se tocan.
-    manuales = [set(r["plantel"]) for r in fijos]
+    # Louvain pone a cada jugador en una sola comunidad: el que juega con varios grupos quedaría afuera de todos.
+    # Se suma a quien jugó 10+ partidas con 3+ del plantel (una sola pasada, sin arrastrar a otros).
     for plantel in planteles:
-        if plantel in manuales:
-            continue
         con = Counter(q for s in lados.values() if len(s & plantel) >= SUMAR_CON for q in s - plantel)
         plantel |= {q for q, n in con.items() if n >= MIN_PARTIDAS}
-    nombres_cfg = {r["id"]: r["nombre"] for r in cfg.get("rosters", []) if r.get("id") and r.get("nombre")}
     out = []
     for plantel in planteles:
         ks = [k for k, s in lados.items() if len(s & plantel) >= MIN_JUNTOS]
@@ -121,10 +128,48 @@ def detectar(db: sqlite3.Connection, nombres: dict[str, str]) -> list[dict]:
             continue
         cuenta = Counter(p for k in ks for p in lados[k] & plantel)
         nucleo = [p for p, _ in sorted(cuenta.items(), key=lambda x: (-x[1], x[0]))[:3]]
-        rid = next((r["id"] for r in fijos if set(r["plantel"]) == plantel and r.get("id")), None) or _rid(nucleo)
-        out.append({"id": rid, "nombre": nombres_cfg.get(rid) or " · ".join(nombres.get(p, p) for p in nucleo),
-                    "nucleo": nucleo, "plantel": plantel, "lados": ks, "cuenta": cuenta})
+        out.append({"id": "s" + hashlib.sha1("|".join(sorted(nucleo)).encode()).hexdigest()[:8],
+                    "nombre": " · ".join(nombres.get(p, p) for p in nucleo), "nucleo": nucleo,
+                    "plantel": plantel, "lados": ks, "cuenta": cuenta})
     return sorted(out, key=lambda r: -len(r["lados"]))
+
+
+def _roles_en(db: sqlite3.Connection, lados: list[tuple[str, str]], plantel: set[str]) -> tuple[dict, dict]:
+    """(rol más jugado de cada uno en esas partidas, quiénes del plantel jugaron cada partida)."""
+    roles, presentes = defaultdict(Counter), {}
+    for mid, lado in lados:
+        presentes[mid] = []
+        for pid, rol in db.execute("SELECT persona_id, rol FROM participantes WHERE match_id=? AND lado=? "
+                                   "AND persona_id IS NOT NULL", (mid, lado)):
+            if pid in plantel:
+                presentes[mid].append(pid)
+                if rol:
+                    roles[pid][rol] += 1
+    return {p: c.most_common(1)[0][0] for p, c in roles.items() if c}, presentes
+
+
+def _jugador(pid: str, nombre: str, rol: str | None) -> dict:
+    """La capa del plantel: lo que se sabe de un jugador en su rol desde sus partidas, aunque no haya jugado con
+    el equipo. Sale de lo que ya publicó el pipeline (perfil, roles, coaching y campeones)."""
+    d = {"id": pid, "nombre": nombre, "rol": rol}
+    perfil = _leer(f"perfil/{pid}.json") or {}
+    solo = [c["solo"] for c in (perfil.get("rango") or {}).values() if c.get("solo")]
+    if solo:
+        m = max(solo, key=lambda r: r.get("valor") or -1)
+        d["rango"] = {k: m.get(k) for k in ("tier", "division", "lp")}
+    if not rol:
+        return d
+    fila = next((r for r in (_leer(f"roles/{pid}.json") or {}).get("tabla", []) if r["cola"] == "todo" and r["rol"] == rol), None)
+    if fila:
+        d["en_rol"] = {"n": fila["n"], "winrate": fila["winrate"], "dif_oro15": fila.get("dif_oro15"),
+                       "muestra_chica": fila.get("muestra_chica")}
+    c = (_leer(f"coaching/{pid}.json") or {}).get("roles", {}).get(rol) or {}
+    if c.get("performance"):
+        d["performance"] = {**c["performance"], "franja": c.get("franja"), "n": c.get("n")}
+    camps = sorted((r for r in (_leer(f"campeones/{pid}.json") or {}).get("tabla", []) if r["cola"] == "todo" and r["rol"] == rol),
+                   key=lambda r: -r["n"])[:3]
+    d["campeones"] = [{"champ": r["champ"], "n": r["n"], "winrate": r["winrate"]["v"]} for r in camps]
+    return d
 
 
 def _partida(db: sqlite3.Connection, m: dict, mid: str, lado: str) -> dict | None:
@@ -214,14 +259,38 @@ def _etiquetar(rosters: list[dict]) -> None:
                 x["nivel"] = "ruido"
 
 
+def _equipo(db, fila, plantel: set[str], ultima: int, ref: list[dict]) -> dict:
+    """La capa del equipo: las partidas con 4+ del plantel juntos (o todos, si son menos de 4)."""
+    juntos = min(MIN_JUNTOS, max(len(plantel), 2))
+    lados = [k for k, s in _lados(db).items() if len(s & plantel) >= juntos]
+    roles, presentes = _roles_en(db, lados, plantel)
+    filas = sorted((f for k in lados if (f := fila(k))), key=lambda f: -f["inicio"])
+    ventanas = {}
+    for v, dias in VENTANAS.items():
+        fs = filas if dias is None else [f for f in filas if f["inicio"] >= ultima - dias * DIA_MS]
+        ventanas[v] = {"n": len(fs), "metricas": _resumen(fs)}
+    lado_de = dict(lados)
+    por_semana = defaultdict(list)
+    for f in filas:
+        por_semana[semana_iso(f["inicio"])].append(f)
+    semanas = {w: {"n": len(fs), "metricas": _resumen(fs),
+                   "partidas": [{"match": f["match"], "inicio": f["inicio"], "cola": f["cola"], "win": f["win"],
+                                 "lado": lado_de[f["match"]], "jugadores": sorted(presentes[f["match"]])} for f in fs]}
+               for w, fs in sorted(por_semana.items(), reverse=True)[:SEMANAS]}
+    cuenta = Counter(p for ps in presentes.values() for p in ps)
+    return {"lados": lados, "roles": roles, "cuenta": cuenta, "juntos": juntos, "partidas": len(filas),
+            "ultima": filas[0]["inicio"] if filas else None, "ventanas": ventanas, "semanas": semanas,
+            "contra_referencia": _contra(filas, ref),
+            "historial": [{"match": f["match"], "inicio": f["inicio"], "cola": f["cola"], "win": f["win"],
+                           "jugadores": sorted(presentes[f["match"]])} for f in filas[:20]]}
+
+
 def generar(db: sqlite3.Connection, escribir: Callable) -> list[dict]:
+    """Publica los rosters declarados (api/roster/<id>.json) y las sugerencias (en api/roster/index.json).
+    Corre después de las fases 2 a 5: la capa del plantel lee lo que ya publicaron."""
     nombres = dict(db.execute("SELECT id, nombre FROM personas"))
     m = modelo(db)
-    rosters = detectar(db, nombres)
-    if not rosters:
-        escribir("roster/index.json", {"rosters": [], "nota": NOTA})
-        return []
-    de_roster = {k for r in rosters for k in r["lados"]}
+    declarados = {rid: r for rid, r in cargar_declarados().items() if isinstance(r, dict)}
     cache: dict[tuple[str, str], dict | None] = {}
 
     def fila(k):
@@ -229,48 +298,51 @@ def generar(db: sqlite3.Connection, escribir: Callable) -> list[dict]:
             cache[k] = _partida(db, m, *k)
         return cache[k]
 
-    ref = [f for k in _lados(db) if k not in de_roster and (f := fila(k))]
-    ref_res = _resumen(ref)
     ultima = db.execute(f"SELECT MAX(inicio_ms) FROM partidas WHERE cola IN {COLAS}").fetchone()[0]
+    planteles = {rid: {x["id"] for x in r.get("plantel") or [] if x.get("id") in nombres} for rid, r in declarados.items()}
+    juntos_de = {rid: min(MIN_JUNTOS, max(len(p), 2)) for rid, p in planteles.items()}
+    lados = _lados(db)
+    de_roster = {k for rid, p in planteles.items() if p for k, s in lados.items() if len(s & p) >= juntos_de[rid]}
+    ref = [f for k in lados if k not in de_roster and (f := fila(k))]
+    ref_res = _resumen(ref)
+
     indice, detalles = [], []
-    for r in rosters:
-        filas = sorted((f for k in r["lados"] if (f := fila(k))), key=lambda f: -f["inicio"])
-        roles, presentes = defaultdict(Counter), {}
-        for mid, lado in r["lados"]:
-            presentes[mid] = []
-            for pid, rol in db.execute("SELECT persona_id, rol FROM participantes WHERE match_id=? AND lado=? "
-                                       "AND persona_id IS NOT NULL", (mid, lado)):
-                if pid in r["plantel"]:
-                    presentes[mid].append(pid)
-                    if rol:
-                        roles[pid][rol] += 1
-        plantel = [{"id": pid, "nombre": nombres.get(pid, pid), "partidas": n,
-                    "rol": roles[pid].most_common(1)[0][0] if roles[pid] else None, "nucleo": pid in r["nucleo"]}
-                   for pid, n in sorted(r["cuenta"].items(), key=lambda x: (-x[1], x[0]))]
-        ventanas = {}
-        for v, dias in VENTANAS.items():
-            fs = filas if dias is None else [f for f in filas if f["inicio"] >= ultima - dias * DIA_MS]
-            ventanas[v] = {"n": len(fs), "metricas": _resumen(fs)}
-        lado_de = dict(r["lados"])  # match -> lado del roster
-        por_semana = defaultdict(list)
-        for f in filas:
-            por_semana[semana_iso(f["inicio"])].append(f)
-        semanas = {w: {"n": len(fs), "metricas": _resumen(fs),
-                       "partidas": [{"match": f["match"], "inicio": f["inicio"], "cola": f["cola"], "win": f["win"],
-                                     "lado": lado_de[f["match"]], "jugadores": sorted(presentes[f["match"]])} for f in fs]}
-                   for w, fs in sorted(por_semana.items(), reverse=True)[:SEMANAS]}
-        d = {"id": r["id"], "nombre": r["nombre"], "plantel": plantel, "partidas": len(filas),
-             "ultima": filas[0]["inicio"] if filas else None, "ventanas": ventanas, "semanas": semanas,
-             "referencia": {"n": len(ref), "metricas": ref_res}, "contra_referencia": _contra(filas, ref),
-             "historial": [{"match": f["match"], "inicio": f["inicio"], "cola": f["cola"], "win": f["win"],
-                            "jugadores": sorted(presentes[f["match"]])} for f in filas[:20]],
+    for rid, r in declarados.items():
+        plantel_ids = planteles[rid]
+        eq = _equipo(db, fila, plantel_ids, ultima, ref) if plantel_ids else None
+        miembros = []
+        for x in r.get("plantel") or []:
+            if x.get("id") not in nombres:
+                continue  # solo vinculados: el que se desvinculó deja de publicarse
+            j = _jugador(x["id"], nombres[x["id"]], x.get("rol"))
+            miembros.append({**j, "estado": x.get("estado", "titular"), "desde": x.get("desde"),
+                             "partidas_juntos": eq["cuenta"].get(x["id"], 0) if eq else 0})
+        titulares = {x["rol"]: x["nombre"] for x in miembros if x["estado"] == "titular" and x.get("rol")}
+        d = {"id": rid, "nombre": r.get("nombre") or rid, "carpeta": r.get("carpeta", "virguhouse"),
+             "plantel": miembros, "cobertura": {rol: titulares.get(rol) for rol in ROLES},
+             "partidas": eq["partidas"] if eq else 0, "ultima": eq["ultima"] if eq else None,
+             "juntos": eq["juntos"] if eq else MIN_JUNTOS,
+             "ventanas": eq["ventanas"] if eq else {v: {"n": 0, "metricas": _resumen([])} for v in VENTANAS},
+             "semanas": eq["semanas"] if eq else {}, "historial": eq["historial"] if eq else [],
+             "referencia": {"n": len(ref), "metricas": ref_res},
+             "contra_referencia": eq["contra_referencia"] if eq else _contra([], ref),
              "metricas": {k: {"nombre": a, "unidad": b, "tipo": c} for k, (a, b, c) in METRICAS.items()},
              "nota": NOTA}
         detalles.append(d)
-        indice.append({k: d[k] for k in ("id", "nombre", "partidas", "ultima")}
-                      | {"plantel": [{k: p[k] for k in ("id", "nombre", "rol", "partidas", "nucleo")} for p in plantel]})
+        indice.append({k: d[k] for k in ("id", "nombre", "carpeta", "partidas", "ultima", "cobertura")}
+                      | {"plantel": [{k: p.get(k) for k in ("id", "nombre", "rol", "estado", "partidas_juntos")} for p in miembros]})
     _etiquetar(detalles)
     for d in detalles:
         escribir(f"roster/{d['id']}.json", d)
-    escribir("roster/index.json", {"rosters": indice, "nota": NOTA})
+
+    # Sugerencias: los grupos que juegan juntos y que no se pisan con un roster declarado (4+ en común).
+    sugerencias = []
+    for g in sugerir(db, nombres):
+        if any(len(g["plantel"] & p) >= MIN_JUNTOS for p in planteles.values()):
+            continue
+        roles, _ = _roles_en(db, g["lados"], g["plantel"])
+        sugerencias.append({"id": g["id"], "nombre": g["nombre"], "partidas": len(g["lados"]),
+                            "plantel": [{"id": pid, "nombre": nombres.get(pid, pid), "rol": roles.get(pid), "partidas": n}
+                                        for pid, n in sorted(g["cuenta"].items(), key=lambda x: (-x[1], x[0]))]})
+    escribir("roster/index.json", {"rosters": indice, "sugerencias": sugerencias, "nota": NOTA})
     return indice

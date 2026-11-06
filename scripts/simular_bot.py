@@ -193,6 +193,7 @@ async def main():
     ap.add_argument("--como", help="id del jugador vinculado al usuario simulado (p. ej. lucca)")
     ap.add_argument("--tocar", help="custom_id de un botón o menú")
     ap.add_argument("--valor", action="append", default=[], help="opción elegida en el menú (se puede repetir)")
+    ap.add_argument("--dueno", action="store_true", help="el usuario simulado es el dueño del bot (Lucca)")
     ap.add_argument("--salida", default=os.path.join(tempfile.gettempdir(), "ldh-simular-bot", "png"))
     # "-coaching" empieza con guion: argparse lo tomaría como una opción, así que se separa a mano.
     argv = sys.argv[1:]
@@ -211,6 +212,8 @@ async def main():
     from bot.main import COGS, Bot
 
     bot = Bot()
+    # Dueño de la app: con --dueno el usuario simulado lo es (para -roster crear/sumar/...); si no, otro id.
+    bot.owner_id = USUARIO if a.dueno else USUARIO + 1
     for cog in COGS:
         await bot.load_extension(cog)
     from bot.ui.coaching_vista import SelectorCoaching

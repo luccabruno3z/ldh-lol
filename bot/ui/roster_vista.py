@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import discord
 
-from bot.cogs.perfil import WEB
+from bot.cogs.perfil import TIERS, WEB
 from bot.services import formato as F
 
 VENTANAS = {"semana": "Última semana", "mes": "Últimas 4 semanas", "temporada": "Temporada"}
@@ -39,14 +39,41 @@ def _dif(k: str, x: dict | None, meta: dict) -> str:
     return f" · en la temporada, contra la referencia {txt}, {'**señal**' if nivel == 'señal' else nivel}"
 
 
-def texto_roster(d: dict, ventana: str) -> str:
+CARPETA = {"virguhouse": "Virguhouse", "srx": "SRX"}
+ROLES = ("Top", "Jungla", "Mid", "ADC", "Support")
+
+
+def _jugador(p: dict, champs: dict) -> str:
+    """Una línea por jugador: la capa del plantel (sus partidas en el rol, aunque no haya jugado con el equipo)."""
+    r = p.get("rango")
+    rango = f"{TIERS.get(r['tier'], r['tier'])} {r.get('division') or ''}".strip() if r else "sin rango de solo/dúo"
+    er = p.get("en_rol") or {}
+    partes = [f"{F.partidas(er['n'])} de {p['rol']}, gana {F.pct(er['winrate']['v'])}" if er else f"sin partidas de {p['rol']}"]
+    if p.get("performance"):
+        partes.append(f"Performance {F.num(p['performance']['v'] * 100, 0)}")
+    if p.get("campeones"):
+        partes.append(", ".join(champs.get(str(c["champ"]), {}).get("nombre", str(c["champ"])) for c in p["campeones"]))
+    sup = " · suplente" if p.get("estado") == "suplente" else ""
+    return (f"**{discord.utils.escape_markdown(p['nombre'])}** ({p['rol'] or '—'}{sup}) · {rango} · " + " · ".join(partes)
+            + f" · {F.partidas(p.get('partidas_juntos', 0))} con el equipo")
+
+
+def texto_roster(d: dict, ventana: str, champs: dict | None = None) -> str:
     v = d["ventanas"][ventana]
     nombre = discord.utils.escape_markdown(d["nombre"])
-    lin = [f"## {nombre}", f"-# {F.partidas(d['partidas'])} juntos en Flex y Normales · {VENTANAS[ventana].lower()}: "
-                           f"{F.partidas(v['n'])}"]
-    plantel = " · ".join(f"{'**' if p['nucleo'] else ''}{discord.utils.escape_markdown(p['nombre'])}{'**' if p['nucleo'] else ''}"
-                         f" ({p['rol'] or '—'}, {p['partidas']})" for p in d["plantel"])
-    lin.append(f"**Plantel:** {plantel}")
+    lin = [f"## {nombre}", f"-# {CARPETA.get(d.get('carpeta'), '')} · {len(d['plantel'])} en el plantel · "
+                           f"{F.partidas(d['partidas'])} juntos en Flex y Normales"]
+    lin.append("### Plantel")
+    lin += [_jugador(p, champs or {}) for p in d["plantel"]] or ["Sin jugadores todavía."]
+    faltan = [r for r in ROLES if not (d.get("cobertura") or {}).get(r)]
+    if faltan:
+        lin.append(f"-# Sin titular en {', '.join(faltan)}.")
+    lin.append(f"### El equipo junto · {VENTANAS[ventana].lower()}")
+    if not d["partidas"]:
+        lin.append(f"Todavía no jugaron juntos ({d.get('juntos', 4)}+ del plantel en el mismo equipo, en Flex o Normales). "
+                   "Las métricas del equipo aparecen cuando jueguen; mientras, el plantel de arriba sale de las partidas de cada uno.")
+        lin.append(f"-# Referencia: las demás partidas de Flex y Normales del grupo ({d['referencia']['n']}).")
+        return "\n".join(lin)
     if v["n"] < MIN:
         cuantas = "Sin partidas en este período." if not v["n"] else f"Solo {F.partidas(v['n'])}:"
         lin.append(f"-# {cuantas} con menos de {MIN} los números cambian mucho.")
@@ -127,21 +154,22 @@ async def vista_roster(bot, rid: str | None, ventana: str = "temporada") -> disc
     view = discord.ui.LayoutView(timeout=None)
     if not idx:
         view.add_item(discord.ui.Container(discord.ui.TextDisplay(
-            "Todavía no hay rosters: hacen falta 10 partidas de Flex o Normales con 4 o más del mismo grupo juntos."),
+            "Todavía no hay rosters. Lucca los crea con `-roster crear`, o declara uno de `-roster sugerencias`."),
             accent_colour=0x00CCCC))
         return view
     rid = rid if any(r["id"] == rid for r in idx) else idx[0]["id"]
     ventana = ventana if ventana in VENTANAS else "temporada"
     d = await bot.datos.roster(rid)
-    texto = texto_roster(d, ventana) if d else "No encontré ese roster."
+    texto = texto_roster(d, ventana, await bot.datos.campeones()) if d else "No encontré ese roster."
     items: list[discord.ui.Item] = [discord.ui.TextDisplay(texto[:3900]), discord.ui.Separator()]
     if len(idx) > 1:
         items.append(discord.ui.ActionRow(SelectorRoster(rid, ventana, "rid", [
             discord.SelectOption(label=r["nombre"][:100], value=r["id"], description=F.partidas(r["partidas"]),
                                  default=r["id"] == rid) for r in idx[:25]])))
-    items.append(discord.ui.ActionRow(SelectorRoster(rid, ventana, "ventana", [
-        discord.SelectOption(label=l, value=k, default=k == ventana,
-                             description=F.partidas(d["ventanas"][k]["n"]) if d else None) for k, l in VENTANAS.items()])))
+    if d and d["partidas"]:  # sin partidas juntos no hay períodos para elegir
+        items.append(discord.ui.ActionRow(SelectorRoster(rid, ventana, "ventana", [
+            discord.SelectOption(label=l, value=k, default=k == ventana, description=F.partidas(d["ventanas"][k]["n"]))
+            for k, l in VENTANAS.items()])))
     items.append(discord.ui.ActionRow(discord.ui.Button(label="Ver en la web", url=f"{WEB}#/equipos/rosters")))
     view.add_item(discord.ui.Container(*items, accent_colour=0x00CCCC))
     return view
