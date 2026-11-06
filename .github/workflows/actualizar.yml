@@ -50,7 +50,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           echo "INICIO=$(date +%s)" >> "$GITHUB_ENV"
-          gh release download timelines --repo "${{ github.repository }}" -p 'timelines-*.tar' -D tl-tar
+          # GitHub a veces devuelve 500 al bajar assets: hasta 3 intentos antes de cortar.
+          for i in 1 2 3; do
+            gh release download timelines --repo "${{ github.repository }}" -p 'timelines-*.tar' -D tl-tar --clobber && break
+            [ "$i" = 3 ] && exit 1
+            echo "Falló la descarga (intento $i), reintento en 20 s"; sleep 20
+          done
 
       - name: Python
         uses: actions/setup-python@v5
