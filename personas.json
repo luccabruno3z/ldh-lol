@@ -239,55 +239,5 @@
     "principal": true
    }
   ]
- },
- {
-  "id": "vhixir",
-  "nombre": "Vhixir",
-  "cuentas": [
-   {
-    "riot_id": "Vhixir#LAS",
-    "principal": true
-   }
-  ]
- },
- {
-  "id": "maxholycat",
-  "nombre": "maxholycat",
-  "cuentas": [
-   {
-    "riot_id": "maxholycat#LAS",
-    "principal": true
-   }
-  ]
- },
- {
-  "id": "tenashya",
-  "nombre": "Tenashya",
-  "cuentas": [
-   {
-    "riot_id": "Tenashya#ABR",
-    "principal": true
-   }
-  ]
- },
- {
-  "id": "missvillain",
-  "nombre": "Miss Villain",
-  "cuentas": [
-   {
-    "riot_id": "Miss Villain#ALVP",
-    "principal": true
-   }
-  ]
- },
- {
-  "id": "buhitonocturno",
-  "nombre": "Buhito Nocturno",
-  "cuentas": [
-   {
-    "riot_id": "Buhito Nocturno#0502",
-    "principal": true
-   }
-  ]
  }
 ]
