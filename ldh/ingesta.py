@@ -37,22 +37,46 @@ class SemillaCoachAI:
 
 
 def resolver_cuentas(api: RiotClient, personas: list[dict], estado: dict) -> None:
-    """Riot ID -> PUUID y plataforma. Lo resuelto queda en estado.json."""
+    """Riot ID -> PUUID y plataforma. Lo resuelto queda en estado.json.
+
+    Riot encripta los PUUID por proyecto: si se cambia de clave (por ejemplo, de desarrollo a una
+    personal de otro proyecto), los guardados dejan de servir y la API responde 400. Por eso se
+    verifica cada PUUID guardado; si da 400, se vuelve a resolver por Riot ID y el anterior queda en
+    "puuids_anteriores", para que las partidas ya bajadas sigan vinculadas (base.py los usa como alias).
+    """
     for persona in personas:
         for cuenta in persona["cuentas"]:
             rid = cuenta["riot_id"]
             ya = estado["cuentas"].get(rid)
             if ya and ya.get("puuid"):
-                continue
+                try:
+                    api.account_by_puuid(ya["puuid"])
+                    continue
+                except RiotAPIError as exc:
+                    if exc.status != 400:
+                        continue  # otro problema (red, 5xx): se deja como está y se usa el guardado
+                    print(f"  {rid}: el PUUID guardado no sirve con esta clave (400); lo vuelvo a resolver")
             nombre, _, tag = rid.rpartition("#")
             try:
                 acc = api.account_by_riot_id(nombre, tag)
                 puuid = acc["puuid"]
                 plataforma = cuenta.get("plataforma") or api.active_region(puuid) or "la2"
-                estado["cuentas"][rid] = {"puuid": puuid, "plataforma": plataforma,
-                                          "persona": persona["id"], "resuelta": ahora_iso()}
+                nueva = {"puuid": puuid, "plataforma": plataforma,
+                         "persona": persona["id"], "resuelta": ahora_iso()}
+                anteriores = list((ya or {}).get("puuids_anteriores") or [])
+                viejo = (ya or {}).get("puuid")
+                if viejo and viejo != puuid:
+                    anteriores.append(viejo)
+                    if viejo in estado.get("cursores", {}):  # no volver a listar todo el historial
+                        estado["cursores"][puuid] = estado["cursores"][viejo]
+                if anteriores:
+                    nueva["puuids_anteriores"] = anteriores
+                estado["cuentas"][rid] = nueva
                 print(f"  {rid}: resuelta ({plataforma})")
             except RiotAPIError as exc:
+                if ya and ya.get("puuid"):
+                    print(f"  {rid}: NO se pudo volver a resolver ({exc.status}); queda el PUUID guardado")
+                    continue
                 estado["cuentas"][rid] = {"puuid": None, "persona": persona["id"], "error": str(exc),
                                           "intento": ahora_iso()}
                 print(f"  {rid}: NO se pudo resolver ({exc.status})")

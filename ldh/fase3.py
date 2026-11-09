@@ -107,6 +107,12 @@ def _filas_grieta(db: sqlite3.Connection) -> list[dict]:
     for puuid, pid in db.execute("SELECT puuid, persona_id FROM cuentas"):
         vinc[puuid] = vinc[anon_id(puuid)] = pid
         real[anon_id(puuid)] = puuid
+    # PUUID de una clave anterior (ver base.py, cuenta_alias): apuntan a la cuenta actual
+    tiene_alias = db.execute("SELECT 1 FROM sqlite_master WHERE name='cuenta_alias'").fetchone()
+    for alias, puuid, pid in (db.execute("SELECT a.alias, a.puuid, c.persona_id FROM cuenta_alias a "
+                                         "JOIN cuentas c USING(puuid)") if tiene_alias else []):
+        vinc[alias] = vinc[anon_id(alias)] = pid
+        real[alias] = real[anon_id(alias)] = puuid
     salida, nuevas = [], 0
     for mid, inicio, cola in db.execute("SELECT match_id, inicio_ms, cola FROM partidas "
                                         "WHERE cola IN ('solo','flex','normal') AND tiene_timeline=1"):

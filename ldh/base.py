@@ -18,6 +18,7 @@ ESQUEMA = """
 CREATE TABLE personas (id TEXT PRIMARY KEY, nombre TEXT NOT NULL);
 CREATE TABLE cuentas (puuid TEXT PRIMARY KEY, persona_id TEXT NOT NULL REFERENCES personas(id),
     riot_id TEXT NOT NULL, plataforma TEXT, principal INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE cuenta_alias (alias TEXT PRIMARY KEY, puuid TEXT NOT NULL REFERENCES cuentas(puuid));
 CREATE TABLE partidas (match_id TEXT PRIMARY KEY, plataforma TEXT, queue_id INTEGER, cola TEXT,
     game_version TEXT, patch TEXT, inicio_ms INTEGER, fin_ms INTEGER, duracion_seg INTEGER,
     ganador INTEGER, tiene_timeline INTEGER);
@@ -85,6 +86,7 @@ def reconstruir() -> dict:
     # cuentas: puuid real y su id anónimo apuntan a la misma persona
     por_puuid: dict[str, str] = {}
     real_de: dict[str, str] = {}
+    alias_de: dict[str, list[str]] = {}
     for p in personas:
         db.execute("INSERT INTO personas VALUES (?,?)", (p["id"], p["nombre"]))
         for k, c in enumerate(p["cuentas"]):
@@ -96,6 +98,11 @@ def reconstruir() -> dict:
             por_puuid[e["puuid"]] = p["id"]
             real_de[e["puuid"]] = e["puuid"]
             real_de[anon_id(e["puuid"])] = e["puuid"]
+            # PUUID de una clave anterior (Riot los encripta por proyecto): las partidas viejas los tienen.
+            for viejo in e.get("puuids_anteriores") or []:
+                real_de[viejo] = real_de[anon_id(viejo)] = e["puuid"]
+                db.execute("INSERT OR IGNORE INTO cuenta_alias VALUES (?,?)", (viejo, e["puuid"]))
+                alias_de.setdefault(e["puuid"], []).append(viejo)
 
     n = descartadas = 0
     for match, tl in iterar_partidas():
@@ -149,7 +156,7 @@ def reconstruir() -> dict:
                     e.get("killerTeamId") or e.get("teamId"), pos.get("x"), pos.get("y")))
         n += 1
 
-    _cargar_rango(db, list(por_puuid))
+    _cargar_rango(db, list(por_puuid), alias_de)
     db.execute("INSERT INTO meta VALUES ('construida', ?)", (datetime.now().astimezone().isoformat(),))
     db.execute("INSERT INTO meta VALUES ('extractor_version', ?)", (str(EXTRACTOR_VERSION),))
     db.commit()
@@ -160,7 +167,7 @@ def reconstruir() -> dict:
     return {"partidas": n, "descartadas": descartadas}
 
 
-def _cargar_rango(db: sqlite3.Connection, puuids: list[str]) -> None:
+def _cargar_rango(db: sqlite3.Connection, puuids: list[str], alias_de: dict | None = None) -> None:
     """Fotos de rango y LP por partida.
 
     Entre dos fotos consecutivas de una cola: si hubo exactamente una partida
@@ -169,7 +176,10 @@ def _cargar_rango(db: sqlite3.Connection, puuids: list[str]) -> None:
     """
     for puuid in puuids:
         previas: dict[str, tuple[str, int]] = {}
-        for foto in cargar_fotos_rango(puuid):
+        fotos = cargar_fotos_rango(puuid)
+        for viejo in (alias_de or {}).get(puuid, []):  # el historial guardado con un PUUID anterior
+            fotos += cargar_fotos_rango(viejo)
+        for foto in sorted(fotos, key=lambda f: f["t"]):
             for qt, (tier, div, lp, w, l) in foto["colas"].items():
                 cola = COLA_RANKED[qt]
                 val = valor_rango(tier, div, lp)
